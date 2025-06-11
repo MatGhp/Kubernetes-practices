@@ -55,3 +55,33 @@
    ```bash
    docker-compose down
    ```
+
+
+
+
+   cd kubernetes
+  ```bash
+   kubectl apply -f users-deployment.yaml
+   ```
+
+  ```bash
+   kubectl apply -f users-service.yaml
+   ```
+
+  ```bash
+   minikube service user-service
+   ```
+
+
+   try with your created ip:port, in my case:
+   
+   ```
+   POST http://172.21.134.127:31978/login
+   ```
+   **Request Body:**
+   ```json
+   {
+     "email": "test@test.com",
+     "password": "testers"
+   }
+   ```
