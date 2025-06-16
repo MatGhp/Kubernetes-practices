@@ -33,55 +33,78 @@
    }
    ```
 
+4. **Test the Tasks Service**
 
-
-   post http://localhost:8000/tasks
+   Send a POST request to the following endpoint to add a task:
+   ```
+   POST http://localhost:8000/tasks
+   ```
+   **Request Body:**
    ```json
-    {
-        "text": "a task",
-        "title": "Do this, too"
-    }
+   {
+       "text": "a task",
+       "title": "Do this, too"
+   }
    ```
 
-4. **Access the Services**
+   Send a GET request to retrieve tasks:
+   ```
+   GET http://localhost:8000/tasks
+   ```
+
+5. **Access the Services**
 
    - **Auth Service**: Accessible internally within the Docker network.
    - **Users Service**: Accessible at `http://localhost:8080`.
    - **Tasks Service**: Accessible at `http://localhost:8000`.
 
-5. **Stop the Services**
+6. **Stop the Services**
 
    To stop all running services, use:
    ```bash
    docker-compose down
    ```
 
+7. **Deploy to Kubernetes**
 
-
-
+   Navigate to the `kubernetes` directory:
+   ```bash
    cd kubernetes
-  ```bash
-   kubectl apply -f users-deployment.yaml
    ```
 
-  ```bash
-   kubectl apply -f users-service.yaml
+   Apply the deployment and service configurations for all modules:
+   ```bash
+   kubectl apply -f auth-deployment.yaml -f auth-service.yaml
+   kubectl apply -f users-deployment.yaml -f users-service.yaml
+   kubectl apply -f tasks-deployment.yaml -f tasks-service.yaml
    ```
 
-  ```bash
+   Access the services using Minikube:
+   ```bash
    minikube service users-service
+   minikube service tasks-service
    ```
 
-
-   try with your created ip:port, in my case:
-   
+   Example for testing the Users Service:
    ```
-   POST http://172.21.134.127:31978/login
+   POST http://<minikube-ip>:<users-service-port>/login
    ```
    **Request Body:**
    ```json
    {
      "email": "test@test.com",
      "password": "testers"
+   }
+   ```
+
+   Example for testing the Tasks Service:
+   ```
+   POST http://<minikube-ip>:<tasks-service-port>/tasks
+   ```
+   **Request Body:**
+   ```json
+   {
+       "text": "a task",
+       "title": "Do this, too"
    }
    ```
