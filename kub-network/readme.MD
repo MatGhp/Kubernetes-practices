@@ -69,7 +69,7 @@
    ```
 
   ```bash
-   minikube service user-service
+   minikube service users-service
    ```
 
 
