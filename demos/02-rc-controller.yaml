@@ -1,0 +1,28 @@
+apiVersion: v1
+kind: ReplicationController
+metadata:
+  name: myapp-rc
+spec:
+  replicas: 3
+  template:
+    metadata:
+      name: myapp-pod
+      labels:
+        app: myapp
+        type: frontend
+    spec:
+      containers:
+        - name: nginx-container
+          image: nginx
+          ports:
+            - containerPort: 80
+
+# ReplicationControllers are being replaced by Deployments in modern Kubernetes. Consider using a Deployment instead for better features and flexibility.
+
+# kubectl create -f 02-rc-controller.yaml
+# kubectl get replicationcontrollers
+# kubectl get pods
+# kubectl describe replicationcontroller myapp-rc
+# kubectl delete replicationcontroller myapp-rc
+# kubectl delete pods -l app=myapp
+# kubectl delete pods -l type=frontend
