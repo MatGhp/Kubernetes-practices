@@ -1,0 +1,30 @@
+# This file defines a ReplicaSet in Kubernetes
+# A ReplicaSet ensures a specified number of pod replicas are running at all times
+
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: myapp-replicaset  # Name of the ReplicaSet
+spec:
+  replicas: 3  # Number of pod replicas to maintain
+  selector:
+    matchLabels:
+      app: myapp  # Selector to match pods with the label 'app: myapp'
+      type: frontend  # Additional label to match pods of type 'frontend'
+  template:
+    metadata:
+      labels:
+        app: myapp  # Labels applied to the pods created by this ReplicaSet
+        type: frontend
+    spec:
+      containers:
+        - name: nginx  # Name of the container
+          image: nginx:latest  # Docker image to use for the container
+
+# kubectl create -f 03-replecase-definition.yaml
+# kubectl get replicasets
+# kubectl get pods
+# kubectl describe replicaset myapp-replicaset
+# kubectl delete replicaset myapp-replicaset
+# kubectl delete pods -l app=myapp
+# kubectl delete pods -l type=frontend
