@@ -1,0 +1,31 @@
+# This file defines a Deployment in Kubernetes
+# A Deployment ensures a specified number of pod replicas are running and allows updates to the pods
+
+
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-deployment  # Name of the Deployment
+spec:
+  replicas: 3  # Number of pod replicas to maintain
+  selector:
+    matchLabels:
+      app: myapp  # Selector to match pods with the label 'app: myapp'
+      type: frontend  # Additional label to match pods of type 'frontend'
+  template:
+    metadata:
+      labels:
+        app: myapp  # Labels applied to the pods created by this Deployment
+        type: frontend
+    spec:
+      containers:
+        - name: nginx-container  # Name of the container
+          image: nginx  # Docker image to use for the container
+
+
+
+# kubectl apply -f 04-deployment-definition.yaml
+# kubectl get deployments
+# kubectl describe deployment myapp-deployment
+# kubectl delete -f 04-deployment-definition.yaml

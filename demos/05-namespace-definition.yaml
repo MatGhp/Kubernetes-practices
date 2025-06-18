@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev  # Name of the namespace
+  labels:
+    purpose: demo  # Label to categorize the namespace
+spec:
+  finalizers:
+    - kubernetes  # Finalizer to ensure the namespace is cleaned up properly
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: prod  # Name of the second namespace
+  labels:
+    purpose: production  # Label to categorize the namespace
+spec:
+  finalizers:
+    - kubernetes  # Finalizer to ensure the namespace is cleaned up properly
+
+
+
+
+# kubectl apply -f 05-namespace-definition.yaml
+
+# kubectl config set-context --current --namespace=dev
+# kubectl config set-context --current --namespace=prod
+
+
+# kubectl get pods --namespace=dev
+# kubectl get pods --all-namespace
+
+# kubectl get namespaces
+
+# kubectl describe namespace dev
+# Delete the Namespace:
+# kubectl delete namespace dev
+
+# List all resources in the Namespace:
+# kubectl get all -n dev
+
+# List all resources in all Namespaces:
+# kubectl get all --all-namespaces
+
+
+# kubectl get namespaces
+
+# List all Namespaces with labels:
+# kubectl get namespaces --show-labels
+
+# List all Namespaces with a specific label:
+# kubectl get namespaces -l purpose=demo
+
+# List all Namespaces with a specific label and output in JSON format:
+# kubectl get namespaces -l purpose=demo -o json
+
+# List all Namespaces with a specific label and output in YAML format:
+# kubectl get namespaces -l purpose=demo -o yaml
+
+# List all Namespaces with a specific label and output in wide format:
+# kubectl get namespaces -l purpose=demo -o wide
+
+# List all Namespaces with a specific label and output in custom format:
+# kubectl get namespaces -l purpose=demo -o custom-columns=NAME:.metadata.name,LABELS:.metadata.labels
+
+# List all Namespaces with a specific label and output in JSONPath format:
+# kubectl get namespaces -l purpose=demo -o jsonpath='{.items[*].metadata.name}'
