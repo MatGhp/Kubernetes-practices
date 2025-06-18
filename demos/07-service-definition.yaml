@@ -1,0 +1,27 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-service  # Name of the service
+spec:
+  selector:
+    app: myapp  # Selector to match pods with the label 'app: myapp'
+  type: ClusterIP  # Service type (ClusterIP, NodePort, LoadBalancer, etc.)
+  ports:
+    - protocol: TCP
+      port: 80  # Port exposed by the service
+      targetPort: 80  # Port on the pod to forward traffic to
+
+
+
+# kubectl apply -f 07-service-definition.yaml
+# kubectl expose deployment/pod myapp-deployment --type=NodePort --name=myapp-service --port=80 --target-port=80
+
+# kubectl get services
+# kubectl get svc
+# kubectl get svc -n=dev
+
+
+
+# kubectl describe service myapp-service
+
+# kubectl delete -f 07-service-definition.yaml
