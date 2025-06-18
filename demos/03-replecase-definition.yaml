@@ -25,6 +25,10 @@ spec:
 # kubectl get replicasets
 # kubectl get pods
 # kubectl describe replicaset myapp-replicaset
-# kubectl delete replicaset myapp-replicaset
+# kubectl edit rs myapp-replicaset
+# kubectl delete rs myapp-replicaset
 # kubectl delete pods -l app=myapp
 # kubectl delete pods -l type=frontend
+
+# kubectl scale replicaset myapp-replicaset --replicas=5
+
