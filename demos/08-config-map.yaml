@@ -28,6 +28,7 @@ data:
 # kubectl apply -f 08-pod-definition-config-map.yaml
 
 # kubectl get configmaps
-# kubectl describe configmaps
-# kubectl describe configmap simple-webapp-color-configmap
+# kubectl get cm
+# kubectl describe cm
+# kubectl describe cm simple-webapp-color-configmap
 
