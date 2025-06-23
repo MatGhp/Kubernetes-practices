@@ -1,0 +1,36 @@
+# Pod using all environment variables from ConfigMap
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color
+spec:
+  containers:
+    - name: simple-webapp-color-container
+      image: mojtabaghp/kub-demo-simple-webapp-color:latest
+      ports:
+        - containerPort: 8080
+      # Import all key-value pairs from ConfigMap as environment variables
+      envFrom:
+        - configMapRef:
+            name: app-config
+
+---
+
+# Pod using a single environment variable from ConfigMap
+apiVersion: v1
+kind: Pod
+metadata:
+  name: simple-webapp-color-single-env
+spec:
+  containers:
+    - name: simple-webapp-color-container
+      image: mojtabaghp/kub-demo-simple-webapp-color:latest
+      ports:
+        - containerPort: 8080
+      # Import only the APP_COLOR key from ConfigMap as an environment variable
+      env:
+        - name: APP_COLOR
+          valueFrom:
+            configMapKeyRef:
+              name: app-config
+              key: APP_COLOR
