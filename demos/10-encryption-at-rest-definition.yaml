@@ -1,0 +1,25 @@
+apiVersion: apiserver.config.k8s.io/v1
+kind: EncryptionConfiguration
+metadata:
+  name: encryption-at-rest-configuration
+resources:
+  - resources:
+      - secrets
+    providers:
+      - aescbc:
+          keys:
+            - name: key1
+              secret: "1y+/tbA0Tk1Wmqfkrngut4gND3RtO8DD3PpQE1sjZSs="  # Base64 encoded key: head -c 32 /dev/urandom | base64
+      - identity: {
+          # This provider does not encrypt data, it simply returns the data as is.
+          # Useful for testing or when no encryption is needed.
+          # It is the default provider if no other providers are specified.
+          # It is not recommended to use this provider in production environments.
+        }
+              
+
+
+# head -c 32 /dev/urandom | base64
+
+# read all secrets and update them to apply server side encryption
+# kubectl get secrets --all-namespaces -o json| kubectl replace -f -
