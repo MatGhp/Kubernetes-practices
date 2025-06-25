@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: cpu-resource-constraint
+  # namespace: my-namespace 
+  # If you want to apply this LimitRange to a specific namespace, uncomment the line above
+spec:
+  limits:
+    - default:
+        cpu: "1" # Default CPU limit for containers without specified limits
+      defaultRequest:
+        cpu: "500m" # Default CPU request for containers without specified requests
+      type: Container # This limit applies to containers
+      max:
+        cpu: "2" # Maximum CPU limit for any container in the namespace
+      min:
+        cpu: "100m" # Minimum CPU request for any container in the namespace
+  # You can also specify limits for Pods, but here we focus on Container limits.

@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: resource-quota-example
+  # namespace: my-namespace 
+  # If you want to apply this LimitRange to a specific namespace, uncomment the line above
+spec:
+  hard:
+    requests.cpu: "4" # Total CPU requests across all pods in the namespace
+    requests.memory: "8Gi" # Total memory requests across all pods in the namespace
+    limits.cpu: "8" # Total CPU limits across all pods in the namespace
+    limits.memory: "16Gi" # Total memory limits across all pods in the namespace
+    pods: "10" # Maximum number of pods allowed in the namespace
+    services: "5" # Maximum number of services allowed in the namespace
+    persistentvolumeclaims: "10" # Maximum number of PVCs allowed in the namespace
+    configmaps: "20" # Maximum number of ConfigMaps allowed in the namespace
+    secrets: "20" # Maximum number of Secrets allowed in the namespace

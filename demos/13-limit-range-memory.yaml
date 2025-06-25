@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: memory-resource-constraint
+  # namespace: my-namespace 
+  # If you want to apply this LimitRange to a specific namespace, uncomment the line above
+spec:
+  limits:
+    - default:
+        memory: "256Mi" # Default memory limit for containers without specified limits
+      defaultRequest:
+        memory: "128Mi" # Default memory request for containers without specified requests
+      type: Container # This limit applies to containers
+      max:
+        memory: "512Mi" # Maximum memory limit for any container in the namespace
+      min:
+        memory: "64Mi" # Minimum memory request for any container in the namespace
+    

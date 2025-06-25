@@ -1,0 +1,20 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp
+  labels:
+    name: myapp
+spec:
+  containers:
+  - name: myapp
+    image: myapp-container
+    ports:
+    - containerPort: 8080
+    # Define resource requirements for the container
+    resources:
+      requests:
+        memory: "128Mi" # 1G 1M 1K 1Gi 1Mi 1Ki - 1K == 1000 bytes, 1Ki == 1024 bytes
+        cpu: "1" # Request 128 MiB of memory and 1 CPU units
+      limits:
+        memory: "256Mi"
+        cpu: "2" # Limit to 256 MiB of memory and 2 CPU units
