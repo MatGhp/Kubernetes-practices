@@ -1,0 +1,31 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp
+spec:
+  containers:
+  - name: myapp
+    image: image-name
+    ports:
+    - containerPort: 8080
+    livenessProbe:
+      httpGet:
+        path: /api/healthy
+        port: 8080
+      initialDelaySeconds: 5 #  Delay before the first probe to warm up the application
+      failureThreshold: 8 # Number of consecutive failures before marking the pod as not ready
+      periodSeconds: 10 #  Interval between readiness probes
+      timeoutSeconds: 2 #  Timeout for each probe
+
+    #  livenessProbe:
+    #    tcpSocket:
+    #      port: 3306
+    
+    #  livenessProbe:
+    #    excec:
+    #      command:
+    #      - /bin/sh
+    #      - -c
+    #      - echo "Ready"
+
+    
