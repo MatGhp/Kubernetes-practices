@@ -1,0 +1,29 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp
+spec:
+  # Node selector to specify which nodes the pod should be scheduled on
+  # This allows you to control where the pod runs based on node labels.
+  nodeSelector:
+    environment: production  # Specify the node label to schedule the pod
+    size: large  # Specify the node label to schedule the pod  
+  containers:
+  - name: myapp
+    image: image-name
+    
+
+
+
+
+
+
+
+
+# kubectl label nodes nodeName key=value
+# Example: Labeling nodes with different environments and sizes
+# This command labels nodes with specific key-value pairs to categorize them.
+# kubectl label nodes node1 environment=production
+# kubectl label nodes node2 environment=staging
+# kubectl label nodes node3 environment=development
+# kubectl label nodes node4 size=large

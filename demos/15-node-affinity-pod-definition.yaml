@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp
+spec:
+  # Node affinity to specify which nodes the pod should be scheduled on
+  # This allows you to control where the pod runs based on node labels.
+  # Node affinity is more flexible than nodeSelector and allows for complex scheduling rules.
+  # It can be used to specify preferred or required node conditions for scheduling.
+  # This example uses requiredDuringSchedulingIgnoredDuringExecution to specify hard requirements.
+  # preferredDuringSchedulingIgnoredDuringExecution can be used for soft requirements.
+  # preferredDuringSchedulingIgnoredDuringExecution allows the scheduler to prefer nodes that match the criteria but
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution: # preferredDururingSchedulingIgnoredDuringExecution
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: environment
+                operator: In
+                values:
+                  - production
+                  - staging
+              - key: size
+                operator: NotIn
+                values:
+                  - large
+              - key: region
+                operator: Exists
+  containers:
+  - name: myapp
+    image: image-name
+    
+
+# kubectl apply -f 15-node-affinity-pod-definition.yaml
+
+
+
+# kubectl label nodes nodeName key=value
+# Example: Labeling nodes with different environments and sizes
+# This command labels nodes with specific key-value pairs to categorize them.
+# kubectl label nodes node1 environment=production
+# kubectl label nodes node2 environment=staging
+# kubectl label nodes node3 environment=development
+# kubectl label nodes node4 size=large
