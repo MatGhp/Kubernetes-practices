@@ -1,0 +1,22 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sidecar-demo
+spec:
+  # Sidecar as a restartable initContainer
+  initContainers:
+    - name: sidecar
+      image: busybox
+      command: ["sh", "-c", "while true; do echo Sidecar running; sleep 10; done"]
+      restartPolicy: Always  # ensures that sidecar containers start before and are terminated after the main application containers and continue running throughout the Pod's lifecycle
+  containers:
+    - name: main-app
+      image: nginx
+      ports:
+        - containerPort: 80
+
+# They can also be restarted independently if they exit unexpectedly.
+
+# A Sidecar container is a secondary container that runs alongside the main application container within the same Pod. 
+# Its primary purpose is to enhance or extend the functionality of the main application without modifying its code. 
+# Common use cases: logging, monitoring, proxying, and data synchronization.
