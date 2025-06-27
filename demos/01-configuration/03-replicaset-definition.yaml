@@ -21,7 +21,7 @@ spec:
         - name: nginx  # Name of the container
           image: nginx:latest  # Docker image to use for the container
 
-# kubectl create -f 03-replecase-definition.yaml
+# kubectl create -f 03-replicaset-definition.yaml
 # kubectl get replicasets
 # kubectl get pods
 # kubectl describe replicaset myapp-replicaset
