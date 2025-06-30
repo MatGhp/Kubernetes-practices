@@ -1,0 +1,57 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mydeployment
+spec:
+  replicas: 4
+  strategy:
+    type: RollingUpdate # RollingUpdate is the default strategy for deployments
+    # type: Recreate # Recreate strategy is used to terminate all existing pods before creating new ones
+    rollingUpdate:
+      maxUnavailable: 25% # Maximum number of pods that can be unavailable during the update
+      maxSurge: 25% # Maximum number of pods that can be created above the desired number of pods during the update
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+      - name: mycontainer
+        image: nginx
+
+
+
+# kubectl create deployment nginx --image=nginx:1.16 deployment.apps/nginx created
+
+# kubectl apply -f 03-roulling-updates-rollback-deployment.yaml
+# kubectl set image deployment/mydeployment mycontainer=nginx:latest
+# kubectl delete deployment mydeployment
+
+# --revision flag is used to specify the revision number of the deployment to roll back to.
+# This allows you to revert to a previous version of the deployment if needed.
+# kubectl rollout undo deployment/mydeployment --to-revision=1
+
+# --record flag is used to record the command in the deployment's history
+# This allows you to track changes made to the deployment and roll back if necessary.
+# You can now see that the change-cause is recorded for the revision 2 of this deployment.
+# kubectl set image deployment/mydeployment mycontainer=nginx:1.20 --record
+
+
+
+
+# kubectl rollout status deployment/mydeployment
+
+# kubectl rollout status deployment/mydeployment
+# kubectl rollout history deployment/mydeployment
+# kubectl rollout undo deployment/mydeployment
+
+# Undo a change:
+# kubectl rollout undo deployment/mydeployment --to-revision=1
+# kubectl rollout undo deployment/mydeployment --revision=1
+
+# kubectl rollout pause deployment/mydeployment
+# kubectl rollout resume deployment/mydeployment
+# kubectl rollout restart deployment/mydeployment
