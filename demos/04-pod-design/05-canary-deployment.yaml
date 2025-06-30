@@ -66,10 +66,10 @@ spec:
 # kubectl get pods -l app=myapp
 #
 # To increase or decrease canary traffic, scale the canary deployment:
-# kubectl scale deployment/myapp-canary --replicas=2
+# kubectl scale deployment --replicas=2 myapp-canary
 #
 # To remove the canary, scale down or delete the canary deployment:
-# kubectl scale deployment/myapp-canary --replicas=0
+# kubectl scale deployment --replicas=0 myapp-canary
 # kubectl delete deployment myapp-canary
 #
 # Clean up:
