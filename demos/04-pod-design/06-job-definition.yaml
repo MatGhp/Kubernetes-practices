@@ -1,0 +1,23 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: simple-job
+spec:
+  completions: 3 # Number of successful completions required for the job to be considered complete
+  parallelism: 2 # Number of pods that can run in parallel 
+  template:
+    spec:
+      containers:
+      - name: pi
+        image: perl
+        command: ["perl",  "-Mbignum=bpi", "-wle", "print bpi(200)"]
+      restartPolicy: Never
+  backoffLimit: 4
+
+# ---
+# Sample commands:
+# kubectl apply -f 06-job-pod-definition.yaml
+# kubectl get jobs
+# kubectl get pods --show-labels
+# kubectl logs <job-pod-name>
+# kubectl delete -f 06-job-pod-definition.yaml

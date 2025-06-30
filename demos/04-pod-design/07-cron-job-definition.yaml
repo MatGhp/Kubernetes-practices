@@ -1,0 +1,29 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: simple-cronjob
+spec: # spec of the CronJob
+  schedule: "*/5 * * * *"  # Every 5 minutes   minute, hour, day of month, month, day of week
+  jobTemplate:
+    spec: # spec of the Job that will be created by the CronJob
+      completions: 2  # Number of successful pods required to complete the job
+      parallelism: 2  # Number of pods to run in parallel
+      template:
+        spec: # spec of the Pod that will be created by the Job
+          containers:
+          - name: hello
+            image: busybox
+            args:
+            - /bin/sh
+            - -c
+            - date; echo Hello from the Kubernetes CronJob!
+          restartPolicy: OnFailure
+
+# ---
+# Sample commands:
+# kubectl apply -f 07-cron-job-definition.yaml
+# kubectl get cronjobs
+# kubectl get jobs --watch
+# kubectl get pods --show-labels
+# kubectl logs <cronjob-pod-name>
+# kubectl delete -f 07-cron-job-definition.yaml
