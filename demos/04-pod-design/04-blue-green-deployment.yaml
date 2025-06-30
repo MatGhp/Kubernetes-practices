@@ -1,0 +1,77 @@
+# Blue Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-blue
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: myapp
+      version: blue
+  template:
+    metadata:
+      labels:
+        app: myapp
+        version: blue
+    spec:
+      containers:
+      - name: myapp
+        image: nginx:1.21
+        ports:
+        - containerPort: 80
+---
+# Green Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp-green
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: myapp
+      version: green
+  template:
+    metadata:
+      labels:
+        app: myapp
+        version: green
+    spec:
+      containers:
+      - name: myapp
+        image: nginx:1.22
+        ports:
+        - containerPort: 80
+---
+# Service to switch between blue and green
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-service
+spec:
+  selector:
+    app: myapp
+    version: blue  # Change to 'green' to switch traffic
+  ports:
+  - port: 80
+    targetPort: 80
+    
+---
+# Sample commands for blue-green deployment management:
+#
+# Apply the blue and green deployments and the service:
+# kubectl apply -f 04-blue-green-deployment.yaml
+#
+# Check which pods are running:
+# kubectl get pods -l app=myapp
+#
+# To switch traffic from blue to green, edit the service selector:
+# kubectl edit service myapp-service
+#   # Change 'version: blue' to 'version: green' in the selector
+#
+# Check which pods the service is targeting:
+# kubectl get endpoints myapp-service
+#
+# Clean up:
+# kubectl delete -f 04-blue-green-deployment.yaml
