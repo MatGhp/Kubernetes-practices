@@ -1,0 +1,33 @@
+# apiVersion: v1
+# kind: Pod
+# metadata:
+#   name: myapp-pod
+#   labels:
+#     name: myapp-label-example
+#     type: frontend
+# spec:
+#   containers:
+#   - name: nginx-container
+#     image: nginx
+
+# ---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-service
+spec:
+  type: NodePort # Change to LoadBalancer for cloud environments or ClusterIP for internal services
+  ports:
+  - port: 80 # required, Port exposed by the service
+    targetPort: 80 # optional, if not given, it defaults to the same value as port / Port on the container/pod to forward traffic to
+    nodePort: 30008 # Optional, specify a port for NodePort service
+  selector:
+    name: myapp-label-example # Match the label of the pod to route traffic to it
+    type: frontend
+
+---
+
+# kubectl create -f 01-service-definition.yaml
+# kubectl get services
+
