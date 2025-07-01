@@ -16,8 +16,8 @@ spec:
 
 # ---
 # Sample commands:
-# kubectl apply -f 06-job-pod-definition.yaml
+# kubectl apply -f 06-job-definition.yaml
 # kubectl get jobs
 # kubectl get pods --show-labels
 # kubectl logs <job-pod-name>
-# kubectl delete -f 06-job-pod-definition.yaml
+# kubectl delete job <job-pod-name>
