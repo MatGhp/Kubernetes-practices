@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-h # Headless service for MySQL
+spec:
+  ports:
+    - port: 3306
+  selector:
+    app: mysql
+  clusterIP: None  # This makes it a headless service, allowing direct access to the pods
+
+
+
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  labels:
+    app: mysql
+spec:    
+  containers:
+  - name: mysql
+    image: mysql
+  subdomain: mysql-h # This is the headless service name. It creates a DNS entry for the pod at mysql-h.default.svc.cluster.local
+  hostname: myapp-pod # This is the hostname of the pod. It will be accessible at my-sql-pod.mysql-h.default.svc.cluster.local
+
+---
+# StatefulSet for MySQL with headless service
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql-deployment
+spec:
+  serviceName: mysql-h # This is the headless service name
+  replicas: 3
+  selector: 
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      name: myapp-pod
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql
+
