@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-which-uses-persistent-volume-claim
+  # This pod will use the PersistentVolumeClaim defined in 022-persistent-volume-claim
+spec:
+  containers:
+    - name: myfrontend
+      image: nginx
+      volumeMounts:
+      - mountPath: "/var/www/html" # Mount the volume at /var/www/html in the container
+        name: mypd
+  volumes:
+    - name: mypd
+      persistentVolumeClaim:
+        claimName: myclaim # Reference the PersistentVolumeClaim named myclaim in the 022-persistent-volume-claim.yaml file
