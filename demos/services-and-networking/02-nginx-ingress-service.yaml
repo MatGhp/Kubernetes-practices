@@ -15,4 +15,6 @@ spec:
     name: https
   selector:
     app: nginx-ingress
-    
+#
+# Example: Expose a deployment as a service
+# kubectl expose deployment nginx-ingress-controller --port=80 --target-port=80 --name=nginx-ingress-service --type=NodePort

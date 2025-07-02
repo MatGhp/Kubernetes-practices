@@ -36,4 +36,6 @@ spec:
           name: http
         - containerPort: 443
           name: https
-      
+#
+# Example: Expose the nginx ingress controller deployment as a service
+# kubectl expose deployment nginx-ingreess-controller --port=80 --target-port=80 --name=nginx-ingress-service --type=NodePort

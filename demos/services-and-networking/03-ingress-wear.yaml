@@ -20,3 +20,6 @@ spec:
 # curl http://localhost:8080/api/v1/products
 # curl http://localhost:8080/api/v1/products/1
 # curl http://localhost:8080/api/v1/products/1/reviews
+#
+# Example: Expose a deployment as a service for wear
+# kubectl expose deployment wear-deployment --port=80 --target-port=80 --name=wear-service --type=ClusterIP

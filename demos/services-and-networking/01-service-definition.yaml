@@ -30,4 +30,7 @@ spec:
 
 # kubectl create -f 01-service-definition.yaml
 # kubectl get services
+#
+# Example: Expose a deployment as a service
+# kubectl expose deployment myapp-deployment --port=80 --target-port=80 --name=myapp-service --type=NodePort
 
