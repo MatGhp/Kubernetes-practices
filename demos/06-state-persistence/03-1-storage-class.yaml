@@ -1,0 +1,9 @@
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: google-storage
+provisioner: kubernetes.io/gce-pd # Specify the provisioner for Google Cloud Persistent Disk
+parameters:
+  type: pd-standard # Specify the type of disk, e.g., pd-standard or pd-ssd
+  replication-type: none  # Specify the replication type, e.g., none, regional-pd, etc.
+
