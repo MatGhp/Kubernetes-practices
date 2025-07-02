@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+spec:
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:5.7
+  replicas: 3
+  selector:
+    matchLabels:
+      app: mysql
+  serviceName: mysql-h # Name of the headless service to manage the network identity of the StatefulSet
+  podManagementPolicy: Parallel # Allows pods to be created in parallel, not sequentially
+
+
+
+# kubectl create -f 04-statefulset-definition.yaml
+# result: statefulset.apps/mysql created
+# kubectl get statefulsets
+# result: NAME    READY   AGE
+#         mysql   0/3     1m
+
+# kubectl get pods --show-labels
+# result: NAME          READY   STATUS    RESTARTS   AGE   LABELS
+#         mysql-0      0/1     Pending   0          1m    app=mysql
+#         mysql-1      0/1     Pending   0          1m
+#         mysql-2      0/1     Pending   0          1m    app=mysql
+
+# kubectl get pods -l app=mysql
+# result: NAME          READY   STATUS    RESTARTS   AGE
+#         mysql-0      0/1     Pending   0          1m
+#         mysql-1      0/1     Pending   0          1m
+#         mysql-2      0/1     Pending   0          1m
+
+# kubectl scale statefulset mysql --replicas=5
+# result: statefulset.apps/mysql scaled
+
+# kubectl scale statefulset mysql --replicas=3
+# result: statefulset.apps/mysql scaled
+
+
+# kubectl delete statefulset mysql
+# result: statefulset.apps "mysql" deleted
