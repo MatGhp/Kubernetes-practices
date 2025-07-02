@@ -13,4 +13,4 @@ spec:
   volumes:
     - name: mypd
       persistentVolumeClaim:
-        claimName: myclaim # Reference the PersistentVolumeClaim named myclaim in the 022-persistent-volume-claim.yaml file
+        claimName: myclaim # Reference the PersistentVolumeClaim named myclaim in the 02-2-persistent-volume-claim-definition.yaml file

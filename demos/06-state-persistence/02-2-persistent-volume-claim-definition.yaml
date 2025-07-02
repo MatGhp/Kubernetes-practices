@@ -16,7 +16,7 @@ spec:
 
 
 
-# kubectl create -f 02-persistent-volume-claim-definition.yaml
+# kubectl create -f 02-2-persistent-volume-claim-definition.yaml
 # kubectl get persistentvolumeclaims
 # kubectl get pvc
 # kubectl describe pvc myclaim

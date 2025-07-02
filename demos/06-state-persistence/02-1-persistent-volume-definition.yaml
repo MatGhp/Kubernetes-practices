@@ -25,7 +25,7 @@ persistentVolumeReclaimPolicy: Retain # default, retain the PV when the PVC is d
 
 
 
-# kubectl apply -f 02-persistent-volumes-definition.yaml
+# kubectl apply -f 02-1-persistent-volume-definition.yaml
 # kubectl get persistentvolumes
 # kubectl get pv
 # kubectl describe pv pv-voll
