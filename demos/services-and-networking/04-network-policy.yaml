@@ -1,0 +1,39 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-policy
+spec:
+  podSelector:
+    matchLabels:
+      role: db # Ensure the policy applies to pods with the label 'role: db'
+  policyTypes:
+  - Ingress # This policy only applies to incoming traffic
+  - Egress # This policy also applies to outgoing traffic
+  ingress:
+  - from:
+    - podSelector: # Allow traffic from pods with the label 'role: api'
+        matchLabels:
+          role: api
+      namespaceSelector: # Optionally, specify the namespace if needed
+    ports:
+    - protocol: TCP
+      port: 3306 # Allow traffic on port 3306 (commonly used for MySQL)      
+    #     matchLabels:
+    #       name: prod 
+    # - namespaceSelector: # Allow traffic from all pods in the 'prod' namespace
+    #     matchLabels:
+    #       name: prod 
+
+    # - ipBlock: # Allow traffic from a specific IP block (can be a single IP or CIDR out of the kubernetes cluster)
+    #     cidr: 192.168.5.10/32  
+  egress:
+  - to:
+    - ipBlock: # Allow traffic to all IPs to an external backup server (can be restricted to specific CIDR)
+        cidr: 192.168.5.10/32
+      ports:
+      - protocol: TCP
+        port: 80
+
+
+
+    
