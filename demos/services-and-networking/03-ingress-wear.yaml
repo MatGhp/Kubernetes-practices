@@ -1,0 +1,22 @@
+apiVersion: extensionss/v1beta1
+kind: Ingress
+metadata:
+  name: wear-ingress
+spec:
+  backend:
+    serviceName: wear-service
+    servicePort: 80
+
+
+
+
+# kubectl create -f ingress-wear.yaml
+# kubectl get ingress
+# kubectl describe ingress wear-ingress
+# kubectl get pods -l app=wear
+# kubectl get svc wear-service
+# kubectl port-forward svc/wear-service 8080:80
+# curl http://localhost:8080
+# curl http://localhost:8080/api/v1/products
+# curl http://localhost:8080/api/v1/products/1
+# curl http://localhost:8080/api/v1/products/1/reviews

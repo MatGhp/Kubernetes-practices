@@ -1,0 +1,49 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-wear-watch
+spec:
+  rules:
+    - host: wear.example.com
+      http:
+        paths:
+          - path: /wear
+            pathType: Prefix
+            backend:
+              service:
+                name: wear-service
+                port:
+                  number: 80
+    - host: watch.example.com
+      http:
+        paths:
+          - path: /watch
+            pathType: Prefix
+            backend:
+              service:
+                name: watch-service
+                port:
+                  number: 80
+
+# Note: This Ingress resource assumes that the NGINX Ingress Controller is already set up and running in your cluster.
+# Ensure that the services 'wear-service' and 'watch-service' are already created and running in your cluster.
+# You can create the Ingress resource using:
+# kubectl apply -f 03-ingress-wear-watch.yaml
+
+# kubectl get ingress ingress-wear-watch
+# kubectl describe ingress ingress-wear-watch
+# kubectl get pods -l app=wear
+# kubectl get pods -l app=watch
+# kubectl port-forward svc/wear-service 8080:80
+# kubectl port-forward svc/watch-service 8081:80
+# curl http://localhost:8080/wear
+# curl http://localhost:8081/watch
+# curl http://localhost:8080/wear/api/v1/products
+# curl http://localhost:8081/watch/api/v1/products
+
+# Now, in k8s version 1.20+ we can create an Ingress resource from the imperative way like this:-
+
+# kubectl create ingress <ingress-name> --rule="host/path=service:port"
+
+# kubectl create ingress ingress-test --rule="wear.my-online-store.com/wear*=wear-service:80"
+# kubectl describe ingress ingress-wear-watch -n app-space
