@@ -1,0 +1,46 @@
+apiVersion: v1
+kind: Config # Configuration for kubectl to access the Kubernetes cluster, not configuration for the cluster itself
+current-context: my-kube-admin@my-kube-playground # The context to use by default when running kubectl commands
+
+
+## Clusters define the Kubernetes cluster to connect to
+## A cluster is a tuple of server address and certificate-authority
+## The server address is the API server of the Kubernetes cluster
+metadata:
+  name: my-kube-playground
+
+
+clusters:
+- name: my-kubernetes-playground
+  cluster:
+    certificate-authority:
+    server: https://my-kube-playground:6443
+
+
+## Users define the credentials to access the cluster
+## A user is a tuple of client certificate and key, or token, or username/password
+## The certificate-authority is used to verify the server's certificate
+users:
+- name: my-kube-admin
+  user:
+    client-certificate: /path/to/admin.crt
+    client-key: /path/to/admin.key
+
+# # Contexts define the cluster and user to use with kubectl commands
+# # A context is a tuple of cluster, user, and namespace
+contexts:
+- name: my-kube-admin@my-kube-playground # Context name, typically in the format user@cluster
+  context:
+    cluster: my-kubernetes-playground # Cluster name defined above
+    user: my-kube-admin # User name defined above
+    namespace: finance # Optional namespace, defaults to 'default' if not specified
+
+
+
+# # Sample commands to manage the kubeconfig file:
+# this change trhe current-context to the one defined above
+# kubectl config use-context prod-user@production-cluster
+# kubectl config get-contexts
+# kubectl config view
+# kubectl config set-context my-kube-admin@my-kube-playground --namespace=finance
+
