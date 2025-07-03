@@ -1,0 +1,20 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: developer-role
+  namespace: default
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "deployments"]
+  verbs: ["get", "list", "watch", "create", "update", "delete"]
+  resourceNames: ["myapp", "myapp-service"]  # Specify the names of resources if needed
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch", "create", "update", "delete"]
+
+
+
+  # kubectl get roles
+  # kubectl describe role developer-role
+  # kubectl apply -f 02-developer-role.yaml
+  # kubectl delete role developer-role

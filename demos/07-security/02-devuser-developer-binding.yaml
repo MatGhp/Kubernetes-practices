@@ -1,0 +1,35 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: devuser-developer-binding
+subjects:
+- kind: User
+  name: devuser
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role 
+  name: developer
+  apiGroup: rbac.authorization.k8s.io
+
+
+
+
+##   # kubectl get rolebindings
+#   # kubectl describe rolebinding devuser-developer-binding
+#   # kubectl apply -f 02-devuser-developer-binding.yaml
+#   # kubectl delete rolebinding devuser-developer-binding
+# # 
+# # This RoleBinding grants the 'devuser' user the permissions defined in the 'developer-role' Role.
+# # It allows the user to perform actions on pods, services, deployments, and configmaps in the 'default' namespace.
+# # The RoleBinding is created in the 'default' namespace, and it binds the '
+# developer-role' Role to the 'devuser' user.
+
+
+
+# kubectl auth can-i get pods
+# kubectl auth can-i create pods
+# kubectl auth can-i delete pods
+# kubectl auth can-i get pods --as=devuser
+# kubectl auth can-i create pods --as=devuser
+# kubectl auth can-i delete nodes
+# kubectl auth can-i get pods --as=devuser --namespace=test-namespace
