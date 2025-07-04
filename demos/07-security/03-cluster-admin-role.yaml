@@ -1,0 +1,31 @@
+qpiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-administrator
+rules:
+- apiGroups: [""]
+  resources: ["pods", "services", "deployments", "configmaps", "nodes"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+
+
+
+
+
+
+# # Sample commands:
+# kubectl apply -f 03-cluster-admin-role.yaml
+# kubectl get clusterroles
+# kubectl describe clusterrole cluster-administrator
+# kubectl delete clusterrole cluster-administrator
+
+# # This ClusterRole grants full permissions on pods, services, deployments, configmaps, and nodes across all namespaces.
+# # It is typically used for cluster administrators who need to manage all resources in the cluster.
+# # The ClusterRole is created in the cluster scope, meaning it applies to all namespaces.
+# # The 'verbs' field specifies the actions that can be performed on the specified resources.
+# # The 'apiGroups' field specifies the API groups to which the resources belong.
+# # The 'resources' field specifies the resources that the role can access.
+# # The 'cluster-admin' role is a built-in role in Kubernetes that provides full administrative access to the cluster.
+
+
+

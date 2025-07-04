@@ -1,0 +1,25 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-admin-binding
+subjects:
+- kind: User
+  name: cluster-administrator
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: cluster-administrator
+  apiGroup: rbac.authorization.k8s.io
+
+
+
+# kubectl create clusterrolebinding cluster-admin-binding --clusterrole=cluster-administrator --user=cluster-admin
+# kubectl create -f 03-cluster-admin-role-binding.yaml
+# kubectl get clusterrolebindings
+# kubectl describe clusterrolebinding cluster-admin-binding
+# kubectl delete clusterrolebinding cluster-admin-binding
+
+# kubectl auth can-i get pods --as=cluster-admin
+# kubectl auth can-i create pods --as=cluster-admin
+# kubectl auth can-i delete pods --as=cluster-admin
+# kubectl auth can-i get pods --as=devuser
