@@ -16,3 +16,11 @@ webhooks:
     apiVersions: ["v1"]
     resources: ["pods"]
     scope: "Namespaced"
+
+
+
+    # kubectl apply -f  04-validating-webhook-configuration.yaml
+    # kubectl get validatingwebhookconfigurations
+    # kubectl describe validatingwebhookconfiguration pod-policy.webhook.com
+    # kubectl delete validatingwebhookconfiguration pod-policy.webhook.com
+    
