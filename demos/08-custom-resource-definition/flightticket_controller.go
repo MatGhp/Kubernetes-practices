@@ -2,7 +2,6 @@ package flightticket
 
 import (
 	"context"
-	"fmt"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -26,33 +25,26 @@ type FlightTicketSpec struct {
 }
 
 // Define the GroupVersionKind for FlightTicket
-var (
-	GroupVersion = schema.GroupVersion{Group: "flight.com", Version: "v1"}
-	
-	// ControllerKind represents the kind of the FlightTicket resource
-	ControllerKind = GroupVersion.WithKind("FlightTicket")
-)
+var ControllerKind = schema.GroupVersion{Group: "flight.com", Version: "v1"}.WithKind("FlightTicket")
 
 // FlightTicketReconciler reconciles a FlightTicket object
 type FlightTicketReconciler struct {
 	client.Client
 }
 
-// Reconcile implements the reconciliation logic for FlightTicket resources
+// Reconcile processes FlightTicket resources
 func (r *FlightTicketReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	logger := log.FromContext(ctx)
+	log := log.FromContext(ctx)
 
-	// Fetch the FlightTicket instance
-	var flightTicket FlightTicket
-	if err := r.Get(ctx, req.NamespacedName, &flightTicket); err != nil {
+	var ticket FlightTicket
+	if err := r.Get(ctx, req.NamespacedName, &ticket); err != nil {
 		return ctrl.Result{}, client.IgnoreNotFound(err)
 	}
 
-	logger.Info("Processing FlightTicket", 
-		"name", flightTicket.Name, 
-		"from", flightTicket.Spec.From, 
-		"to", flightTicket.Spec.To,
-		"passengers", flightTicket.Spec.Number)
+	log.Info("Processing flight ticket", 
+		"from", ticket.Spec.From, 
+		"to", ticket.Spec.To,
+		"passengers", ticket.Spec.Number)
 
 	return ctrl.Result{}, nil
 }
