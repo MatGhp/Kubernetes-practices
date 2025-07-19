@@ -1,0 +1,19 @@
+apiVersion: flight.com/v1
+kind: FlightTicket
+metadata:
+  name: my-flight-ticket
+spec:
+  from: "New York"
+  to: "Los Angeles"
+  number: 2
+
+
+
+
+
+
+
+# samples in the flightticket-custom-definition.yaml file define a custom resource definition (CRD) for FlightTicket.
+# This file defines an instance of the FlightTicket custom resource.
+# The CRD allows you to create, manage, and interact with flight ticket resources in your
+
