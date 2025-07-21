@@ -1,0 +1,21 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Main kustomization that references all components
+resources:
+  - api/
+  - db/
+  - cache/
+  - kafka/
+
+namePrefix: myapp-
+commonLabels:
+  app: myapp
+  version: v1.0.0
+
+
+# kustomize build . | kubectl apply -f -
+
+# or 
+
+# kubectl apply -k . 
