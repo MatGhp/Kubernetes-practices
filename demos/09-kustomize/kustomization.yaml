@@ -23,3 +23,28 @@ labels:
 # cd c:\me\git\Kubernetes-practices\demos\09-kustomize\
 # Run kustomize build on current directory
 # kustomize build .
+
+# to apply the build
+
+# kustomize build . | kubectl  apply -f -
+# service/nginx-loadbalancer-service created 
+# deployment.apps/nginx-deployment created service/nginx-loadbalancer-service created
+
+
+# or
+
+# kubectl apply -k .
+# service/nginx-loadbalancer-service created
+# deployment.apps/nginx-deployment created
+
+# delete resources
+
+# kustomize build . | kubectl delete -f -
+# service "nginx-loadbalancer-service" deleted
+# deployment.apps "nginx-deployment" deleted
+
+# or
+
+# kubectl delete -k .
+# service "nginx-loadbalancer-service" deleted
+# deployment.apps "nginx-deployment" deleted
