@@ -85,6 +85,8 @@ git clone https://github.com/MatGhp/Kubernetes-practices.git
 cd Kubernetes-practices
 ```
 
+> **Note:** Replace `MatGhp` with your GitHub username if you've forked this repository.
+
 ### 2. Start Your Kubernetes Cluster
 
 **Using Minikube:**
@@ -292,9 +294,11 @@ A demonstration of persistent storage in Kubernetes with a simple Node.js applic
 ```bash
 cd kub-persistent-volume
 
-# Build Docker image
-docker build -t <your-dockerhub-username>/kub-data-demo:2 .
-docker push <your-dockerhub-username>/kub-data-demo:2
+# Build Docker image (replace <your-dockerhub-username> and tag as needed)
+docker build -t <your-dockerhub-username>/kub-data-demo:latest .
+docker push <your-dockerhub-username>/kub-data-demo:latest
+
+# Note: Update the image reference in deployment.yaml to match your image name and tag
 
 # Deploy to Kubernetes
 kubectl apply -f environment.yaml
