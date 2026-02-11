@@ -13,17 +13,31 @@ spec:
         - containerPort: 80
 
 
+# Create the pod from this manifest file
 # kubectl create -f 01-pod-definition.yaml
+# List all pods in the current namespace
 # kubectl get pods
+# Show detailed pod info (events/status/IP)
 # kubectl describe pod myapp-pod
+# Delete a single pod by name
 # kubectl delete pod myapp-pod
+# Delete pods matching label app=myapp
 # kubectl delete pods -l app=myapp
+# Delete pods matching label type=frontend
 # kubectl delete pods -l type=frontend
+# Delete pods matching app=myapp AND type=frontend
 # kubectl delete pods -l app=myapp,type=frontend
+# Force delete matching pods immediately (no grace period)
 # kubectl delete pods -l app=myapp,type=frontend --grace-period=0 --force
+# Force delete immediately and do not wait for completion
 # kubectl delete pods -l app=myapp,type=frontend --grace-period=0 --force --wait=false
+# Force delete with a 10s client timeout
 # kubectl delete pods -l app=myapp,type=frontend --grace-period=0 --force --wait=false --timeout=10s
+# Same as above but ignore if pods already removed
 # kubectl delete pods -l app=myapp,type=frontend --grace-period=0 --force --wait=false --timeout=10s --ignore-not-found
+# Same as above, explicit boolean for ignore-not-found
 # kubectl delete pods -l app=myapp,type=frontend --grace-period=0 --force --wait=false --timeout=10s --ignore-not-found=true
+# Force delete across all namespaces
 # kubectl delete pods -l app=myapp,type=frontend --grace-period=0 --force --wait=false --timeout=10s --ignore-not-found=true --all-namespaces
+# Explicitly target current namespace only
 # kubectl delete pods -l app=myapp,type=frontend --grace-period=0 --force --wait=false --timeout=10s --ignore-not-found=true --all-namespaces=false
