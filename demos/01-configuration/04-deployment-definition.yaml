@@ -1,7 +1,20 @@
 # This file defines a Deployment in Kubernetes
-# A Deployment ensures a specified number of pod replicas are running and allows updates to the pods
-
-
+#
+# A Deployment is the recommended way to manage replicated pods in production.
+# It creates and manages ReplicaSets under the hood, providing:
+#   - Rolling updates: gradually replace old pods with new ones (zero downtime)
+#   - Rollbacks: revert to a previous version if something goes wrong
+#   - Scaling: easily scale the number of replicas up or down
+#   - Self-healing: automatically replaces failed or evicted pods
+#   - Update strategies:
+#       * RollingUpdate (default): incrementally updates pods with new ones
+#       * Recreate: terminates all existing pods before creating new ones
+#   - Revision history: keeps track of previous ReplicaSet versions for rollback
+#
+# Deployment vs ReplicaSet vs ReplicationController:
+#   - ReplicationController: deprecated, use ReplicaSet instead
+#   - ReplicaSet: not deprecated, but rarely used directly
+#   - Deployment (this): the recommended abstraction that manages ReplicaSets for you
 
 apiVersion: apps/v1
 kind: Deployment
@@ -24,6 +37,9 @@ spec:
           image: nginx  # Docker image to use for the container
 
 
+
+# Create a deployment imperatively (command line):
+# kubectl create deployment myapp-deployment --image=nginx --replicas=3
 
 # kubectl apply -f 04-deployment-definition.yaml
 # kubectl get deployments
