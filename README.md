@@ -1,6 +1,6 @@
 # Kubernetes Practices & Learning Repository
 
-A comprehensive collection of Kubernetes configurations, examples, and practical implementations for learning and mastering Kubernetes concepts. This repository serves as a hands-on guide covering fundamental to advanced Kubernetes topics.
+A hands-on collection of Kubernetes configurations and practical examples, organized from fundamentals to advanced topics. Each demo includes YAML files with detailed comments and kubectl commands you can run directly.
 
 ## 📋 Table of Contents
 
@@ -16,8 +16,6 @@ A comprehensive collection of Kubernetes configurations, examples, and practical
 - [License](#license)
 
 ## 🎯 Overview
-
-This repository contains practical Kubernetes examples and demonstrations organized by topic. Each section includes YAML configuration files with detailed comments and kubectl commands to help you understand and practice Kubernetes concepts.
 
 **What you'll learn:**
 - Core Kubernetes objects (Pods, Deployments, Services, etc.)
@@ -119,7 +117,7 @@ Follow this recommended path for structured learning:
 
 ### Beginner Level
 1. **01-configuration/** - Start here to learn core Kubernetes objects
-   - Pods, ReplicaSets, Deployments
+   - Pods → ReplicationController (deprecated) → ReplicaSet → Deployment
    - Services and basic networking
    - ConfigMaps and Secrets
    - Namespaces and Resource Quotas
@@ -172,13 +170,16 @@ Follow this recommended path for structured learning:
 ### 01-configuration
 Core Kubernetes configurations including:
 - Pod definitions
-- ReplicationControllers and ReplicaSets
-- Deployments
+- ReplicationControllers (deprecated, replaced by ReplicaSets)
+- ReplicaSets (not deprecated, but rarely used directly)
+- Deployments (recommended way to manage replicated pods)
 - Services
 - ConfigMaps and Secrets
 - Namespaces and Resource Quotas
 - Security contexts and Service Accounts
 - Taints, Tolerations, and Node Affinity
+
+> **Evolution:** ReplicationController → ReplicaSet → Deployment. In practice, use Deployments which manage ReplicaSets automatically and provide rolling updates, rollbacks, and revision history.
 
 **Example commands:**
 ```bash

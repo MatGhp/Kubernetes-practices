@@ -23,8 +23,6 @@ spec:
           ports:
             - containerPort: 80
 
-# ReplicationControllers are being replaced by Deployments in modern Kubernetes. Consider using a Deployment instead for better features and flexibility.
-
 # kubectl create -f 02-rc-controller.yaml
 # kubectl get replicationcontrollers
 # kubectl get pods
