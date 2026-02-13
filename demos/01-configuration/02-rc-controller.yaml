@@ -1,3 +1,9 @@
+# DEPRECATED: ReplicationController is deprecated and replaced by ReplicaSet.
+# ReplicaSet supports set-based label selectors (matchExpressions) in addition
+# to equality-based ones, making it more flexible.
+# In practice, you should use a Deployment (which manages ReplicaSets automatically)
+# rather than using either ReplicationController or ReplicaSet directly.
+
 apiVersion: v1
 kind: ReplicationController
 metadata:

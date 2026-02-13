@@ -1,5 +1,14 @@
 # This file defines a ReplicaSet in Kubernetes
 # A ReplicaSet ensures a specified number of pod replicas are running at all times
+#
+# NOTE: ReplicaSet is NOT deprecated, but it is rarely used directly.
+# The recommended approach is to use a Deployment, which manages ReplicaSets automatically.
+# Deployments provide additional capabilities over bare ReplicaSets:
+#   - Rolling updates and rollbacks
+#   - Declarative update strategies (RollingUpdate, Recreate)
+#   - Revision history for easy rollback
+# Use a ReplicaSet directly only if you need custom update orchestration
+# that Deployments don't support.
 
 apiVersion: apps/v1
 kind: ReplicaSet
