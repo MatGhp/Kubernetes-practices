@@ -1,3 +1,48 @@
+# ============================================================================
+# NAMESPACE
+# ============================================================================
+#
+# What is a Namespace?
+#   A Namespace is a mechanism for isolating groups of resources within a single
+#   Kubernetes cluster. They provide a scope for names — resource names must be
+#   unique within a namespace, but not across namespaces.
+#
+# Why use Namespaces?
+#   - Environment separation: run dev, staging, and prod workloads on the same
+#     cluster without conflicts.
+#   - Team isolation: give each team its own namespace so they can work
+#     independently without naming collisions.
+#   - Resource management: apply ResourceQuotas and LimitRanges per namespace
+#     to control CPU, memory, and object counts.
+#   - Access control: use RBAC (Roles and RoleBindings) scoped to a namespace
+#     so users can only access their own resources.
+#
+# Default Namespaces (created automatically by Kubernetes):
+#   - default        : where resources go if no namespace is specified.
+#   - kube-system    : contains control-plane components (API server, scheduler,
+#                      controller-manager, CoreDNS, etc.). Don't deploy your
+#                      workloads here.
+#   - kube-public    : readable by all users (including unauthenticated ones).
+#                      Typically holds cluster-info ConfigMap.
+#   - kube-node-lease: holds Lease objects for node heartbeats. Used internally
+#                      by the control plane to detect node failures.
+#
+# Cross-namespace communication:
+#   Services can be reached from other namespaces using the fully qualified
+#   DNS name:
+#     <service-name>.<namespace>.svc.cluster.local
+#   For example, a service "db-service" in the "prod" namespace can be reached
+#   from any namespace as:
+#     db-service.prod.svc.cluster.local
+#
+# What is NOT namespaced?
+#   Some resources are cluster-wide and do not belong to any namespace:
+#   Nodes, PersistentVolumes, ClusterRoles, ClusterRoleBindings, Namespaces
+#   themselves, and StorageClasses among others.
+#   Run: kubectl api-resources --namespaced=false   to see the full list.
+#
+# ============================================================================
+
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -18,54 +63,33 @@ spec:
   finalizers:
     - kubernetes  # Finalizer to ensure the namespace is cleaned up properly
 
-
-
-
+# --- Lifecycle commands ---
 # kubectl apply -f 05-namespace-definition.yaml
+# kubectl describe namespace dev
+# kubectl describe namespace prod
+# kubectl delete -f 05-namespace-definition.yaml
 
+# --- Switch your current context to a namespace ---
 # kubectl config set-context --current --namespace=dev
 # kubectl config set-context --current --namespace=prod
 
-
+# --- Querying resources within namespaces ---
 # kubectl get pods --namespace=dev
-# kubectl get pods -n=dev
-
-# kubectl get pods --all-namespace
+# kubectl get pods -n dev
+# kubectl get pods --all-namespaces
 # kubectl get pods -A
-
-# kubectl get namespaces
-# kubectl get ns
-
-# kubectl describe namespace dev
-# Delete the Namespace:
-# kubectl delete namespace dev
-
-# List all resources in the Namespace:
 # kubectl get all -n dev
-
-# List all resources in all Namespaces:
 # kubectl get all --all-namespaces
 
-
+# --- Listing and inspecting namespaces ---
 # kubectl get namespaces
-
-# List all Namespaces with labels:
+# kubectl get ns
 # kubectl get namespaces --show-labels
-
-# List all Namespaces with a specific label:
 # kubectl get namespaces -l purpose=demo
 
-# List all Namespaces with a specific label and output in JSON format:
+# --- Output formatting examples ---
 # kubectl get namespaces -l purpose=demo -o json
-
-# List all Namespaces with a specific label and output in YAML format:
 # kubectl get namespaces -l purpose=demo -o yaml
-
-# List all Namespaces with a specific label and output in wide format:
 # kubectl get namespaces -l purpose=demo -o wide
-
-# List all Namespaces with a specific label and output in custom format:
 # kubectl get namespaces -l purpose=demo -o custom-columns=NAME:.metadata.name,LABELS:.metadata.labels
-
-# List all Namespaces with a specific label and output in JSONPath format:
 # kubectl get namespaces -l purpose=demo -o jsonpath='{.items[*].metadata.name}'
