@@ -22,6 +22,57 @@ spec:
 # Show detailed pod info (events/status/IP)
 # kubectl describe pod myapp-pod
 
+# Get pod output in YAML format
+# kubectl get pod myapp-pod -o yaml
+
+# Get pod output in JSON format
+# kubectl get pod myapp-pod -o json
+
+# Get pod IP address
+# kubectl get pod myapp-pod -o wide
+
+# Stream pod logs
+# kubectl logs myapp-pod
+
+# Stream logs and follow (tail -f)
+# kubectl logs myapp-pod -f
+
+# Show previous container logs (useful after crash)
+# kubectl logs myapp-pod --previous
+
+# Exec into the pod (interactive shell)
+# kubectl exec -it myapp-pod -- /bin/bash
+
+# Run a single command inside the pod
+# kubectl exec myapp-pod -- ls /usr/share/nginx/html
+
+# Port-forward pod port 80 to localhost:8080
+# kubectl port-forward myapp-pod 8080:80
+
+# Edit pod live (opens in editor)
+# kubectl edit pod myapp-pod
+
+# Patch a pod label
+# kubectl label pod myapp-pod env=dev
+
+# Overwrite an existing label
+# kubectl label pod myapp-pod type=backend --overwrite
+
+# Annotate a pod
+# kubectl annotate pod myapp-pod description="my frontend pod"
+
+# Get pod status phase only
+# kubectl get pod myapp-pod -o jsonpath='{.status.phase}'
+
+# Watch pod status changes in real time
+# kubectl get pod myapp-pod --watch
+
+# Copy a file from pod to local machine
+# kubectl cp myapp-pod:/usr/share/nginx/html/index.html ./index.html
+
+# Copy a local file into the pod
+# kubectl cp ./index.html myapp-pod:/usr/share/nginx/html/index.html
+
 # Delete a single pod by name
 # kubectl delete pod myapp-pod
 
