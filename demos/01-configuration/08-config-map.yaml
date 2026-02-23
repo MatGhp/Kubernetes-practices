@@ -1,34 +1,124 @@
+# =============================================================================
+# Kubernetes ConfigMap — Educational Reference
+# =============================================================================
+#
+# A ConfigMap is a Kubernetes object used to store non-confidential
+# configuration data as key-value pairs. It decouples configuration from
+# container images so the same image can run with different settings across
+# environments (dev, staging, production).
+#
+# How Pods consume ConfigMaps:
+#   1. envFrom     → Inject ALL keys as environment variables at once
+#   2. env/valueFrom → Inject a SINGLE key as a named environment variable
+#   3. volume      → Mount keys as files inside the container
+#
+# Key facts:
+#   - ConfigMaps are namespace-scoped (must live in the same namespace as the Pod).
+#   - Max size per ConfigMap: 1 MiB.
+#   - Data is stored in plain text — use Secrets for sensitive values.
+#   - Changes to a mounted ConfigMap volume are picked up automatically
+#     (eventual, not instant). Environment variables are NOT updated after
+#     pod startup — a pod restart is required.
+#
+# See 08-pod-config-map-definition.yaml for Pod examples that consume
+# this ConfigMap.
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# ConfigMap definition (declarative)
+# -----------------------------------------------------------------------------
+
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: app-config
-# Key-value pairs to be stored in the ConfigMap
-# APP_COLOR: Color used by the application
-# APP_MODE: Application mode (e.g., production, development)
-# APP_VERSION: Version of the application
 data:
-  APP_COLOR: blue  # Color used by the application
-  APP_MODE: production  # Application mode (e.g., production, development)
-  APP_VERSION: "1.0.0"  # Version of the application
+  APP_COLOR: blue              # Color used by the application
+  APP_MODE: production         # Application mode (production, development)
+  APP_VERSION: "1.0.0"        # Version of the application
 
-# Imperative definition of ConfigMap
+
+# =============================================================================
+# Imperative Commands — Create ConfigMaps
+# =============================================================================
+
+# Create from literal key-value pairs
 # kubectl create configmap app-config \
-#   --from-literal=color=$APP_COLOR \
-#   --from-literal=mode=$APP_MODE \
-#   --from-literal=version=$APP_VERSION
+#   --from-literal=APP_COLOR=blue \
+#   --from-literal=APP_MODE=production \
+#   --from-literal=APP_VERSION=1.0.0
 
-# kubectl create configmap app-config-name \
-#           --from-file=app-config-file.yaml \
+# Create from a file (each file becomes a key, filename = key name)
+# kubectl create configmap app-config --from-file=app.properties
 
-# kubectl create configmap app-config-name \
-#           --from-file=app-config-file.properties \
+# Create from a specific file with a custom key name
+# kubectl create configmap app-config --from-file=config=app.properties
 
-# Declarative definition of ConfigMap
+# Create from an entire directory (each file in the dir becomes a key)
+# kubectl create configmap app-config --from-file=./config-dir/
+
+# Create from an .env file (KEY=VALUE per line)
+# kubectl create configmap app-config --from-env-file=app.env
+
+# Generate YAML without creating (dry-run)
+# kubectl create configmap app-config \
+#   --from-literal=APP_COLOR=blue \
+#   --dry-run=client -o yaml > configmap.yaml
+
+# =============================================================================
+# Declarative Commands — Apply
+# =============================================================================
+
+# Apply this ConfigMap definition
 # kubectl apply -f 08-config-map.yaml
-# kubectl apply -f 08-pod-definition-config-map.yaml
 
+# Apply the Pod that consumes this ConfigMap
+# kubectl apply -f 08-pod-config-map-definition.yaml
+
+# =============================================================================
+# Inspect ConfigMaps
+# =============================================================================
+
+# List all ConfigMaps in the current namespace
 # kubectl get configmaps
 # kubectl get cm
-# kubectl describe cm
-# kubectl describe cm simple-webapp-color-configmap
+
+# List ConfigMaps in a specific namespace
+# kubectl get cm -n dev
+
+# Describe a ConfigMap (shows all keys and values)
+# kubectl describe cm app-config
+
+# Get ConfigMap output in YAML
+# kubectl get cm app-config -o yaml
+
+# Get a specific key's value using jsonpath
+# kubectl get cm app-config -o jsonpath='{.data.APP_COLOR}'
+
+# Verify which env vars a running pod received from the ConfigMap
+# kubectl exec simple-webapp-color -- env | grep APP_
+
+# =============================================================================
+# Edit / Update ConfigMaps
+# =============================================================================
+
+# Edit a ConfigMap live (opens in editor)
+# kubectl edit cm app-config
+
+# Patch a single key in a ConfigMap
+# kubectl patch cm app-config --type merge -p '{"data":{"APP_COLOR":"red"}}'
+
+# Replace a ConfigMap from file (must already exist)
+# kubectl replace -f 08-config-map.yaml
+
+# =============================================================================
+# Delete ConfigMaps
+# =============================================================================
+
+# Delete by name
+# kubectl delete cm app-config
+
+# Delete from file
+# kubectl delete -f 08-config-map.yaml
 
