@@ -1,14 +1,47 @@
-# SecurityContext in pod level
+# =============================================================================
+# Kubernetes SecurityContext — Educational Reference
+# =============================================================================
+#
+# A SecurityContext defines privilege and access control settings for a Pod
+# or individual container. It controls WHO the process runs as and WHAT it
+# can do on the host.
+#
+# Two levels:
+#   Pod-level   (spec.securityContext)      → Applies to ALL containers in the Pod
+#   Container-level (containers[].securityContext) → Applies to ONE container only
+#
+# If both are set, container-level settings OVERRIDE pod-level for that container.
+#
+# Common fields:
+#   runAsUser        → UID the process runs as (0 = root)
+#   runAsGroup       → Primary GID for the process
+#   fsGroup          → GID applied to all mounted volumes (Pod-level only)
+#   runAsNonRoot     → Refuse to start if the image runs as root (true/false)
+#   readOnlyRootFilesystem → Mount container's root filesystem as read-only
+#   allowPrivilegeEscalation → Allow child process to gain more privileges
+#   capabilities     → Add/drop Linux capabilities (Container-level only)
+#
+# Note: "capabilities" can ONLY be set at the container level, not pod level.
+#
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1. Pod-level SecurityContext
+# -----------------------------------------------------------------------------
+# Settings here apply to ALL containers in the Pod.
+# Useful for setting a common user/group across all containers.
+
 apiVersion: v1
 kind: Pod
 metadata:
   name: security-context-pod
 spec:
   securityContext:
-    runAsUser: 1000  # Run the container as user ID 1000
-    runAsGroup: 3000  # Run the container as group ID 3000
-    fsGroup: 2000  # Set the filesystem group ID to 2000
-    # capabilities are only supported in container level
+    runAsUser: 1000          # All containers run as UID 1000 (non-root)
+    runAsGroup: 3000         # All containers run with primary GID 3000
+    fsGroup: 2000            # Mounted volumes are owned by GID 2000
+    runAsNonRoot: true       # Fail to start if image would run as root
   containers:
     - name: ubuntu-container
       image: ubuntu:latest
@@ -16,21 +49,84 @@ spec:
 
 ---
 
+# -----------------------------------------------------------------------------
+# 2. Container-level SecurityContext
+# -----------------------------------------------------------------------------
+# Settings here apply to this specific container only.
+# Container-level overrides pod-level for overlapping fields.
+# Linux capabilities can ONLY be set here (not at pod level).
 
-# SecurityContext in Container level
 apiVersion: v1
 kind: Pod
 metadata:
-  name: security-context-pod
+  name: security-context-container
 spec:
-  
   containers:
     - name: ubuntu-container
       image: ubuntu:latest
       command: ["sleep", "3600"]
       securityContext:
-        runAsUser: 1000  # Run the container as user ID 1000
-        runAsGroup: 3000  # Run the container as group ID 3000
-        # capabilities are only supported in container level
+        runAsUser: 1000                   # Run as UID 1000
+        runAsGroup: 3000                  # Run with GID 3000
+        allowPrivilegeEscalation: false   # Prevent child processes from gaining privileges
+        readOnlyRootFilesystem: true      # Root filesystem is read-only
         capabilities:
-          add: ["NET_ADMIN", "SYS_TIME"]  # Add capabilities to the container
+          add: ["NET_ADMIN", "SYS_TIME"] # Grant specific Linux capabilities
+          drop: ["ALL"]                   # Drop all capabilities first (least privilege)
+
+---
+
+# -----------------------------------------------------------------------------
+# 3. Combined — Pod-level + Container-level override
+# -----------------------------------------------------------------------------
+# Pod sets defaults; container overrides where needed.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: security-context-combined
+spec:
+  securityContext:
+    runAsUser: 1000            # Default for all containers
+    runAsGroup: 3000
+    fsGroup: 2000
+  containers:
+    - name: app
+      image: nginx:latest
+      securityContext:
+        runAsUser: 2000        # Override: this container runs as UID 2000
+        capabilities:
+          drop: ["ALL"]
+          add: ["NET_BIND_SERVICE"]  # Allow binding to ports < 1024
+    - name: sidecar
+      image: busybox:latest
+      command: ["sleep", "3600"]
+      # No override — inherits pod-level: UID 1000, GID 3000
+
+
+# =============================================================================
+# Sample Commands
+# =============================================================================
+
+# Apply this file
+# kubectl apply -f 11-security-context-pod.yaml
+
+# Verify which user the container is running as
+# kubectl exec security-context-pod -- id
+# Output: uid=1000 gid=3000 groups=2000
+
+# Verify filesystem group on mounted volumes
+# kubectl exec security-context-pod -- ls -la /mnt
+
+# Check if root filesystem is read-only
+# kubectl exec security-context-container -- touch /test
+# Expected: "Read-only file system" error
+
+# List effective Linux capabilities of the container process
+# kubectl exec security-context-container -- cat /proc/1/status | grep Cap
+
+# Check what user a container would run as (without creating the pod)
+# kubectl run test --image=ubuntu --dry-run=client -o yaml --overrides='{"spec":{"securityContext":{"runAsUser":1000}}}'
+
+# Delete pods
+# kubectl delete -f 11-security-context-pod.yaml
