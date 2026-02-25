@@ -1,25 +1,123 @@
+# =============================================================================
+# Kubernetes Encryption at Rest — Educational Reference
+# =============================================================================
+#
+# By default, Secrets (and other resources) are stored UNENCRYPTED in etcd.
+# Anyone with access to etcd can read all Secrets in plain text.
+#
+# Encryption at Rest ensures data is encrypted BEFORE it is written to etcd.
+# The kube-apiserver handles encryption/decryption transparently.
+#
+# How it works:
+#   1. You create an EncryptionConfiguration file on the control plane node.
+#   2. You pass it to kube-apiserver via --encryption-provider-config flag.
+#   3. The FIRST provider in the list is used for ENCRYPTING new data.
+#   4. ALL providers are tried (in order) for DECRYPTING existing data.
+#
+# Available providers (in order of recommendation):
+#   - aescbc    → AES-CBC with PKCS#7 padding (strong, recommended)
+#   - aesgcm    → AES-GCM (fast, requires key rotation every 200K writes)
+#   - secretbox → XSalsa20 + Poly1305 (strong, newer option)
+#   - kms v2    → Envelope encryption via external KMS (best for production)
+#   - identity  → No encryption (plain text, default behavior)
+#
+# Important:
+#   - The encryption key must be kept safe — losing it means losing access
+#     to all encrypted data in etcd.
+#   - Existing Secrets are NOT re-encrypted automatically. You must read and
+#     rewrite them after enabling encryption (see commands below).
+#   - This file lives on the control plane node, NOT applied via kubectl.
+#
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# EncryptionConfiguration — encrypt Secrets using AES-CBC
+# -----------------------------------------------------------------------------
+
 apiVersion: apiserver.config.k8s.io/v1
 kind: EncryptionConfiguration
-metadata:
-  name: encryption-at-rest-configuration
 resources:
   - resources:
-      - secrets
+      - secrets                # Resources to encrypt (can add configmaps, etc.)
     providers:
+      # First provider = used for ENCRYPTING new writes
       - aescbc:
           keys:
             - name: key1
-              secret: "1y+/tbA0Tk1Wmqfkrngut4gND3RtO8DD3PpQE1sjZSs="  # Base64 encoded key: head -c 32 /dev/urandom | base64
-      - identity: {
-          # This provider does not encrypt data, it simply returns the data as is.
-          # Useful for testing or when no encryption is needed.
-          # It is the default provider if no other providers are specified.
-          # It is not recommended to use this provider in production environments.
-        }
-              
+              # 32-byte random key, base64-encoded
+              # Generate with: head -c 32 /dev/urandom | base64
+              secret: "1y+/tbA0Tk1Wmqfkrngut4gND3RtO8DD3PpQE1sjZSs="
+      # Fallback provider = allows reading old unencrypted data
+      - identity: {}
 
 
+# =============================================================================
+# Setup Steps (on the control plane node)
+# =============================================================================
+
+# Step 1: Generate a 32-byte encryption key
 # head -c 32 /dev/urandom | base64
 
-# read all secrets and update them to apply server side encryption
-# kubectl get secrets --all-namespaces -o json| kubectl replace -f -
+# Step 2: Save this file to the control plane node, e.g.:
+# /etc/kubernetes/enc/encryption-at-rest.yaml
+
+# Step 3: Edit the kube-apiserver manifest to add the flag:
+#   --encryption-provider-config=/etc/kubernetes/enc/encryption-at-rest.yaml
+#
+# For kubeadm clusters, edit:
+# /etc/kubernetes/manifests/kube-apiserver.yaml
+#
+# Add under spec.containers.command:
+#   - --encryption-provider-config=/etc/kubernetes/enc/encryption-at-rest.yaml
+#
+# Add a volume and volumeMount so the apiserver can read the file:
+#   volumeMounts:
+#     - name: enc
+#       mountPath: /etc/kubernetes/enc
+#       readOnly: true
+#   volumes:
+#     - name: enc
+#       hostPath:
+#         path: /etc/kubernetes/enc
+#         type: DirectoryOrCreate
+
+# Step 4: Wait for kube-apiserver to restart (kubeadm does this automatically)
+# kubectl get pods -n kube-system | grep kube-apiserver
+
+# =============================================================================
+# Re-encrypt Existing Secrets
+# =============================================================================
+
+# Existing Secrets remain unencrypted until rewritten.
+# Read all Secrets and replace them to trigger encryption:
+# kubectl get secrets --all-namespaces -o json | kubectl replace -f -
+
+# =============================================================================
+# Verify Encryption is Working
+# =============================================================================
+
+# Create a test secret
+# kubectl create secret generic test-encryption --from-literal=mykey=myvalue
+
+# Read it directly from etcd to confirm it's encrypted (requires etcd access):
+# ETCDCTL_API=3 etcdctl get /registry/secrets/default/test-encryption \
+#   --cacert=/etc/kubernetes/pki/etcd/ca.crt \
+#   --cert=/etc/kubernetes/pki/etcd/server.crt \
+#   --key=/etc/kubernetes/pki/etcd/server.key \
+#   | hexdump -C
+# If encrypted, you'll see "k8s:enc:aescbc:v1:key1" prefix instead of plain text.
+
+# Clean up test secret
+# kubectl delete secret test-encryption
+
+# =============================================================================
+# Key Rotation
+# =============================================================================
+
+# To rotate keys:
+# 1. Add a new key as the FIRST entry under aescbc.keys (new writes use it)
+# 2. Keep the old key below it (so old data can still be decrypted)
+# 3. Restart kube-apiserver
+# 4. Re-encrypt all secrets: kubectl get secrets --all-namespaces -o json | kubectl replace -f -
+# 5. Remove the old key from the config and restart kube-apiserver
