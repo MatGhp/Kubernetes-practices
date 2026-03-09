@@ -1,3 +1,46 @@
+# =============================================================================
+# Kubernetes Pod Resource Requirements — Educational Reference
+# =============================================================================
+#
+# Every container can declare resource "requests" and "limits". These tell
+# the scheduler and kubelet how much CPU and memory the container needs.
+#
+# requests vs limits:
+#   requests  → GUARANTEED minimum. The scheduler uses this to find a node
+#               with enough capacity. The container is guaranteed this amount.
+#   limits    → MAXIMUM allowed. The container cannot use more than this.
+#
+# What happens when limits are exceeded:
+#   CPU:    Throttled (container still runs, just slower). CPU is compressible.
+#   Memory: OOMKilled (container is killed and restarted). Memory is incompressible.
+#
+# What happens with no requests/limits set:
+#   - Container can use unlimited resources on the node (risky!).
+#   - If a ResourceQuota exists in the namespace, the Pod is REJECTED.
+#   - Use LimitRange to auto-inject defaults (see 13-limit-range-*.yaml).
+#
+# QoS classes (assigned automatically based on requests/limits):
+#   Guaranteed → requests == limits for all containers (highest priority)
+#   Burstable  → At least one container has requests < limits
+#   BestEffort → No requests or limits set (first to be evicted under pressure)
+#
+# CPU units:        Memory units:
+#   1   = 1 core      Ki = 1024 bytes (kibibyte)
+#   500m = 0.5 core   Mi = 1024 Ki (mebibyte)
+#   100m = 0.1 core   Gi = 1024 Mi (gibibyte)
+#   1m  = minimum     K  = 1000 bytes (kilobyte, decimal)
+#
+# See also:
+#   13-limit-range-cpu.yaml    → Default/min/max per container
+#   13-limit-range-memory.yaml → Default/min/max per container
+#   13-resource-quota.yaml     → Aggregate limits per namespace
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Pod with resource requests and limits
+# -----------------------------------------------------------------------------
+
 apiVersion: v1
 kind: Pod
 metadata:
@@ -10,11 +53,60 @@ spec:
     image: myapp-container
     ports:
     - containerPort: 8080
-    # Define resource requirements for the container
     resources:
       requests:
-        memory: "128Mi" # 1G 1M 1K 1Gi 1Mi 1Ki - 1K == 1000 bytes, 1Ki == 1024 bytes
-        cpu: "1" # Request 128 MiB of memory and 1 CPU units
+        cpu: "500m"            # Guaranteed 0.5 CPU core
+        memory: "128Mi"        # Guaranteed 128 MiB of memory
       limits:
-        memory: "256Mi"
-        cpu: "2" # Limit to 256 MiB of memory and 2 CPU units
+        cpu: "2"               # Max 2 CPU cores (throttled if exceeded)
+        memory: "256Mi"        # Max 256 MiB (OOMKilled if exceeded)
+
+
+# =============================================================================
+# QoS class examples
+# =============================================================================
+#
+# Guaranteed (requests == limits):
+#   resources:
+#     requests: { cpu: "1", memory: "256Mi" }
+#     limits:   { cpu: "1", memory: "256Mi" }
+#
+# Burstable (requests < limits):
+#   resources:
+#     requests: { cpu: "500m", memory: "128Mi" }
+#     limits:   { cpu: "2",    memory: "256Mi" }
+#
+# BestEffort (nothing set):
+#   resources: {}
+
+
+# =============================================================================
+# Sample Commands
+# =============================================================================
+
+# Apply this Pod
+# kubectl apply -f 13-resource-requirements-pod-definition.yaml
+
+# Check the QoS class assigned to the pod
+# kubectl get pod myapp -o jsonpath='{.status.qosClass}'
+
+# View resource requests/limits of a running pod
+# kubectl get pod myapp -o jsonpath='{.spec.containers[0].resources}'
+
+# View actual CPU/memory usage (requires metrics-server)
+# kubectl top pod myapp
+
+# View node resource usage and allocatable capacity
+# kubectl top nodes
+
+# Describe pod (shows resource requests, limits, and QoS class)
+# kubectl describe pod myapp
+
+# Check if a pod was OOMKilled
+# kubectl get pod myapp -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'
+
+# See how much resource is allocated on each node
+# kubectl describe node <node-name> | grep -A 10 "Allocated resources"
+
+# Delete the pod
+# kubectl delete -f 13-resource-requirements-pod-definition.yaml
