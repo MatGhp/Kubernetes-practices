@@ -1,18 +1,100 @@
+# =============================================================================
+# Kubernetes LimitRange (CPU) — Educational Reference
+# =============================================================================
+#
+# A LimitRange enforces minimum and maximum resource constraints per Pod or
+# Container within a namespace. It also sets default values for containers
+# that don't specify their own requests/limits.
+#
+# Why use LimitRange:
+#   - Prevent a single container from consuming all CPU on a node.
+#   - Ensure every container has at least a baseline request (helps scheduler).
+#   - Enforce guardrails so developers can't deploy without resource boundaries.
+#
+# How it works:
+#   - Applied per NAMESPACE (must create one LimitRange per namespace).
+#   - Evaluated at Pod ADMISSION time (existing Pods are NOT affected).
+#   - If a container doesn't set requests/limits, the defaults are injected.
+#   - If a container exceeds max or is below min, the Pod is REJECTED.
+#
+# Key fields:
+#   default         → Default "limits" applied if container omits limits
+#   defaultRequest  → Default "requests" applied if container omits requests
+#   max             → Maximum allowed limits for a container
+#   min             → Minimum allowed requests for a container
+#   type            → Container | Pod | PersistentVolumeClaim
+#
+# CPU units:
+#   1 CPU = 1000m (millicores)
+#   "500m" = 0.5 CPU = half a core
+#   "2"    = 2 full CPU cores
+#
+# See also:
+#   13-limit-range-memory.yaml  → Same concept for memory
+#   13-resource-quota.yaml      → Namespace-wide aggregate limits
+#   13-resource-requirements-pod-definition.yaml → Pod with explicit requests/limits
+# =============================================================================
+
+
 apiVersion: v1
 kind: LimitRange
 metadata:
   name: cpu-resource-constraint
-  # namespace: my-namespace 
-  # If you want to apply this LimitRange to a specific namespace, uncomment the line above
+  # namespace: my-namespace   # LimitRange is namespace-scoped; defaults to current namespace
 spec:
   limits:
-    - default:
-        cpu: "1" # Default CPU limit for containers without specified limits
+    - type: Container          # Apply these constraints to each container
+      default:
+        cpu: "1"               # Default CPU limit (if container omits spec.resources.limits.cpu)
       defaultRequest:
-        cpu: "500m" # Default CPU request for containers without specified requests
-      type: Container # This limit applies to containers
+        cpu: "500m"            # Default CPU request (if container omits spec.resources.requests.cpu)
       max:
-        cpu: "2" # Maximum CPU limit for any container in the namespace
+        cpu: "2"               # Max CPU limit any container can set (rejected if exceeded)
       min:
-        cpu: "100m" # Minimum CPU request for any container in the namespace
-  # You can also specify limits for Pods, but here we focus on Container limits.
+        cpu: "100m"            # Min CPU request any container must have (rejected if below)
+
+
+# =============================================================================
+# What happens at admission time — examples
+# =============================================================================
+#
+# Container with NO resources specified:
+#   → Gets: requests.cpu=500m, limits.cpu=1 (from defaults above)
+#
+# Container with requests.cpu=200m, limits.cpu=1:
+#   → Accepted (200m >= min 100m, 1 <= max 2)
+#
+# Container with requests.cpu=50m:
+#   → REJECTED (50m < min 100m)
+#
+# Container with limits.cpu=3:
+#   → REJECTED (3 > max 2)
+
+
+# =============================================================================
+# Sample Commands
+# =============================================================================
+
+# Apply this LimitRange
+# kubectl apply -f 13-limit-range-cpu.yaml
+
+# Apply to a specific namespace
+# kubectl apply -f 13-limit-range-cpu.yaml -n dev
+
+# List LimitRanges in the current namespace
+# kubectl get limitrange
+# kubectl get limits
+
+# Describe a LimitRange (shows all defaults, min, max)
+# kubectl describe limitrange cpu-resource-constraint
+
+# Get LimitRange in YAML format
+# kubectl get limitrange cpu-resource-constraint -o yaml
+
+# Verify defaults were injected into a pod (create a pod with no resources set)
+# kubectl run test-limits --image=nginx --restart=Never
+# kubectl get pod test-limits -o jsonpath='{.spec.containers[0].resources}'
+
+# Delete the LimitRange
+# kubectl delete limitrange cpu-resource-constraint
+# kubectl delete -f 13-limit-range-cpu.yaml

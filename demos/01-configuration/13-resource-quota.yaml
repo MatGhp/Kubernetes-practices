@@ -1,17 +1,116 @@
+# =============================================================================
+# Kubernetes ResourceQuota — Educational Reference
+# =============================================================================
+#
+# A ResourceQuota limits the TOTAL (aggregate) resource consumption across
+# all objects in a namespace. Unlike LimitRange, which constrains individual
+# containers, ResourceQuota constrains the entire namespace.
+#
+# Why use ResourceQuota:
+#   - Prevent one team/namespace from consuming all cluster resources.
+#   - Cap the number of objects (Pods, Services, Secrets, etc.).
+#   - Enforce that teams stay within their allocated budget.
+#
+# How it works:
+#   - Applied per NAMESPACE (create one per namespace).
+#   - When a ResourceQuota for CPU/memory exists, every Pod MUST specify
+#     requests/limits — otherwise the Pod is rejected. Use LimitRange
+#     to set defaults and avoid this issue.
+#   - Evaluated at admission time: new Pods/objects are rejected if the
+#     quota would be exceeded.
+#   - Existing objects are NOT evicted if a quota is lowered retroactively.
+#
+# ResourceQuota vs LimitRange:
+#   ResourceQuota → Total aggregate across the namespace
+#   LimitRange    → Per-container/pod min/max/defaults
+#   Use BOTH together for complete resource governance.
+#
+# Quotable resource categories:
+#   Compute:  requests.cpu, limits.cpu, requests.memory, limits.memory
+#   Objects:  pods, services, configmaps, secrets, persistentvolumeclaims,
+#             replicationcontrollers, deployments.apps, replicasets.apps, etc.
+#   Storage:  requests.storage, <storageclass>.storageclass.storage.k8s.io/requests.storage
+#
+# See also:
+#   06-compute-quota.yaml   → Simpler compute-only quota
+#   13-limit-range-cpu.yaml → Per-container CPU defaults/limits
+#   13-limit-range-memory.yaml → Per-container memory defaults/limits
+# =============================================================================
+
+
 apiVersion: v1
 kind: ResourceQuota
 metadata:
   name: resource-quota-example
-  # namespace: my-namespace 
-  # If you want to apply this LimitRange to a specific namespace, uncomment the line above
+  # namespace: my-namespace   # ResourceQuota is namespace-scoped; defaults to current namespace
 spec:
   hard:
-    requests.cpu: "4" # Total CPU requests across all pods in the namespace
-    requests.memory: "8Gi" # Total memory requests across all pods in the namespace
-    limits.cpu: "8" # Total CPU limits across all pods in the namespace
-    limits.memory: "16Gi" # Total memory limits across all pods in the namespace
-    pods: "10" # Maximum number of pods allowed in the namespace
-    services: "5" # Maximum number of services allowed in the namespace
-    persistentvolumeclaims: "10" # Maximum number of PVCs allowed in the namespace
-    configmaps: "20" # Maximum number of ConfigMaps allowed in the namespace
-    secrets: "20" # Maximum number of Secrets allowed in the namespace
+    # --- Compute resources (aggregate across all Pods) ---
+    requests.cpu: "4"              # Total CPU requests: 4 cores
+    requests.memory: "8Gi"        # Total memory requests: 8 GiB
+    limits.cpu: "8"                # Total CPU limits: 8 cores
+    limits.memory: "16Gi"         # Total memory limits: 16 GiB
+
+    # --- Object counts (max number of each resource type) ---
+    pods: "10"                     # Max 10 Pods
+    services: "5"                  # Max 5 Services
+    persistentvolumeclaims: "10"   # Max 10 PVCs
+    configmaps: "20"               # Max 20 ConfigMaps
+    secrets: "20"                  # Max 20 Secrets
+
+
+# =============================================================================
+# What happens at admission time — examples
+# =============================================================================
+#
+# Namespace already has 4 CPU requested. New Pod requests 1 CPU:
+#   → REJECTED (4 + 1 = 5 > quota of 4)
+#
+# Namespace has 9 Pods. Creating a new Pod:
+#   → REJECTED (9 + 1 = 10... actually accepted! 10 = quota of 10)
+#
+# Namespace has 10 Pods. Creating a new Pod:
+#   → REJECTED (10 + 1 = 11 > quota of 10)
+#
+# Pod without requests/limits when compute quota exists:
+#   → REJECTED (must specify requests/limits, or use LimitRange defaults)
+
+
+# =============================================================================
+# Sample Commands
+# =============================================================================
+
+# Apply this ResourceQuota
+# kubectl apply -f 13-resource-quota.yaml
+
+# Apply to a specific namespace
+# kubectl apply -f 13-resource-quota.yaml -n dev
+
+# Create a quota imperatively
+# kubectl create quota my-quota --hard=pods=10,services=5,requests.cpu=4,requests.memory=8Gi -n dev
+
+# Generate YAML without creating (dry-run)
+# kubectl create quota my-quota --hard=pods=10,requests.cpu=4 --dry-run=client -o yaml
+
+# List ResourceQuotas in the current namespace
+# kubectl get resourcequota
+# kubectl get quota
+
+# Describe a quota (shows Used vs Hard for each resource)
+# kubectl describe quota resource-quota-example
+
+# Get quota in YAML format
+# kubectl get quota resource-quota-example -o yaml
+
+# Check current usage vs limits at a glance
+# kubectl describe quota resource-quota-example | grep -E "Resource|Used|Hard|---"
+
+# List quotas across all namespaces
+# kubectl get quota -A
+
+# Edit a quota live
+# kubectl edit quota resource-quota-example
+
+# Delete the ResourceQuota
+# kubectl delete quota resource-quota-example
+# kubectl delete -f 13-resource-quota.yaml

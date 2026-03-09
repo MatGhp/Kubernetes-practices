@@ -1,18 +1,94 @@
+# =============================================================================
+# Kubernetes LimitRange (Memory) — Educational Reference
+# =============================================================================
+#
+# Same concept as the CPU LimitRange (13-limit-range-cpu.yaml), but for memory.
+# Enforces min/max memory constraints and sets defaults per container.
+#
+# Key difference from CPU:
+#   - CPU is compressible: if a container exceeds its CPU limit, it gets
+#     throttled (still runs, just slower).
+#   - Memory is incompressible: if a container exceeds its memory limit,
+#     it is OOMKilled (Out Of Memory killed) and restarted.
+#
+# Memory units:
+#   Ki = kibibyte (1024 bytes)     Mi = mebibyte (1024 Ki)
+#   Gi = gibibyte (1024 Mi)        Ti = tebibyte (1024 Gi)
+#   Plain integers are bytes:      "134217728" = 128 Mi
+#
+# See also:
+#   13-limit-range-cpu.yaml  → Same concept for CPU
+#   13-resource-quota.yaml   → Namespace-wide aggregate limits
+#   13-resource-requirements-pod-definition.yaml → Pod with explicit requests/limits
+# =============================================================================
+
+
 apiVersion: v1
 kind: LimitRange
 metadata:
   name: memory-resource-constraint
-  # namespace: my-namespace 
-  # If you want to apply this LimitRange to a specific namespace, uncomment the line above
+  # namespace: my-namespace   # LimitRange is namespace-scoped; defaults to current namespace
 spec:
   limits:
-    - default:
-        memory: "256Mi" # Default memory limit for containers without specified limits
+    - type: Container          # Apply these constraints to each container
+      default:
+        memory: "256Mi"        # Default memory limit (if container omits spec.resources.limits.memory)
       defaultRequest:
-        memory: "128Mi" # Default memory request for containers without specified requests
-      type: Container # This limit applies to containers
+        memory: "128Mi"        # Default memory request (if container omits spec.resources.requests.memory)
       max:
-        memory: "512Mi" # Maximum memory limit for any container in the namespace
+        memory: "512Mi"        # Max memory limit any container can set (rejected if exceeded)
       min:
-        memory: "64Mi" # Minimum memory request for any container in the namespace
+        memory: "64Mi"         # Min memory request any container must have (rejected if below)
+
+
+# =============================================================================
+# What happens at admission time — examples
+# =============================================================================
+#
+# Container with NO resources specified:
+#   → Gets: requests.memory=128Mi, limits.memory=256Mi (from defaults above)
+#
+# Container with requests.memory=100Mi, limits.memory=256Mi:
+#   → Accepted (100Mi >= min 64Mi, 256Mi <= max 512Mi)
+#
+# Container with requests.memory=32Mi:
+#   → REJECTED (32Mi < min 64Mi)
+#
+# Container with limits.memory=1Gi:
+#   → REJECTED (1Gi > max 512Mi)
+#
+# Container exceeds its limit at runtime:
+#   → OOMKilled (process killed, container restarted per restartPolicy)
+
+
+# =============================================================================
+# Sample Commands
+# =============================================================================
+
+# Apply this LimitRange
+# kubectl apply -f 13-limit-range-memory.yaml
+
+# Apply to a specific namespace
+# kubectl apply -f 13-limit-range-memory.yaml -n dev
+
+# List LimitRanges in the current namespace
+# kubectl get limitrange
+# kubectl get limits
+
+# Describe a LimitRange (shows all defaults, min, max)
+# kubectl describe limitrange memory-resource-constraint
+
+# Get LimitRange in YAML format
+# kubectl get limitrange memory-resource-constraint -o yaml
+
+# Verify defaults were injected into a pod (create a pod with no resources set)
+# kubectl run test-mem --image=nginx --restart=Never
+# kubectl get pod test-mem -o jsonpath='{.spec.containers[0].resources}'
+
+# Check if a pod was OOMKilled
+# kubectl get pod <pod-name> -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'
+
+# Delete the LimitRange
+# kubectl delete limitrange memory-resource-constraint
+# kubectl delete -f 13-limit-range-memory.yaml
     
