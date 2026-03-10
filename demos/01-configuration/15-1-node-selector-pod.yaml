@@ -1,29 +1,105 @@
+# =============================================================================
+# Kubernetes nodeSelector — Educational Reference
+# =============================================================================
+#
+# nodeSelector is the SIMPLEST way to constrain a Pod to run on specific nodes.
+# It matches Pods to nodes based on key-value labels.
+#
+# How it works:
+#   1. Label your nodes with key=value pairs.
+#   2. Add nodeSelector to the Pod spec with the same labels.
+#   3. The scheduler only places the Pod on nodes matching ALL labels (AND logic).
+#
+# Limitations:
+#   - Only supports equality matching (key=value). No "not equal", "in set",
+#     or "exists" operators.
+#   - Cannot express OR logic (e.g., "large OR medium").
+#   - Cannot express preferences ("prefer large, but accept medium").
+#   → For advanced expressions, use Node Affinity (see 15-2-node-affinity-pod.yaml).
+#
+# nodeSelector vs Node Affinity vs Taints/Tolerations:
+#   nodeSelector       → Simple equality labels (AND only). Attracts Pods to nodes.
+#   Node Affinity      → Rich expressions (In, NotIn, Exists, etc.) + soft/hard rules.
+#   Taints/Tolerations → Repels Pods FROM nodes (opposite direction).
+#
+# See also:
+#   15-2-node-affinity-pod.yaml → Advanced node selection with expressions
+#   14-taint-toleration.yaml    → Repel Pods from nodes
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Pod with nodeSelector — schedule only on matching nodes
+# -----------------------------------------------------------------------------
+# This Pod requires a node with BOTH labels:
+#   environment=production AND size=large
+
 apiVersion: v1
 kind: Pod
 metadata:
   name: myapp
 spec:
-  # Node selector to specify which nodes the pod should be scheduled on
-  # This allows you to control where the pod runs based on node labels.
   nodeSelector:
-    environment: production  # Specify the node label to schedule the pod
-    size: large  # Specify the node label to schedule the pod  
+    environment: production    # Must match node label
+    size: large                # Must match node label (AND logic — both required)
   containers:
   - name: myapp
     image: image-name
-    
 
 
+# =============================================================================
+# Node Label Commands
+# =============================================================================
 
+# Label a node
+# kubectl label nodes node01 environment=production
+# kubectl label nodes node01 size=large
 
+# Label multiple nodes
+# kubectl label nodes node01 node02 environment=production
 
+# View labels on a node
+# kubectl get nodes --show-labels
+# kubectl get nodes node01 --show-labels
 
+# View specific label value
+# kubectl get nodes -l environment=production
 
+# List nodes with multiple label selectors (AND)
+# kubectl get nodes -l environment=production,size=large
 
-# kubectl label nodes nodeName key=value
-# Example: Labeling nodes with different environments and sizes
-# This command labels nodes with specific key-value pairs to categorize them.
-# kubectl label nodes node1 environment=production
-# kubectl label nodes node2 environment=staging
-# kubectl label nodes node3 environment=development
-# kubectl label nodes node4 size=large
+# Overwrite an existing label
+# kubectl label nodes node01 environment=staging --overwrite
+
+# Remove a label (use minus sign at the end)
+# kubectl label nodes node01 size-
+
+# =============================================================================
+# Built-in Node Labels (always available, no manual labeling needed)
+# =============================================================================
+#
+# kubernetes.io/hostname         → Node hostname
+# kubernetes.io/os               → linux / windows
+# kubernetes.io/arch             → amd64 / arm64
+# node.kubernetes.io/instance-type → Cloud instance type (e.g., m5.large)
+# topology.kubernetes.io/zone    → Availability zone (e.g., us-east-1a)
+# topology.kubernetes.io/region  → Region (e.g., us-east-1)
+
+# =============================================================================
+# Sample Commands - Pod
+# =============================================================================
+
+# Apply this Pod
+# kubectl apply -f 15-1-node-selector-pod.yaml
+
+# Verify which node the Pod was scheduled on
+# kubectl get pod myapp -o wide
+
+# Check nodeSelector on a running pod
+# kubectl get pod myapp -o jsonpath='{.spec.nodeSelector}'
+
+# Debug scheduling issues (look for "MatchNodeSelector" in events)
+# kubectl describe pod myapp | grep -A 10 Events
+
+# Delete the Pod
+# kubectl delete -f 15-1-node-selector-pod.yaml
