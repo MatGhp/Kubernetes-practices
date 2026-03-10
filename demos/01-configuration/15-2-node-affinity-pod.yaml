@@ -1,18 +1,131 @@
+# =============================================================================
+# Kubernetes Node Affinity — Educational Reference
+# =============================================================================
+#
+# Node Affinity is the advanced version of nodeSelector. It lets you constrain
+# which nodes a Pod can be scheduled on using rich label expressions.
+#
+# Two rule types:
+#   requiredDuringSchedulingIgnoredDuringExecution  (HARD rule)
+#     → Pod MUST be placed on a matching node. If no node matches, Pod stays Pending.
+#     → "IgnoredDuringExecution" means if the node label changes after scheduling,
+#        the Pod is NOT evicted (it keeps running).
+#
+#   preferredDuringSchedulingIgnoredDuringExecution (SOFT rule)
+#     → Scheduler PREFERS matching nodes but will place the Pod elsewhere
+#       if no match is found. Uses a weight (1-100) to rank preferences.
+#
+# Planned (not yet available):
+#   requiredDuringSchedulingRequiredDuringExecution
+#     → Would also evict Pods if node labels change after scheduling.
+#
+# Operators (used in matchExpressions):
+#   In        → Label value must be IN the given list (OR logic)
+#   NotIn     → Label value must NOT be in the list
+#   Exists    → Label key must exist (value is ignored)
+#   DoesNotExist → Label key must NOT exist
+#   Gt        → Label value > given value (numeric comparison)
+#   Lt        → Label value < given value (numeric comparison)
+#
+# Logic:
+#   - Multiple expressions in the SAME matchExpressions block → AND
+#   - Multiple nodeSelectorTerms → OR
+#
+# Node Affinity vs nodeSelector vs Taints/Tolerations:
+#   nodeSelector       → Simple key=value equality (AND only)
+#   Node Affinity      → Rich expressions + soft/hard rules (this file)
+#   Taints/Tolerations → Repel Pods FROM nodes (opposite direction)
+#
+# For guaranteed placement, combine Taints/Tolerations + Node Affinity.
+#
+# See also:
+#   15-1-node-selector-pod.yaml → Simple node selection
+#   14-taint-toleration.yaml    → Repel Pods from nodes
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1. Required (hard) Node Affinity
+# -----------------------------------------------------------------------------
+# Pod MUST be scheduled on a node matching ALL these conditions (AND):
+#   - environment IN (production, staging)  — node is prod or staging
+#   - size NOT IN (large)                   — node is not large
+#   - region label EXISTS                   — node has a region label (any value)
+
 apiVersion: v1
 kind: Pod
 metadata:
-  name: myapp
+  name: myapp-required
 spec:
-  # Node affinity to specify which nodes the pod should be scheduled on
-  # This allows you to control where the pod runs based on node labels.
-  # Node affinity is more flexible than nodeSelector and allows for complex scheduling rules.
-  # It can be used to specify preferred or required node conditions for scheduling.
-  # This example uses requiredDuringSchedulingIgnoredDuringExecution to specify hard requirements.
-  # preferredDuringSchedulingIgnoredDuringExecution can be used for soft requirements.
-  # preferredDuringSchedulingIgnoredDuringExecution allows the scheduler to prefer nodes that match the criteria but
   affinity:
     nodeAffinity:
-      requiredDuringSchedulingIgnoredDuringExecution: # preferredDururingSchedulingIgnoredDuringExecution
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: environment
+                operator: In             # OR: production or staging
+                values:
+                  - production
+                  - staging
+              - key: size
+                operator: NotIn          # Exclude large nodes
+                values:
+                  - large
+              - key: region
+                operator: Exists         # Any value, just needs the label
+  containers:
+  - name: myapp
+    image: image-name
+
+---
+
+# -----------------------------------------------------------------------------
+# 2. Preferred (soft) Node Affinity
+# -----------------------------------------------------------------------------
+# Scheduler PREFERS nodes matching these criteria, but will schedule
+# elsewhere if no match. Weight (1-100) determines priority.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-preferred
+spec:
+  affinity:
+    nodeAffinity:
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 80                     # High priority preference
+          preference:
+            matchExpressions:
+              - key: environment
+                operator: In
+                values:
+                  - production
+        - weight: 20                     # Lower priority preference
+          preference:
+            matchExpressions:
+              - key: size
+                operator: In
+                values:
+                  - large
+  containers:
+  - name: myapp
+    image: image-name
+
+---
+
+# -----------------------------------------------------------------------------
+# 3. Combined — Required + Preferred
+# -----------------------------------------------------------------------------
+# MUST be prod or staging (hard) + PREFER large nodes (soft)
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-combined
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
         nodeSelectorTerms:
           - matchExpressions:
               - key: environment
@@ -20,25 +133,54 @@ spec:
                 values:
                   - production
                   - staging
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 100
+          preference:
+            matchExpressions:
               - key: size
-                operator: NotIn
+                operator: In
                 values:
                   - large
-              - key: region
-                operator: Exists
   containers:
   - name: myapp
     image: image-name
-    
 
+
+# =============================================================================
+# Node Label Commands
+# =============================================================================
+
+# Label nodes
+# kubectl label nodes node01 environment=production
+# kubectl label nodes node02 environment=staging
+# kubectl label nodes node01 size=large
+# kubectl label nodes node01 region=us-east-1
+
+# View labels on all nodes
+# kubectl get nodes --show-labels
+
+# Filter nodes by label
+# kubectl get nodes -l environment=production
+# kubectl get nodes -l environment=production,size=large
+
+# Remove a label
+# kubectl label nodes node01 region-
+
+# =============================================================================
+# Sample Commands — Pods
+# =============================================================================
+
+# Apply this file
 # kubectl apply -f 15-2-node-affinity-pod.yaml
 
+# Verify which node the Pod was scheduled on
+# kubectl get pod myapp-required -o wide
 
+# Check the affinity rules on a running pod
+# kubectl get pod myapp-required -o jsonpath='{.spec.affinity}'
 
-# kubectl label nodes nodeName key=value
-# Example: Labeling nodes with different environments and sizes
-# This command labels nodes with specific key-value pairs to categorize them.
-# kubectl label nodes node1 environment=production
-# kubectl label nodes node2 environment=staging
-# kubectl label nodes node3 environment=development
-# kubectl label nodes node4 size=large
+# Debug scheduling issues (look for FailedScheduling events)
+# kubectl describe pod myapp-required | grep -A 10 Events
+
+# Delete pods
+# kubectl delete -f 15-2-node-affinity-pod.yaml
