@@ -1,3 +1,50 @@
+# =============================================================================
+# Kubernetes Taints & Tolerations — Educational Reference
+# =============================================================================
+#
+# Taints and Tolerations work together to control which Pods can be scheduled
+# on which Nodes. They are used to REPEL pods from nodes, not attract them.
+#
+# How it works:
+#   1. A TAINT is applied to a Node → "I won't accept Pods unless they tolerate me"
+#   2. A TOLERATION is set on a Pod → "I can tolerate this taint, schedule me there"
+#
+# Important: Tolerations do NOT guarantee scheduling on a tainted node.
+# They only ALLOW it. Use Node Affinity to ATTRACT pods to specific nodes.
+# For guaranteed placement, combine Taints + Tolerations + Node Affinity.
+#
+# Taint format:   key=value:effect
+#
+# Taint effects:
+#   NoSchedule        → New Pods without a matching toleration are NOT scheduled.
+#                       Existing Pods already running on the node are unaffected.
+#   PreferNoSchedule  → Scheduler TRIES to avoid the node, but may still place
+#                       Pods there if no other node is available (soft constraint).
+#   NoExecute         → New Pods without a toleration are NOT scheduled AND
+#                       existing Pods without a toleration are EVICTED.
+#                       (Can use tolerationSeconds to delay eviction.)
+#
+# Toleration operators:
+#   Equal  → key, value, and effect must all match the taint
+#   Exists → key and effect must match; value is ignored (matches any value)
+#
+# Real-world use cases:
+#   - Dedicated nodes for specific teams/workloads
+#   - GPU nodes that only accept GPU workloads
+#   - Control plane nodes (tainted by default to prevent user Pods)
+#   - Node maintenance (taint with NoExecute to drain Pods)
+#
+# See also:
+#   15-node-affinity-pod-definition.yaml → Attract Pods TO specific nodes
+#   15-node-selector-pod-definition.yaml → Simple node selection by label
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Pod with a toleration (operator: Equal)
+# -----------------------------------------------------------------------------
+# This Pod can be scheduled on nodes tainted with key=value:NoSchedule
+
 apiVersion: v1
 kind: Pod
 metadata:
@@ -5,37 +52,109 @@ metadata:
   labels:
     name: myapp
 spec:
-  
   containers:
   - name: nginx-container
     image: nginx
     ports:
     - containerPort: 8080
-    # define tolerations for the pod
-    # This allows the pod to be scheduled on nodes with specific taintstolerations:
-  
   tolerations:
-    - key: "key"
+    - key: "app"
+      operator: "Equal"        # key + value + effect must match the taint
+      value: "blue"
+      effect: "NoSchedule"
+
+---
+
+# -----------------------------------------------------------------------------
+# Pod with a toleration (operator: Exists)
+# -----------------------------------------------------------------------------
+# Matches any taint with key "app" and effect NoSchedule, regardless of value.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-exists
+  labels:
+    name: myapp-exists
+spec:
+  containers:
+  - name: nginx-container
+    image: nginx
+    ports:
+    - containerPort: 8080
+  tolerations:
+    - key: "app"
+      operator: "Exists"       # Matches any value for this key
+      effect: "NoSchedule"
+
+---
+
+# -----------------------------------------------------------------------------
+# Pod with NoExecute toleration + tolerationSeconds
+# -----------------------------------------------------------------------------
+# If the node gets tainted with NoExecute, this Pod stays for 300s then is evicted.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-noexecute
+  labels:
+    name: myapp-noexecute
+spec:
+  containers:
+  - name: nginx-container
+    image: nginx
+    ports:
+    - containerPort: 8080
+  tolerations:
+    - key: "maintenance"
       operator: "Equal"
-      value: "value"
-      effect: "NoSchedule" 
-      # "NoSchedule" means the pod will not be scheduled on nodes with this taint
-      # "PreferNoSchedule" means the pod will be scheduled on nodes with this taint if possible
-      # "NoExecute" means the pod will be evicted from nodes with this taint
-    
+      value: "true"
+      effect: "NoExecute"
+      tolerationSeconds: 300   # Stay on the node for 300s, then evicted
 
 
+# =============================================================================
+# Taint Commands — Apply to Nodes
+# =============================================================================
 
-# kubectl describe node kubemaster
-# kubectl taint nodes kubemaster key=value:NoSchedule
-# kubectl taint nodes kubemaster key=value:PreferNoSchedule
-# kubectl taint nodes kubemaster key=value:NoExecute
+# Add a taint to a node
+# kubectl taint nodes node01 app=blue:NoSchedule
 
-# to remove a taint from a node, use the following command: the - sign at the end of the taint key-value pair
-# kubectl taint node controlplane node-role.kubernetes.io/control-plane:NoSchedule-
-# result: node/controlplane untainted
+# Add multiple taints
+# kubectl taint nodes node01 app=blue:NoSchedule env=prod:NoExecute
 
-# kubectl taint nodes node01 spray=mortein:NoSchedule
+# Add PreferNoSchedule taint
+# kubectl taint nodes node01 app=blue:PreferNoSchedule
 
-# kubectl create -f 14-taint-toleration.yaml
+# View taints on a node
+# kubectl describe node node01 | grep -A 5 Taints
+
+# Remove a specific taint (note the minus sign "-" at the end)
+# kubectl taint nodes node01 app=blue:NoSchedule-
+
+# Remove all taints with a key (regardless of value/effect)
+# kubectl taint nodes node01 app-
+
+# Remove the default control plane taint (allow user Pods on master)
+# kubectl taint nodes controlplane node-role.kubernetes.io/control-plane:NoSchedule-
+
+# =============================================================================
+# Sample Commands — Pods
+# =============================================================================
+
+# Apply this file
+# kubectl apply -f 14-taint-toleration.yaml
+
+# Check which tolerations a Pod has
+# kubectl get pod myapp -o jsonpath='{.spec.tolerations}'
+
+# Describe a pod (shows tolerations and scheduling events)
+# kubectl describe pod myapp
+
+# Check why a pod is Pending (usually taint-related)
+# kubectl describe pod myapp | grep -A 5 Events
+
+# Delete pods
+# kubectl delete -f 14-taint-toleration.yaml
 
