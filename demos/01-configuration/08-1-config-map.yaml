@@ -20,7 +20,7 @@
 #     (eventual, not instant). Environment variables are NOT updated after
 #     pod startup — a pod restart is required.
 #
-# See 08-pod-config-map-definition.yaml for Pod examples that consume
+# See 08-2-pod-config-map.yaml for Pod examples that consume
 # this ConfigMap.
 # =============================================================================
 
@@ -71,10 +71,10 @@ data:
 # =============================================================================
 
 # Apply this ConfigMap definition
-# kubectl apply -f 08-config-map.yaml
+# kubectl apply -f 08-1-config-map.yaml
 
 # Apply the Pod that consumes this ConfigMap
-# kubectl apply -f 08-pod-config-map-definition.yaml
+# kubectl apply -f 08-2-pod-config-map.yaml
 
 # =============================================================================
 # Inspect ConfigMaps
@@ -110,7 +110,7 @@ data:
 # kubectl patch cm app-config --type merge -p '{"data":{"APP_COLOR":"red"}}'
 
 # Replace a ConfigMap from file (must already exist)
-# kubectl replace -f 08-config-map.yaml
+# kubectl replace -f 08-1-config-map.yaml
 
 # =============================================================================
 # Delete ConfigMaps
@@ -120,5 +120,5 @@ data:
 # kubectl delete cm app-config
 
 # Delete from file
-# kubectl delete -f 08-config-map.yaml
+# kubectl delete -f 08-1-config-map.yaml
 

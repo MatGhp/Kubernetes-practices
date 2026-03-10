@@ -2,7 +2,7 @@
 # Kubernetes LimitRange (Memory) — Educational Reference
 # =============================================================================
 #
-# Same concept as the CPU LimitRange (13-limit-range-cpu.yaml), but for memory.
+# Same concept as the CPU LimitRange (13-1-limit-range-cpu.yaml), but for memory.
 # Enforces min/max memory constraints and sets defaults per container.
 #
 # Key difference from CPU:
@@ -17,9 +17,9 @@
 #   Plain integers are bytes:      "134217728" = 128 Mi
 #
 # See also:
-#   13-limit-range-cpu.yaml  → Same concept for CPU
-#   13-resource-quota.yaml   → Namespace-wide aggregate limits
-#   13-resource-requirements-pod-definition.yaml → Pod with explicit requests/limits
+#   13-1-limit-range-cpu.yaml  → Same concept for CPU
+#   13-3-resource-quota.yaml   → Namespace-wide aggregate limits
+#   13-4-resource-requirements-pod.yaml → Pod with explicit requests/limits
 # =============================================================================
 
 
@@ -66,10 +66,10 @@ spec:
 # =============================================================================
 
 # Apply this LimitRange
-# kubectl apply -f 13-limit-range-memory.yaml
+# kubectl apply -f 13-2-limit-range-memory.yaml
 
 # Apply to a specific namespace
-# kubectl apply -f 13-limit-range-memory.yaml -n dev
+# kubectl apply -f 13-2-limit-range-memory.yaml -n dev
 
 # List LimitRanges in the current namespace
 # kubectl get limitrange
@@ -90,5 +90,5 @@ spec:
 
 # Delete the LimitRange
 # kubectl delete limitrange memory-resource-constraint
-# kubectl delete -f 13-limit-range-memory.yaml
+# kubectl delete -f 13-2-limit-range-memory.yaml
     

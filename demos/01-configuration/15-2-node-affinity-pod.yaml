@@ -31,7 +31,7 @@ spec:
     image: image-name
     
 
-# kubectl apply -f 15-node-affinity-pod-definition.yaml
+# kubectl apply -f 15-2-node-affinity-pod.yaml
 
 
 

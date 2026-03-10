@@ -1,7 +1,7 @@
 # =============================================================================
 # Pods consuming a ConfigMap — 3 injection methods
 # =============================================================================
-# Requires: ConfigMap "app-config" from 08-config-map.yaml
+# Requires: ConfigMap "app-config" from 08-1-config-map.yaml
 #
 # Method 1 — envFrom:  Inject ALL keys as env vars (bulk)
 # Method 2 — env/valueFrom: Inject a SINGLE key as a named env var (selective)

@@ -17,7 +17,7 @@
 # What happens with no requests/limits set:
 #   - Container can use unlimited resources on the node (risky!).
 #   - If a ResourceQuota exists in the namespace, the Pod is REJECTED.
-#   - Use LimitRange to auto-inject defaults (see 13-limit-range-*.yaml).
+#   - Use LimitRange to auto-inject defaults (see 13-1-limit-range-*.yaml).
 #
 # QoS classes (assigned automatically based on requests/limits):
 #   Guaranteed → requests == limits for all containers (highest priority)
@@ -31,9 +31,9 @@
 #   1m  = minimum     K  = 1000 bytes (kilobyte, decimal)
 #
 # See also:
-#   13-limit-range-cpu.yaml    → Default/min/max per container
-#   13-limit-range-memory.yaml → Default/min/max per container
-#   13-resource-quota.yaml     → Aggregate limits per namespace
+#   13-1-limit-range-cpu.yaml    → Default/min/max per container
+#   13-2-limit-range-memory.yaml → Default/min/max per container
+#   13-3-resource-quota.yaml     → Aggregate limits per namespace
 # =============================================================================
 
 
@@ -85,7 +85,7 @@ spec:
 # =============================================================================
 
 # Apply this Pod
-# kubectl apply -f 13-resource-requirements-pod-definition.yaml
+# kubectl apply -f 13-4-resource-requirements-pod.yaml
 
 # Check the QoS class assigned to the pod
 # kubectl get pod myapp -o jsonpath='{.status.qosClass}'
@@ -109,4 +109,4 @@ spec:
 # kubectl describe node <node-name> | grep -A 10 "Allocated resources"
 
 # Delete the pod
-# kubectl delete -f 13-resource-requirements-pod-definition.yaml
+# kubectl delete -f 13-4-resource-requirements-pod.yaml

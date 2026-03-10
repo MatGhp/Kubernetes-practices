@@ -33,8 +33,8 @@
 #
 # See also:
 #   06-compute-quota.yaml   → Simpler compute-only quota
-#   13-limit-range-cpu.yaml → Per-container CPU defaults/limits
-#   13-limit-range-memory.yaml → Per-container memory defaults/limits
+#   13-1-limit-range-cpu.yaml → Per-container CPU defaults/limits
+#   13-2-limit-range-memory.yaml → Per-container memory defaults/limits
 # =============================================================================
 
 
@@ -81,10 +81,10 @@ spec:
 # =============================================================================
 
 # Apply this ResourceQuota
-# kubectl apply -f 13-resource-quota.yaml
+# kubectl apply -f 13-3-resource-quota.yaml
 
 # Apply to a specific namespace
-# kubectl apply -f 13-resource-quota.yaml -n dev
+# kubectl apply -f 13-3-resource-quota.yaml -n dev
 
 # Create a quota imperatively
 # kubectl create quota my-quota --hard=pods=10,services=5,requests.cpu=4,requests.memory=8Gi -n dev
@@ -113,4 +113,4 @@ spec:
 
 # Delete the ResourceQuota
 # kubectl delete quota resource-quota-example
-# kubectl delete -f 13-resource-quota.yaml
+# kubectl delete -f 13-3-resource-quota.yaml
