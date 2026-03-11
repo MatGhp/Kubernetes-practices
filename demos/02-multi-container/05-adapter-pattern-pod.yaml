@@ -1,0 +1,240 @@
+# =============================================================================
+# Kubernetes Multi-Container Pod — Adapter Pattern
+# =============================================================================
+#
+# The Adapter pattern uses a helper container that transforms, normalizes,
+# or reformats output from the main application into a standard format
+# expected by an external consumer (monitoring system, log aggregator, etc.).
+#
+# Why Adapter?
+#   Different apps produce output in different formats. Instead of
+#   modifying each app, an adapter container standardizes the output.
+#
+#   Main App → (custom format) → Adapter → (standard format) → Consumer
+#
+# Adapter vs other patterns:
+#   Adapter    → Transforms OUTBOUND data to a standard format
+#   Ambassador → Proxies OUTBOUND traffic to external services
+#   Sidecar    → General-purpose helper (logging, config, etc.)
+#
+# Common use cases:
+#   - Log format normalization (app logs → JSON for Elasticsearch)
+#   - Metrics conversion (custom metrics → Prometheus format)
+#   - Data enrichment (add metadata, timestamps, context)
+#   - Protocol translation (XML → JSON, binary → text)
+#   - Response reshaping for downstream APIs
+#
+# See also:
+#   01 — Co-Located Containers  → general multi-container sharing
+#   02 — Sidecar Containers     → long-running helper alongside app
+#   03 — Init Containers        → run-to-completion before app
+#   04 — Ambassador Pattern     → proxy to external services
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Example 1: Log format adapter — Plain text → JSON
+# -----------------------------------------------------------------------------
+# The app writes logs in a custom format. The adapter reads them and
+# converts each line to JSON for a log aggregator (e.g., Elasticsearch).
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: adapter-log-formatter
+spec:
+  containers:
+    - name: main-app
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          while true; do
+            echo "$(date) INFO  user=john action=login status=success" >> /var/log/app/app.log
+            sleep 5
+            echo "$(date) WARN  user=jane action=upload status=failed" >> /var/log/app/app.log
+            sleep 5
+          done
+      volumeMounts:
+        - name: log-volume
+          mountPath: /var/log/app
+
+    - name: log-adapter
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          # Convert plain-text logs to JSON format
+          tail -F /var/log/app/app.log | while read line; do
+            TIMESTAMP=$(echo "$line" | cut -d' ' -f1-5)
+            LEVEL=$(echo "$line" | awk '{print $6}')
+            REST=$(echo "$line" | cut -d' ' -f7-)
+            echo "{\"timestamp\":\"$TIMESTAMP\",\"level\":\"$LEVEL\",\"message\":\"$REST\"}"
+          done
+      volumeMounts:
+        - name: log-volume
+          mountPath: /var/log/app
+
+  volumes:
+    - name: log-volume
+      emptyDir: {}
+
+---
+
+# -----------------------------------------------------------------------------
+# Example 2: Metrics adapter — Custom metrics → Prometheus format
+# -----------------------------------------------------------------------------
+# The app exposes metrics in a custom format. The adapter converts them
+# to Prometheus exposition format (text/plain) on :9113/metrics.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: adapter-metrics-exporter
+  labels:
+    app: myapp
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9113"
+    prometheus.io/path: "/metrics"
+spec:
+  containers:
+    - name: main-app
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          # Simulate writing custom metrics to a file
+          while true; do
+            REQUESTS=$((RANDOM % 1000))
+            ERRORS=$((RANDOM % 50))
+            LATENCY=$((RANDOM % 200))
+            echo "requests_total=$REQUESTS" > /metrics/app-metrics.txt
+            echo "errors_total=$ERRORS" >> /metrics/app-metrics.txt
+            echo "avg_latency_ms=$LATENCY" >> /metrics/app-metrics.txt
+            sleep 15
+          done
+      volumeMounts:
+        - name: metrics-volume
+          mountPath: /metrics
+
+    - name: metrics-adapter
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          # Read custom metrics and serve them in Prometheus format
+          while true; do
+            if [ -f /metrics/app-metrics.txt ]; then
+              {
+                echo "# HELP app_requests_total Total number of requests"
+                echo "# TYPE app_requests_total counter"
+                grep requests_total /metrics/app-metrics.txt | sed 's/requests_total=/app_requests_total /'
+                echo "# HELP app_errors_total Total number of errors"
+                echo "# TYPE app_errors_total counter"
+                grep errors_total /metrics/app-metrics.txt | sed 's/errors_total=/app_errors_total /'
+                echo "# HELP app_avg_latency_ms Average latency in ms"
+                echo "# TYPE app_avg_latency_ms gauge"
+                grep avg_latency_ms /metrics/app-metrics.txt | sed 's/avg_latency_ms=/app_avg_latency_ms /'
+              } > /metrics/prometheus-metrics.txt
+            fi
+            sleep 15
+          done
+      volumeMounts:
+        - name: metrics-volume
+          mountPath: /metrics
+
+  volumes:
+    - name: metrics-volume
+      emptyDir: {}
+
+---
+
+# -----------------------------------------------------------------------------
+# Example 3: Data enrichment adapter
+# -----------------------------------------------------------------------------
+# The app writes raw events. The adapter enriches them with node and pod
+# metadata before forwarding.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: adapter-enricher
+spec:
+  containers:
+    - name: main-app
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          while true; do
+            echo "{\"event\":\"click\",\"user\":\"user123\"}" >> /data/raw-events.log
+            sleep 5
+          done
+      volumeMounts:
+        - name: data-volume
+          mountPath: /data
+
+    - name: enrichment-adapter
+      image: busybox
+      env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+      command:
+        - sh
+        - -c
+        - |
+          # Enrich each event with pod and node metadata
+          tail -F /data/raw-events.log | while read line; do
+            # Strip trailing } and append metadata
+            ENRICHED=$(echo "$line" | sed "s/}$/,\"pod\":\"$POD_NAME\",\"node\":\"$NODE_NAME\"}/")
+            echo "$ENRICHED"
+          done
+      volumeMounts:
+        - name: data-volume
+          mountPath: /data
+
+  volumes:
+    - name: data-volume
+      emptyDir: {}
+
+
+# =============================================================================
+# Sample Commands
+# =============================================================================
+
+# Apply
+# kubectl apply -f 05-adapter-pattern-pod.yaml
+
+# View transformed JSON logs from the adapter
+# kubectl logs adapter-log-formatter -c log-adapter
+
+# Compare raw logs vs adapted output
+# kubectl logs adapter-log-formatter -c main-app
+# kubectl logs adapter-log-formatter -c log-adapter
+
+# View Prometheus-formatted metrics
+# kubectl exec adapter-metrics-exporter -c metrics-adapter -- cat /metrics/prometheus-metrics.txt
+
+# View enriched events (includes pod and node metadata)
+# kubectl logs adapter-enricher -c enrichment-adapter
+
+# Check all containers are running
+# kubectl get pod adapter-log-formatter -o jsonpath='{.status.containerStatuses[*].name}'
+
+# Describe
+# kubectl describe pod adapter-log-formatter
+
+# Delete
+# kubectl delete -f 05-adapter-pattern-pod.yaml

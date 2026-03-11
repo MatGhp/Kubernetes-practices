@@ -1,0 +1,184 @@
+# =============================================================================
+# Kubernetes Multi-Container Pod — Ambassador Pattern
+# =============================================================================
+#
+# The Ambassador pattern uses a proxy container that acts as a "local
+# representative" for an external service. The main app connects to
+# localhost, and the ambassador handles routing to the real destination.
+#
+# Why Ambassador?
+#   The main app doesn't need to know about:
+#     - Connection strings or endpoints of external services
+#     - Load balancing logic across replicas
+#     - TLS termination or authentication
+#     - Environment-specific configuration (dev/staging/prod)
+#
+#   The app just connects to localhost:<port> → ambassador handles the rest.
+#
+# Ambassador vs other patterns:
+#   Ambassador → Proxies OUTBOUND traffic to external services
+#   Sidecar    → Extends functionality (logging, config reload)
+#   Adapter    → Transforms OUTBOUND data format
+#
+# Common use cases:
+#   - Database proxy (e.g., Cloud SQL Proxy for GCP, pgbouncer)
+#   - API gateway / service mesh proxy (Envoy)
+#   - Rate limiting proxy
+#   - TLS termination for legacy apps
+#   - Environment-aware routing (dev → dev-db, prod → prod-db)
+#
+# See also:
+#   01 — Co-Located Containers  → general multi-container sharing
+#   02 — Sidecar Containers     → long-running helper alongside app
+#   03 — Init Containers        → run-to-completion before app
+#   05 — Adapter Pattern        → transform/normalize output
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Example 1: Database connection proxy
+# -----------------------------------------------------------------------------
+# The app connects to localhost:5432. The ambassador proxies traffic
+# to the actual database service (e.g., external-db:5432).
+# In production, this could be Cloud SQL Proxy, pgbouncer, or HAProxy.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ambassador-db-proxy
+spec:
+  containers:
+    - name: main-app
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          echo "App connecting to database via localhost:5432"
+          while true; do
+            echo "$(date) Querying database on localhost:5432..."
+            sleep 10
+          done
+
+    - name: db-proxy
+      image: alpine/socat
+      # socat forwards localhost:5432 → actual-db-host:5432
+      # Replace "actual-db-host" with real service name
+      command:
+        - sh
+        - -c
+        - |
+          echo "Starting DB proxy: localhost:5432 → external-db:5432"
+          socat TCP-LISTEN:5432,fork,reuseaddr TCP:external-db:5432
+      ports:
+        - containerPort: 5432
+
+---
+
+# -----------------------------------------------------------------------------
+# Example 2: HTTP caching proxy
+# -----------------------------------------------------------------------------
+# The app makes API calls to localhost:8080. The ambassador caches
+# responses and forwards to the real upstream API, reducing external calls.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ambassador-cache-proxy
+spec:
+  containers:
+    - name: main-app
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          while true; do
+            echo "$(date) Calling API via localhost:8080..."
+            wget -q -O- http://localhost:8080/api/data 2>/dev/null || true
+            sleep 5
+          done
+
+    - name: cache-proxy
+      image: nginx
+      ports:
+        - containerPort: 8080
+      volumeMounts:
+        - name: proxy-config
+          mountPath: /etc/nginx/conf.d
+
+  volumes:
+    - name: proxy-config
+      configMap:
+        name: ambassador-nginx-config  # Nginx reverse proxy config
+
+---
+
+# -----------------------------------------------------------------------------
+# Example 3: Environment-aware proxy
+# -----------------------------------------------------------------------------
+# The ambassador reads env vars to decide which backend to proxy to.
+# Same app image works in dev, staging, and prod — only the ambassador
+# config changes.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: ambassador-env-proxy
+spec:
+  containers:
+    - name: main-app
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          while true; do
+            echo "$(date) Calling service via localhost:9000"
+            sleep 10
+          done
+
+    - name: env-proxy
+      image: alpine/socat
+      env:
+        - name: UPSTREAM_HOST
+          value: "api-service.production.svc.cluster.local"
+        - name: UPSTREAM_PORT
+          value: "9000"
+      command:
+        - sh
+        - -c
+        - |
+          echo "Proxying localhost:9000 → $UPSTREAM_HOST:$UPSTREAM_PORT"
+          socat TCP-LISTEN:9000,fork,reuseaddr TCP:$UPSTREAM_HOST:$UPSTREAM_PORT
+      ports:
+        - containerPort: 9000
+
+
+# =============================================================================
+# Sample Commands
+# =============================================================================
+
+# Apply
+# kubectl apply -f 04-ambassador-pattern-pod.yaml
+
+# Check all containers are running
+# kubectl get pod ambassador-db-proxy -o wide
+
+# View logs from the ambassador proxy
+# kubectl logs ambassador-db-proxy -c db-proxy
+
+# View logs from the main app
+# kubectl logs ambassador-db-proxy -c main-app
+
+# Verify localhost connectivity from main app
+# kubectl exec ambassador-db-proxy -c main-app -- wget -q -O- http://localhost:8080 2>/dev/null
+
+# Check all container statuses
+# kubectl get pod ambassador-db-proxy -o jsonpath='{range .status.containerStatuses[*]}{.name}{": "}{.state}{"\n"}{end}'
+
+# Describe
+# kubectl describe pod ambassador-db-proxy
+
+# Delete
+# kubectl delete -f 04-ambassador-pattern-pod.yaml

@@ -1,0 +1,148 @@
+# =============================================================================
+# Kubernetes Multi-Container Pod — Co-Located Containers
+# =============================================================================
+#
+# A Pod can hold multiple containers that share the same network namespace
+# (localhost), storage volumes, and lifecycle. This is the fundamental
+# building block for all multi-container patterns.
+#
+# Co-located containers are simply multiple containers in one Pod that
+# cooperate to deliver a single service. They are NOT the same as sidecars
+# or init containers — they are all "regular" containers that run in parallel.
+#
+# What co-located containers share:
+#   - Network      → Same IP, communicate via localhost:<port>
+#   - Storage      → Shared volumes (emptyDir, configMap, secret, etc.)
+#   - Lifecycle    → Created and destroyed together with the Pod
+#   - IPC          → Can use shared memory / IPC if needed
+#
+# When to use co-located containers:
+#   ✔ Containers are tightly coupled and MUST run together
+#   ✔ They share data via filesystem or localhost
+#   ✔ They have the same scaling requirements
+#
+# When NOT to use (use separate Pods/Deployments instead):
+#   ✘ Containers need independent scaling
+#   ✘ Containers have different lifecycles or update frequencies
+#   ✘ Failure in one should not affect the other
+#
+# Multi-container patterns overview:
+#   01 — Co-Located Containers  ← this file (general pattern)
+#   02 — Sidecar Containers     ← native sidecar (K8s 1.28+)
+#   03 — Init Containers        ← run-to-completion before main app
+#   04 — Ambassador Pattern     ← proxy to external services
+#   05 — Adapter Pattern        ← transform/normalize output
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Example 1: Content generator + Web server
+# -----------------------------------------------------------------------------
+# busybox generates content → nginx serves it, via a shared emptyDir volume.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: colocated-content-pod
+spec:
+  containers:
+    - name: web-server
+      image: nginx
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: shared-data
+          mountPath: /usr/share/nginx/html
+
+    - name: content-generator
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          while true; do
+            echo "Page generated at $(date)" > /shared-data/index.html
+            sleep 10
+          done
+      volumeMounts:
+        - name: shared-data
+          mountPath: /shared-data
+
+  volumes:
+    - name: shared-data
+      emptyDir: {}
+
+---
+
+# -----------------------------------------------------------------------------
+# Example 2: App + Log collector (classic co-location)
+# -----------------------------------------------------------------------------
+# The app writes logs to a shared volume. The log collector reads and
+# forwards them (e.g., to stdout so kubectl logs can see them).
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: colocated-logging-pod
+spec:
+  containers:
+    - name: app
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          while true; do
+            echo "$(date) INFO  app is running" >> /var/log/app/app.log
+            sleep 5
+          done
+      volumeMounts:
+        - name: log-volume
+          mountPath: /var/log/app
+
+    - name: log-collector
+      image: busybox
+      command:
+        - sh
+        - -c
+        - tail -F /var/log/app/app.log
+      volumeMounts:
+        - name: log-volume
+          mountPath: /var/log/app
+
+  volumes:
+    - name: log-volume
+      emptyDir: {}
+
+
+# =============================================================================
+# Sample Commands
+# =============================================================================
+
+# Apply
+# kubectl apply -f 01-co-located-pattern-pod.yaml
+
+# List all containers in the pod
+# kubectl get pod colocated-content-pod -o jsonpath='{.spec.containers[*].name}'
+
+# View logs from a specific container (-c flag)
+# kubectl logs colocated-content-pod -c web-server
+# kubectl logs colocated-content-pod -c content-generator
+
+# View logs from ALL containers at once
+# kubectl logs colocated-content-pod --all-containers=true
+
+# Exec into a specific container
+# kubectl exec -it colocated-content-pod -c web-server -- /bin/sh
+
+# Verify shared volume — curl from web-server
+# kubectl exec colocated-content-pod -c web-server -- curl -s localhost
+
+# Check which node the pod is running on
+# kubectl get pod colocated-content-pod -o wide
+
+# Describe pod — shows all containers, statuses, events
+# kubectl describe pod colocated-content-pod
+
+# Delete
+# kubectl delete -f 01-co-located-pattern-pod.yaml

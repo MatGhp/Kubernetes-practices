@@ -1,0 +1,186 @@
+# =============================================================================
+# Kubernetes Multi-Container Pod — Init Containers
+# =============================================================================
+#
+# Init containers run to completion BEFORE any regular container starts.
+# They are used to set up preconditions for the main application.
+#
+# Key behaviors:
+#   - Run ONE at a time, in order (sequential, not parallel)
+#   - Each must exit successfully (exit code 0) before the next starts
+#   - If an init container fails, the Pod restarts (per restartPolicy)
+#   - They do NOT run again after Pod startup (unless Pod restarts entirely)
+#   - They do NOT have readiness/liveness probes (they are not long-running)
+#   - They CAN have resource limits (counted separately from app containers)
+#
+# Init containers vs Sidecar containers:
+#   Init Container  → Runs to completion, then exits. Blocks app startup.
+#   Native Sidecar  → initContainer with restartPolicy: Always. Runs
+#                      alongside app for the entire Pod lifetime. (K8s 1.28+)
+#
+# Common use cases:
+#   - Wait for a dependency (database, API, ConfigMap) to be ready
+#   - Clone a Git repo or download config files
+#   - Run database migrations
+#   - Set up file permissions or seed data
+#   - Register the service with a service discovery system
+#
+# See also:
+#   01 — Co-Located Containers  → all containers run in parallel
+#   02 — Sidecar Containers     → long-running helper alongside app
+#   04 — Ambassador Pattern     → proxy to external services
+#   05 — Adapter Pattern        → transform/normalize output
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Example 1: Wait for a service to be available
+# -----------------------------------------------------------------------------
+# The init container blocks until a service (mydb) is DNS-resolvable,
+# then the main app starts knowing its dependency is ready.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: init-wait-for-service
+spec:
+  initContainers:
+    - name: wait-for-db
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for mydb service..."
+          until nslookup mydb.default.svc.cluster.local; do
+            echo "  mydb not ready, retrying in 2s..."
+            sleep 2
+          done
+          echo "mydb is available!"
+
+  containers:
+    - name: main-app
+      image: nginx
+      ports:
+        - containerPort: 80
+
+---
+
+# -----------------------------------------------------------------------------
+# Example 2: Multiple init containers — Clone repo + Set permissions
+# -----------------------------------------------------------------------------
+# Init containers run in order: first clones the code, second fixes perms.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: init-multi-step
+spec:
+  initContainers:
+    - name: clone-repo
+      image: alpine/git
+      command:
+        - git
+        - clone
+        - https://github.com/example/static-site.git
+        - /work-dir
+      volumeMounts:
+        - name: app-data
+          mountPath: /work-dir
+
+    - name: fix-permissions
+      image: busybox
+      command:
+        - sh
+        - -c
+        - chmod -R 755 /work-dir
+      volumeMounts:
+        - name: app-data
+          mountPath: /work-dir
+
+  containers:
+    - name: web-server
+      image: nginx
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: app-data
+          mountPath: /usr/share/nginx/html
+
+  volumes:
+    - name: app-data
+      emptyDir: {}
+
+---
+
+# -----------------------------------------------------------------------------
+# Example 3: Seed configuration from a ConfigMap
+# -----------------------------------------------------------------------------
+# The init container copies config to a writable volume so the app
+# can modify it at runtime if needed.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: init-seed-config
+spec:
+  initContainers:
+    - name: seed-config
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          echo "Seeding configuration..."
+          cp /config-readonly/app.conf /config-writable/app.conf
+          echo "Done."
+      volumeMounts:
+        - name: config-readonly
+          mountPath: /config-readonly
+        - name: config-writable
+          mountPath: /config-writable
+
+  containers:
+    - name: main-app
+      image: nginx
+      volumeMounts:
+        - name: config-writable
+          mountPath: /etc/app
+
+  volumes:
+    - name: config-readonly
+      configMap:
+        name: app-config               # Must exist before applying
+    - name: config-writable
+      emptyDir: {}
+
+
+# =============================================================================
+# Sample Commands
+# =============================================================================
+
+# Apply
+# kubectl apply -f 03-init-container-pattern-pod.yaml
+
+# Watch Pod go through Init phases → Running
+# kubectl get pod init-wait-for-service -w
+
+# Check init container status
+# kubectl get pod init-multi-step -o jsonpath='{.status.initContainerStatuses[*].name}'
+
+# View init container logs (useful for debugging startup failures)
+# kubectl logs init-wait-for-service -c wait-for-db
+# kubectl logs init-multi-step -c clone-repo
+# kubectl logs init-multi-step -c fix-permissions
+
+# Describe pod — shows init container order and statuses under "Init Containers"
+# kubectl describe pod init-multi-step
+
+# Check why a pod is stuck in Init:0/2 (init container failed)
+# kubectl describe pod init-multi-step | grep -A 15 "Init Containers"
+
+# Exec into an init container (only while it's running — hard to catch)
+# kubectl exec -it init-wait-for-service -c wait-for-db -- /bin/sh
+
+# Delete
+# kubectl delete -f 03-init-container-pattern-pod.yaml

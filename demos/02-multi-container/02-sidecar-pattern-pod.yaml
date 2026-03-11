@@ -1,0 +1,198 @@
+# =============================================================================
+# Kubernetes Multi-Container Pod — Sidecar Containers
+# =============================================================================
+#
+# A Sidecar is a secondary container that runs alongside the main application
+# to enhance or extend its functionality WITHOUT modifying the app's code.
+#
+# Native Sidecar (K8s 1.28+ / stable in 1.29):
+#   Defined as an initContainer with `restartPolicy: Always`.
+#   Benefits over regular multi-container co-location:
+#     ✔ Starts BEFORE main containers (guaranteed initialization)
+#     ✔ Stops AFTER main containers (graceful shutdown)
+#     ✔ Restarts independently if it crashes
+#     ✔ Does NOT block main container startup (unlike regular init containers)
+#     ✔ Proper lifecycle ordering for Jobs / CronJobs
+#
+# Legacy Sidecar (before K8s 1.28):
+#   Defined as a regular container in spec.containers[].
+#   Drawbacks: no startup/shutdown ordering, no independent restart.
+#
+# Common sidecar use cases:
+#   - Log shipping (Fluentd, Filebeat)
+#   - Service mesh proxy (Envoy, Istio)
+#   - Monitoring agent (Prometheus exporter)
+#   - Configuration reloading (watch + signal)
+#   - TLS termination / certificate rotation
+#
+# See also:
+#   01 — Co-Located Containers  → general multi-container sharing
+#   03 — Init Containers        → run-to-completion before app
+#   04 — Ambassador Pattern     → proxy to external services
+#   05 — Adapter Pattern        → transform/normalize output
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# Example 1: Native Sidecar — Log shipper (K8s 1.28+)
+# -----------------------------------------------------------------------------
+# The sidecar starts first, runs for the Pod's entire lifetime, and stops
+# after the main container exits.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sidecar-native-demo
+spec:
+  initContainers:
+    - name: log-shipper
+      image: busybox
+      restartPolicy: Always            # ← This makes it a native sidecar
+      command:
+        - sh
+        - -c
+        - tail -F /var/log/app/app.log
+      volumeMounts:
+        - name: log-volume
+          mountPath: /var/log/app
+
+  containers:
+    - name: main-app
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          while true; do
+            echo "$(date) INFO  processing request" >> /var/log/app/app.log
+            sleep 5
+          done
+      volumeMounts:
+        - name: log-volume
+          mountPath: /var/log/app
+
+  volumes:
+    - name: log-volume
+      emptyDir: {}
+
+---
+
+# -----------------------------------------------------------------------------
+# Example 2: Native Sidecar — Config reloader
+# -----------------------------------------------------------------------------
+# Watches a ConfigMap-mounted file and sends SIGHUP to the main process
+# whenever the configuration changes.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sidecar-config-reloader
+spec:
+  shareProcessNamespace: true          # Allow sidecar to signal main container
+
+  initContainers:
+    - name: config-watcher
+      image: busybox
+      restartPolicy: Always
+      command:
+        - sh
+        - -c
+        - |
+          CHECKSUM=""
+          while true; do
+            NEW=$(md5sum /etc/config/app.conf 2>/dev/null | cut -d' ' -f1)
+            if [ "$NEW" != "$CHECKSUM" ] && [ -n "$CHECKSUM" ]; then
+              echo "Config changed, sending SIGHUP"
+              # In real use: kill -HUP <pid of main process>
+            fi
+            CHECKSUM=$NEW
+            sleep 5
+          done
+      volumeMounts:
+        - name: config-volume
+          mountPath: /etc/config
+
+  containers:
+    - name: main-app
+      image: nginx
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: config-volume
+          mountPath: /etc/config
+
+  volumes:
+    - name: config-volume
+      emptyDir: {}              # Replace with configMap in real use
+
+---
+
+# -----------------------------------------------------------------------------
+# Example 3: Legacy Sidecar (pre-K8s 1.28)
+# -----------------------------------------------------------------------------
+# Before native sidecars, a sidecar was just a regular container.
+# No startup/shutdown ordering guarantees.
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sidecar-legacy-demo
+spec:
+  containers:
+    - name: main-app
+      image: nginx
+      ports:
+        - containerPort: 80
+      volumeMounts:
+        - name: shared-data
+          mountPath: /usr/share/nginx/html
+
+    - name: content-sidecar
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          while true; do
+            echo "Updated at $(date)" > /shared-data/index.html
+            sleep 10
+          done
+      volumeMounts:
+        - name: shared-data
+          mountPath: /shared-data
+
+  volumes:
+    - name: shared-data
+      emptyDir: {}
+
+
+# =============================================================================
+# Sample Commands
+# =============================================================================
+
+# Apply
+# kubectl apply -f 02-sidecar-pattern-pod.yaml
+
+# Check that native sidecar started before main container
+# kubectl describe pod sidecar-native-demo | grep -A 5 "Init Containers"
+
+# View logs from the sidecar
+# kubectl logs sidecar-native-demo -c log-shipper
+
+# View logs from the main app
+# kubectl logs sidecar-native-demo -c main-app
+
+# View all container logs at once
+# kubectl logs sidecar-native-demo --all-containers=true
+
+# Check container statuses and restart counts
+# kubectl get pod sidecar-native-demo -o jsonpath='{.status.initContainerStatuses[*].name}{" restarts: "}{.status.initContainerStatuses[*].restartCount}'
+
+# Exec into the sidecar
+# kubectl exec -it sidecar-native-demo -c log-shipper -- /bin/sh
+
+# Check Kubernetes version supports native sidecars (1.28+)
+# kubectl version --short
+
+# Delete
+# kubectl delete -f 02-sidecar-pattern-pod.yaml
