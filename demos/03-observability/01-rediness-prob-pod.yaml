@@ -1,31 +1,331 @@
+# =============================================================================
+# Kubernetes Readiness Probes — Educational Reference
+# =============================================================================
+#
+# A readiness probe tells Kubernetes whether a container is ready to accept
+# traffic. Unlike a liveness probe (which restarts the container on failure),
+# a readiness probe only removes the pod from Service endpoints when it fails.
+# Once the probe succeeds again, the pod is added back automatically.
+#
+# Why readiness probes matter:
+#   Without a readiness probe, a pod is added to Service endpoints as soon as
+#   the container process starts — even if the app hasn't finished loading
+#   config, warming caches, or connecting to a database. This means clients
+#   hit pods that aren't ready, causing errors. Readiness probes prevent this
+#   by gating traffic until the app signals it's truly ready.
+#
+# How it works:
+#   1. The kubelet runs the readiness probe at the configured interval.
+#   2. If the probe succeeds, the pod's IP is added to the Endpoints object
+#      of all matching Services → traffic reaches this pod.
+#   3. If the probe fails, the pod's IP is REMOVED from Endpoints →
+#      the Service stops sending traffic to this pod (but the pod is NOT
+#      restarted — it keeps running and is re-probed).
+#   4. Once the probe succeeds again, the pod is added back to Endpoints.
+#
+# Probe types (same three mechanisms as liveness):
+#   - httpGet     → Sends an HTTP GET request. Success = 200–399 status code.
+#   - tcpSocket   → Opens a TCP connection. Success = port is open.
+#   - exec        → Runs a command inside the container. Success = exit code 0.
+#
+# Common configuration fields:
+#   - initialDelaySeconds  → Seconds to wait after container start before the
+#                            first probe (give the app time to boot).
+#   - periodSeconds        → How often (in seconds) to run the probe.
+#   - timeoutSeconds       → Seconds to wait for a probe response before
+#                            counting it as a failure.
+#   - failureThreshold     → Consecutive failures needed to mark the pod as
+#                            "not ready" (default: 3).
+#   - successThreshold     → Consecutive successes needed to mark the pod as
+#                            "ready" again (default: 1). Can be > 1 for
+#                            readiness probes (unlike liveness where it must
+#                            be 1).
+#
+# Readiness vs Liveness vs Startup:
+#   - Readiness  → "Can the container serve traffic?" Removes from endpoints
+#                  if not. Does NOT restart the container.
+#   - Liveness   → "Is the container alive?" Restarts it if not.
+#                  See 01-liveness-prob-pod.yaml.
+#   - Startup    → "Has the container finished starting?" Disables readiness
+#                  and liveness probes until it succeeds.
+#
+# Best practice: Use readiness AND liveness probes together.
+#   - Readiness gates traffic; liveness recovers from deadlocks.
+#   - Use different endpoints if possible (/ready vs /healthy) so they can
+#     fail independently.
+#
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1. HTTP GET Readiness Probe
+# -----------------------------------------------------------------------------
+# Best for web applications and REST APIs. The kubelet sends an HTTP GET
+# to the specified path and port. Any 2xx or 3xx response means ready.
+#
+#   kubelet
+#       |  GET /api/ready
+#       v
+#   container:8080
+#       |
+#       200 OK → pod IP added to Service Endpoints → receives traffic
+#       5xx / timeout → failure count +1
+#       failure count >= failureThreshold → pod IP removed from Endpoints
+# -----------------------------------------------------------------------------
+
 apiVersion: v1
 kind: Pod
 metadata:
-  name: myapp
+  name: readiness-http-pod
+  labels:
+    app: myapp
+    probe: readiness-http
 spec:
   containers:
-  - name: myapp
-    image: image-name
-    ports:
-    - containerPort: 8080
-    readinessProbe:
-      httpGet:
-        path: /api/ready
-        port: 8080
-      initialDelaySeconds: 5 #  Delay before the first probe to warm up the application
-      failureThreshold: 8 # Number of consecutive failures before marking the pod as not ready
-      periodSeconds: 10 #  Interval between readiness probes
-      timeoutSeconds: 2 #  Timeout for each probe
+    - name: myapp
+      image: nginx:1.25
+      ports:
+        - containerPort: 8080  # Port the application listens on
+      readinessProbe:
+        httpGet:
+          path: /api/ready     # Endpoint the kubelet will hit (should return 200 when ready)
+          port: 8080           # Must match the container's listening port
+          # httpHeaders:       # Optional: add custom headers if the app requires them
+          #   - name: X-Custom-Header
+          #     value: ReadinessCheck
+        initialDelaySeconds: 5 # Wait 5s after start before first probe (app warm-up)
+        periodSeconds: 10      # Probe every 10 seconds
+        timeoutSeconds: 2      # Fail the probe if no response within 2s
+        failureThreshold: 8    # Remove from endpoints after 8 consecutive failures
+        successThreshold: 1    # 1 success to be considered ready again
 
-    #  readinessProbe:
-    #    tcpSocket:
-    #      port: 3306
-    
-    #  readinessProbe:
-    #    excec:
-    #      command:
-    #      - /bin/sh
-    #      - -c
-    #      - echo "Ready"
+---
 
-    
+# -----------------------------------------------------------------------------
+# 2. TCP Socket Readiness Probe
+# -----------------------------------------------------------------------------
+# Best for non-HTTP services (databases, message brokers, custom TCP servers).
+# The kubelet attempts to open a TCP connection to the specified port.
+# If the connection is established, the pod is considered ready.
+#
+#   kubelet
+#       |  TCP SYN → port 3306
+#       v
+#   container:3306
+#       |
+#       Connection established → pod added to Endpoints
+#       Connection refused / timeout → failure count +1
+#       failure count >= failureThreshold → pod removed from Endpoints
+# -----------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: readiness-tcp-pod
+  labels:
+    app: mydb
+    probe: readiness-tcp
+spec:
+  containers:
+    - name: mysql
+      image: mysql:8.0
+      ports:
+        - containerPort: 3306  # MySQL default port
+      env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "example"     # For demo only — use Secrets in production
+      readinessProbe:
+        tcpSocket:
+          port: 3306           # Attempt TCP connection to this port
+        initialDelaySeconds: 15 # MySQL needs time to initialize
+        periodSeconds: 10       # Check every 10 seconds
+        timeoutSeconds: 3       # Timeout for TCP handshake
+        failureThreshold: 5     # Remove from endpoints after 5 failures
+        successThreshold: 1     # 1 success to be considered ready
+
+---
+
+# -----------------------------------------------------------------------------
+# 3. Exec Command Readiness Probe
+# -----------------------------------------------------------------------------
+# Best when readiness can only be determined by running a command inside the
+# container (e.g., checking if a database is accepting connections, verifying
+# a cache is warmed, or testing an internal dependency). Exit code 0 = ready,
+# any non-zero = not ready.
+#
+#   kubelet
+#       |  exec: cat /tmp/ready
+#       v
+#   container filesystem
+#       |
+#       exit 0 (file exists) → pod added to Endpoints
+#       exit 1 (file missing) → failure count +1
+#       failure count >= failureThreshold → pod removed from Endpoints
+# -----------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: readiness-exec-pod
+  labels:
+    app: myapp
+    probe: readiness-exec
+spec:
+  containers:
+    - name: myapp
+      image: busybox:1.36
+      # This command creates /tmp/ready after 10s. Before that, the readiness
+      # probe fails and the pod receives no traffic from Services.
+      command:
+        - /bin/sh
+        - -c
+        - sleep 10; touch /tmp/ready; sleep 600
+      readinessProbe:
+        exec:
+          command:             # Command to execute inside the container
+            - cat
+            - /tmp/ready       # Succeeds (exit 0) if file exists
+        initialDelaySeconds: 5 # Wait 5s before first check
+        periodSeconds: 5       # Check every 5 seconds
+        timeoutSeconds: 2      # Command must finish within 2s
+        failureThreshold: 3    # Remove from endpoints after 3 failures
+        successThreshold: 2    # Require 2 consecutive successes (stricter re-add)
+
+---
+
+# -----------------------------------------------------------------------------
+# 4. Readiness + Liveness + Startup (Combined Example)
+# -----------------------------------------------------------------------------
+# Production best practice: use all three probes together.
+#   - Startup probe  → protects slow-starting apps from premature liveness kills
+#   - Readiness probe → gates Service traffic until the app is truly ready
+#   - Liveness probe  → recovers from deadlocks/hangs after startup
+#
+#   Container starts
+#       |
+#       v
+#   Startup probe runs (readiness + liveness DISABLED)
+#       |
+#       Succeeds → readiness + liveness probes take over
+#       |
+#       Readiness probe controls Endpoints membership
+#       Liveness probe controls container restart
+# -----------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: readiness-full-pod
+  labels:
+    app: myapp
+    probe: readiness-full
+spec:
+  containers:
+    - name: myapp
+      image: nginx:1.25
+      ports:
+        - containerPort: 8080
+      startupProbe:            # Phase 1: wait for app to finish booting
+        httpGet:
+          path: /api/healthy
+          port: 8080
+        periodSeconds: 5
+        failureThreshold: 30   # 30 × 5s = up to 150s to start
+      readinessProbe:          # Phase 2: gate traffic
+        httpGet:
+          path: /api/ready     # Separate endpoint from liveness (best practice)
+          port: 8080
+        periodSeconds: 10
+        timeoutSeconds: 2
+        failureThreshold: 3
+        successThreshold: 1
+      livenessProbe:           # Phase 2: detect deadlocks
+        httpGet:
+          path: /api/healthy   # Different path than readiness
+          port: 8080
+        periodSeconds: 15
+        timeoutSeconds: 3
+        failureThreshold: 5
+
+
+# =============================================================================
+# Imperative Commands — Create Pods with Readiness Probes
+# =============================================================================
+
+# Generate a pod YAML skeleton (then add readinessProbe manually)
+# kubectl run readiness-http-pod --image=nginx:1.25 --port=8080 --dry-run=client -o yaml > readiness.yaml
+
+# Validate this file without applying (dry-run)
+# kubectl apply -f 01-rediness-prob-pod.yaml --dry-run=client -o yaml
+
+
+# =============================================================================
+# Apply / Inspect
+# =============================================================================
+
+# Apply all readiness probe examples from this file
+# kubectl apply -f 01-rediness-prob-pod.yaml
+
+# List all pods — look at READY column (0/1 = not ready, 1/1 = ready)
+# kubectl get pods
+
+# Watch pods transition from not-ready to ready in real time
+# kubectl get pods --watch
+
+# Wide output showing node, IP, readiness gates
+# kubectl get pods -o wide
+
+# Describe a pod (look at "Conditions" for Ready status and "Events" for probe results)
+# kubectl describe pod readiness-http-pod
+
+# Get the pod in YAML format (shows probe config and conditions)
+# kubectl get pod readiness-http-pod -o yaml
+
+# Check the Ready condition directly via jsonpath
+# kubectl get pod readiness-http-pod -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'
+
+# Check which pods are selected by a Service's endpoints
+# kubectl get endpoints myapp-service
+
+# Check EndpointSlices (modern replacement for Endpoints)
+# kubectl get endpointslices -l kubernetes.io/service-name=myapp-service
+
+
+# =============================================================================
+# Debugging Readiness Probe Failures
+# =============================================================================
+
+# Stream logs to see what the app is doing when probes fail
+# kubectl logs readiness-http-pod
+
+# Stream logs with follow
+# kubectl logs readiness-http-pod -f
+
+# Exec into the pod to manually test the readiness endpoint
+# kubectl exec -it readiness-http-pod -- curl -v http://localhost:8080/api/ready
+
+# Exec into the pod to check if the ready file exists (exec probe)
+# kubectl exec readiness-exec-pod -- cat /tmp/ready
+
+# Test TCP connectivity from inside a temp pod
+# kubectl run tcp-test --image=busybox:1.36 --rm -it --restart=Never -- nc -zv readiness-tcp-pod 3306
+
+# Check events filtered to a specific pod
+# kubectl get events --field-selector involvedObject.name=readiness-http-pod
+
+# Check if readiness failure is removing pod from endpoints
+# kubectl get endpoints myapp-service --watch
+
+
+# =============================================================================
+# Delete / Clean up
+# =============================================================================
+
+# Delete all pods defined in this file
+# kubectl delete -f 01-rediness-prob-pod.yaml
+
+# Delete a single pod by name
+# kubectl delete pod readiness-http-pod
+
+# Force delete a stuck pod (use with caution)
+# kubectl delete pod readiness-http-pod --grace-period=0 --force

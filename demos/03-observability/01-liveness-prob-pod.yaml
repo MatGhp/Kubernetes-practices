@@ -1,31 +1,312 @@
+# =============================================================================
+# Kubernetes Liveness Probes — Educational Reference
+# =============================================================================
+#
+# A liveness probe tells Kubernetes whether a container is still running
+# correctly. If the probe fails, the kubelet kills the container and
+# restarts it according to the pod's restartPolicy (default: Always).
+#
+# Why liveness probes matter:
+#   Containers can enter a broken state (deadlocks, infinite loops, corrupted
+#   memory) where the process is still running but can no longer serve traffic.
+#   Without a liveness probe Kubernetes has no way to detect this — the pod
+#   stays "Running" but is effectively dead. A liveness probe automates
+#   detection and recovery.
+#
+# How it works:
+#   1. The kubelet on the node runs the probe at the configured interval.
+#   2. If the probe succeeds, the container is considered healthy.
+#   3. If the probe fails `failureThreshold` consecutive times, the kubelet
+#      kills the container and restarts it.
+#   4. After a restart, `initialDelaySeconds` is respected again before
+#      probing resumes.
+#
+# Probe types (three mechanisms):
+#   - httpGet     → Sends an HTTP GET request. Success = 200–399 status code.
+#   - tcpSocket   → Opens a TCP connection. Success = port is open.
+#   - exec        → Runs a command inside the container. Success = exit code 0.
+#
+# Common configuration fields:
+#   - initialDelaySeconds  → Seconds to wait after container start before the
+#                            first probe (give the app time to boot).
+#   - periodSeconds        → How often (in seconds) to run the probe.
+#   - timeoutSeconds       → Seconds to wait for a probe response before
+#                            counting it as a failure.
+#   - failureThreshold     → Consecutive failures needed to restart the
+#                            container (default: 3).
+#   - successThreshold     → Consecutive successes needed to mark the
+#                            container as healthy again (default: 1;
+#                            must be 1 for liveness probes).
+#
+# Liveness vs Readiness vs Startup probes:
+#   - Liveness   → "Is the container alive?" Restarts it if not.
+#   - Readiness  → "Can the container serve traffic?" Removes it from
+#                  Service endpoints if not. See 01-rediness-prob-pod.yaml.
+#   - Startup    → "Has the container finished starting?" Disables liveness
+#                  and readiness probes until it succeeds. Useful for slow-
+#                  starting apps so liveness doesn't kill them prematurely.
+#
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1. HTTP GET Liveness Probe
+# -----------------------------------------------------------------------------
+# Best for web applications and REST APIs. The kubelet sends an HTTP GET
+# to the specified path and port. Any 2xx or 3xx response means healthy.
+#
+#   kubelet
+#       |  GET /api/healthy
+#       v
+#   container:8080
+#       |
+#       200 OK → healthy
+#       5xx / timeout → failure count +1
+#       failure count >= failureThreshold → restart container
+# -----------------------------------------------------------------------------
+
 apiVersion: v1
 kind: Pod
 metadata:
-  name: myapp
+  name: liveness-http-pod
+  labels:
+    app: myapp
+    probe: liveness-http
 spec:
   containers:
-  - name: myapp
-    image: image-name
-    ports:
-    - containerPort: 8080
-    livenessProbe:
-      httpGet:
-        path: /api/healthy
-        port: 8080
-      initialDelaySeconds: 5 # Delay before the first probe to warm up the application
-      failureThreshold: 8 # Number of consecutive failures before marking the pod as not healthy
-      periodSeconds: 10 #  Interval between liveness probes
-      timeoutSeconds: 2 # Timeout for each probe
+    - name: myapp
+      image: nginx:1.25
+      ports:
+        - containerPort: 8080  # Port the application listens on
+      livenessProbe:
+        httpGet:
+          path: /api/healthy   # Endpoint the kubelet will hit
+          port: 8080           # Must match the container's listening port
+          # httpHeaders:       # Optional: add custom headers if the app requires them
+          #   - name: X-Custom-Header
+          #     value: LivenessCheck
+        initialDelaySeconds: 5 # Wait 5s after start before first probe (app warm-up)
+        periodSeconds: 10      # Probe every 10 seconds
+        timeoutSeconds: 2      # Fail the probe if no response within 2s
+        failureThreshold: 8    # Restart after 8 consecutive failures
+        successThreshold: 1    # 1 success to be considered healthy again (only valid value for liveness)
 
-    #  livenessProbe:
-    #    tcpSocket:
-    #      port: 3306
-    
-    #  livenessProbe:
-    #    excec:
-    #      command:
-    #      - /bin/sh
-    #      - -c
-    #      - echo "Ready"
+---
 
-    
+# -----------------------------------------------------------------------------
+# 2. TCP Socket Liveness Probe
+# -----------------------------------------------------------------------------
+# Best for non-HTTP services (databases, message brokers, custom TCP servers).
+# The kubelet attempts to open a TCP connection to the specified port.
+# If the connection is established, the probe succeeds.
+#
+#   kubelet
+#       |  TCP SYN → port 3306
+#       v
+#   container:3306
+#       |
+#       Connection established → healthy
+#       Connection refused / timeout → failure count +1
+#       failure count >= failureThreshold → restart container
+# -----------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: liveness-tcp-pod
+  labels:
+    app: mydb
+    probe: liveness-tcp
+spec:
+  containers:
+    - name: mysql
+      image: mysql:8.0
+      ports:
+        - containerPort: 3306  # MySQL default port
+      env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "example"     # For demo only — use Secrets in production
+      livenessProbe:
+        tcpSocket:
+          port: 3306           # Attempt TCP connection to this port
+        initialDelaySeconds: 15 # MySQL needs more time to initialize
+        periodSeconds: 10       # Check every 10 seconds
+        timeoutSeconds: 3       # Timeout for TCP handshake
+        failureThreshold: 5     # Restart after 5 consecutive failures
+
+---
+
+# -----------------------------------------------------------------------------
+# 3. Exec Command Liveness Probe
+# -----------------------------------------------------------------------------
+# Best when health can only be determined by running a command inside the
+# container (e.g., checking a PID file, querying an internal status script,
+# or verifying a lock file). The kubelet runs the command; exit code 0 =
+# healthy, any non-zero exit code = failure.
+#
+#   kubelet
+#       |  exec: cat /tmp/healthy
+#       v
+#   container filesystem
+#       |
+#       exit 0 (file exists) → healthy
+#       exit 1 (file missing) → failure count +1
+#       failure count >= failureThreshold → restart container
+# -----------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: liveness-exec-pod
+  labels:
+    app: myapp
+    probe: liveness-exec
+spec:
+  containers:
+    - name: myapp
+      image: busybox:1.36
+      # This command creates /tmp/healthy, sleeps 30s, removes it, then sleeps
+      # forever. After 30s the liveness probe will start failing → restart.
+      command:
+        - /bin/sh
+        - -c
+        - touch /tmp/healthy; sleep 30; rm -f /tmp/healthy; sleep 600
+      livenessProbe:
+        exec:
+          command:             # Command to execute inside the container
+            - cat
+            - /tmp/healthy     # Succeeds (exit 0) if file exists
+        initialDelaySeconds: 5 # Wait 5s before first check
+        periodSeconds: 5       # Check every 5 seconds
+        timeoutSeconds: 2      # Command must finish within 2s
+        failureThreshold: 3    # Restart after 3 consecutive failures
+
+---
+
+# -----------------------------------------------------------------------------
+# 4. Startup Probe (used alongside Liveness Probe)
+# -----------------------------------------------------------------------------
+# For slow-starting applications that might be killed by a liveness probe
+# before they finish booting. A startup probe disables liveness and readiness
+# probes until it succeeds. Once it succeeds, it never runs again — the
+# liveness probe takes over.
+#
+#   Container starts
+#       |
+#       v
+#   Startup probe runs (liveness/readiness DISABLED)
+#       |
+#       Succeeds → liveness probe takes over
+#       Fails failureThreshold times → container is killed + restarted
+# -----------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: liveness-startup-pod
+  labels:
+    app: myapp
+    probe: liveness-startup
+spec:
+  containers:
+    - name: myapp
+      image: nginx:1.25
+      ports:
+        - containerPort: 8080
+      startupProbe:
+        httpGet:
+          path: /api/healthy
+          port: 8080
+        initialDelaySeconds: 0  # Start checking immediately
+        periodSeconds: 5        # Check every 5s during startup
+        timeoutSeconds: 2       # Timeout per attempt
+        failureThreshold: 30    # 30 × 5s = up to 150 seconds to start
+        # Once this succeeds, it never runs again — livenessProbe takes over
+      livenessProbe:
+        httpGet:
+          path: /api/healthy
+          port: 8080
+        periodSeconds: 10       # Normal cadence after startup succeeds
+        timeoutSeconds: 2
+        failureThreshold: 3
+
+
+# =============================================================================
+# Imperative Commands — Create Pods with Liveness Probes
+# =============================================================================
+
+# Create a pod with an HTTP liveness probe (imperative, limited options)
+# kubectl run liveness-http-pod --image=nginx:1.25 --port=8080 --dry-run=client -o yaml > liveness.yaml
+# (Then add the livenessProbe section manually — probes can't be set imperatively)
+
+# Generate YAML from this file without applying (useful for review)
+# kubectl apply -f 01-liveness-prob-pod.yaml --dry-run=client -o yaml
+
+
+# =============================================================================
+# Apply / Inspect
+# =============================================================================
+
+# Apply all probe examples from this file
+# kubectl apply -f 01-liveness-prob-pod.yaml
+
+# List all pods (look for RESTARTS column — liveness failures increase it)
+# kubectl get pods
+
+# List pods with wide output (shows node, IP, and nominated node)
+# kubectl get pods -o wide
+
+# Watch pod status in real time (observe restarts happening live)
+# kubectl get pods --watch
+
+# Describe a specific pod (look for the "Events" section for probe failures)
+# kubectl describe pod liveness-http-pod
+
+# Get pod in YAML format (shows full probe configuration as Kubernetes sees it)
+# kubectl get pod liveness-http-pod -o yaml
+
+# Get the restart count for a specific pod using jsonpath
+# kubectl get pod liveness-http-pod -o jsonpath='{.status.containerStatuses[0].restartCount}'
+
+# Get the last termination reason (shows why the container was killed)
+# kubectl get pod liveness-exec-pod -o jsonpath='{.status.containerStatuses[0].lastState.terminated.reason}'
+
+
+# =============================================================================
+# Debugging Liveness Probe Failures
+# =============================================================================
+
+# Stream logs to see what the app is doing when probes fail
+# kubectl logs liveness-http-pod
+
+# Stream logs with follow (tail -f behavior)
+# kubectl logs liveness-http-pod -f
+
+# Show logs from the previous (crashed) container instance
+# kubectl logs liveness-http-pod --previous
+
+# Exec into the pod to manually test the probe endpoint
+# kubectl exec -it liveness-http-pod -- curl -v http://localhost:8080/api/healthy
+
+# Exec into the pod to check if the health file exists (exec probe)
+# kubectl exec liveness-exec-pod -- cat /tmp/healthy
+
+# Test TCP connectivity from inside a temp pod
+# kubectl run tcp-test --image=busybox:1.36 --rm -it --restart=Never -- nc -zv liveness-tcp-pod 3306
+
+# Check pod events for probe failure messages (filtered)
+# kubectl get events --field-selector involvedObject.name=liveness-http-pod
+
+
+# =============================================================================
+# Delete / Clean up
+# =============================================================================
+
+# Delete all pods defined in this file
+# kubectl delete -f 01-liveness-prob-pod.yaml
+
+# Delete a single pod by name
+# kubectl delete pod liveness-http-pod
+
+# Force delete a stuck pod (use with caution)
+# kubectl delete pod liveness-http-pod --grace-period=0 --force
