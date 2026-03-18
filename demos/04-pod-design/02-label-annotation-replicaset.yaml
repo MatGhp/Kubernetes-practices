@@ -1,38 +1,310 @@
+# =============================================================================
+# Kubernetes Labels & Annotations on ReplicaSets — Educational Reference
+# =============================================================================
+#
+# This file demonstrates how labels and annotations work on a ReplicaSet
+# (and its associated Service), building on the label concepts introduced
+# in 01-labels-pod.yaml.
+#
+# Labels vs Annotations — key differences:
+#   ┌─────────────┬───────────────────────────────────┬──────────────────────────────────┐
+#   │             │ Labels                            │ Annotations                      │
+#   ├─────────────┼───────────────────────────────────┼──────────────────────────────────┤
+#   │ Purpose     │ Identify & select resources       │ Attach non-identifying metadata  │
+#   │ Queryable   │ Yes (kubectl -l, selectors)       │ No (not used in selectors)       │
+#   │ Used by     │ Services, Deployments, schedulers │ Tools, CI/CD, humans, dashboards │
+#   │ Size limit  │ Key: 63 chars, Value: 63 chars    │ Key: 63 chars, Value: 256 KB     │
+#   │ Examples    │ app=myapp, env=prod               │ description, git-commit, owner   │
+#   └─────────────┴───────────────────────────────────┴──────────────────────────────────┘
+#
+# When to use annotations:
+#   - Build/release info (git commit, CI pipeline URL, build version)
+#   - Description or documentation for the resource
+#   - Tool-specific config (Ingress annotations for nginx, cert-manager, etc.)
+#   - Contact info (team email, on-call owner)
+#   - Timestamps, change reasons, rollout notes
+#
+# Labels on a ReplicaSet — three distinct places:
+#   1. metadata.labels      → Labels on the ReplicaSet object itself.
+#                             Used to identify/query the RS (kubectl get rs -l app=myapp).
+#   2. spec.selector        → Label selector that determines which Pods the RS
+#                             manages. Must match template.metadata.labels.
+#   3. template.metadata    → Labels applied to every Pod the RS creates.
+#                             These are what Services and selectors actually match.
+#
+#   ReplicaSet (metadata.labels: app=webapp, type=frontend)
+#       │
+#       │ spec.selector.matchLabels: app=webapp
+#       │
+#       ├── Pod 1 (labels: app=webapp, type=frontend)
+#       ├── Pod 2 (labels: app=webapp, type=frontend)
+#       └── Pod 3 (labels: app=webapp, type=frontend)
+#              │
+#              │ Service selector: app=webapp
+#              ▼
+#        Service → routes traffic to all 3 Pods
+#
+# See also:
+#   - 01-labels-pod.yaml for label fundamentals and selector queries
+#   - 03-roulling-updates-rollback-deployment.yaml for Deployments (which
+#     manage ReplicaSets automatically)
+#
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1. ReplicaSet with Labels and Annotations
+# -----------------------------------------------------------------------------
+# Demonstrates all three label locations plus annotations for metadata.
+#
+#   ReplicaSet: webapp-replicaset
+#       metadata.labels:  app=webapp, type=frontend
+#       annotations:      description, buildVersion, owner, git-commit
+#       │
+#       │  selector.matchLabels: app=webapp
+#       │
+#       ├── Pod (app=webapp, type=frontend)
+#       ├── Pod (app=webapp, type=frontend)
+#       └── Pod (app=webapp, type=frontend)
+# -----------------------------------------------------------------------------
+
 apiVersion: apps/v1
 kind: ReplicaSet
 metadata:
-  name: simple-webapp
+  name: webapp-replicaset
   labels:
-    app: App1 #  Label to identify the replicaset
-    type: frontend
-  annotations: #  Additional metadata for the replicaset
-    description: "This is a simple web application replicaset"
-    buildVersion: 1.0.0 # Annotations for additional metadata
+    app: webapp            # Label on the RS itself (for querying ReplicaSets)
+    type: frontend         # Role label — not used by selector, but useful for filtering
+  annotations:
+    description: "Frontend web application serving the main UI"  # Human-readable purpose
+    buildVersion: "1.0.0"  # Build/release version (not used by K8s, useful for tracking)
+    owner: "platform-team" # Team responsible for this workload
+    git-commit: "abc1234"  # Source commit (typically set by CI/CD pipeline)
 spec:
-  replicas: 3
+  replicas: 3              # Desired number of Pod replicas
   selector:
-    matchLabels: # Match pods with these labels
-      app: App1
+    matchLabels:
+      app: webapp          # MUST match template.metadata.labels (at minimum)
+      # Note: selector is immutable after creation — you cannot change it
   template:
     metadata:
       labels:
-        app: App1 # Label to identify the pod
-        type: frontend
+        app: webapp        # Must match selector.matchLabels
+        type: frontend     # Additional label — Services and queries can use this
+      annotations:
+        description: "Frontend pod managed by webapp-replicaset"
+        # Pod-level annotations are independent from RS-level annotations
     spec:
       containers:
-      - name: simple-webapp
-        image: simple-webapp:latest
-        ports:
-        - containerPort: 8080
+        - name: webapp
+          image: nginx:1.25
+          ports:
+            - containerPort: 8080  # Port the application listens on
 
 ---
+
+# -----------------------------------------------------------------------------
+# 2. Service Selecting ReplicaSet Pods by Labels
+# -----------------------------------------------------------------------------
+# This Service routes traffic to all Pods with label app=webapp.
+# It doesn't know about the ReplicaSet — it only cares about Pod labels.
+#
+#   Client (inside cluster)
+#       │
+#       ▼
+#   webapp-service:80 (ClusterIP)
+#       │  selector: app=webapp
+#       ▼
+#   Pod(s) with label app=webapp  :8080 (targetPort)
+# -----------------------------------------------------------------------------
+
 apiVersion: v1
 kind: Service
 metadata:
-  name: my-service
+  name: webapp-service
+  labels:
+    app: webapp            # Label on the Service itself (for service discovery)
+  annotations:
+    description: "Routes traffic to webapp frontend pods"
 spec:
+  type: ClusterIP          # Internal only (default)
   selector:
-    app: App1 # Selector to match pods with the label 'app: App1'
+    app: webapp            # Matches Pods created by the ReplicaSet above
   ports:
-  - port: 80
-    targetPort: 9376
+    - protocol: TCP
+      port: 80             # Service port (what clients connect to)
+      targetPort: 8080     # Pod port (where traffic is forwarded)
+
+---
+
+# -----------------------------------------------------------------------------
+# 3. ReplicaSet with Set-Based Selector (matchExpressions)
+# -----------------------------------------------------------------------------
+# ReplicaSets support set-based selectors via matchExpressions, which are
+# more flexible than matchLabels. Useful when you need to match multiple
+# values or check for label existence.
+#
+# Operators:
+#   In            → key's value must be one of the listed values
+#   NotIn         → key's value must NOT be one of the listed values
+#   Exists        → key must be present (value doesn't matter)
+#   DoesNotExist  → key must NOT be present
+# -----------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: webapp-setbased-rs
+  labels:
+    app: webapp
+    type: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: webapp                    # Equality match (AND with matchExpressions)
+    matchExpressions:
+      - key: env                     # Pod must have env label
+        operator: In                 # with value "prod" or "staging"
+        values:
+          - prod
+          - staging
+      - key: deprecated              # Pod must NOT have a "deprecated" label
+        operator: DoesNotExist
+  template:
+    metadata:
+      labels:
+        app: webapp
+        type: backend
+        env: prod                    # Satisfies the In expression above
+    spec:
+      containers:
+        - name: backend
+          image: nginx:1.25
+          ports:
+            - containerPort: 8080
+
+
+# =============================================================================
+# Imperative Commands — Annotations
+# =============================================================================
+
+# Add an annotation to a resource
+# kubectl annotate replicaset webapp-replicaset owner="platform-team"
+
+# Add multiple annotations at once
+# kubectl annotate replicaset webapp-replicaset \
+#   git-commit="abc1234" \
+#   buildVersion="1.0.0"
+
+# Update an existing annotation (requires --overwrite)
+# kubectl annotate replicaset webapp-replicaset buildVersion="2.0.0" --overwrite
+
+# Remove an annotation (use key followed by a minus sign)
+# kubectl annotate replicaset webapp-replicaset owner-
+
+# Annotate all pods matching a label selector
+# kubectl annotate pods -l app=webapp description="frontend pod"
+
+
+# =============================================================================
+# Imperative Commands — Labels on ReplicaSets
+# =============================================================================
+
+# Add a label to the ReplicaSet itself
+# kubectl label replicaset webapp-replicaset env=prod
+
+# Update an existing label (requires --overwrite)
+# kubectl label replicaset webapp-replicaset type=backend --overwrite
+
+# Remove a label from the ReplicaSet
+# kubectl label replicaset webapp-replicaset env-
+
+# Note: You CANNOT change spec.selector.matchLabels after creation.
+# To change the selector, you must delete and recreate the ReplicaSet.
+
+
+# =============================================================================
+# Apply / Inspect
+# =============================================================================
+
+# Apply all resources from this file
+# kubectl apply -f 02-label-annotation-replicaset.yaml
+
+# List ReplicaSets with labels
+# kubectl get replicasets --show-labels
+
+# List ReplicaSets filtered by label
+# kubectl get rs -l app=webapp
+
+# Describe the ReplicaSet (shows labels, annotations, selector, events)
+# kubectl describe replicaset webapp-replicaset
+
+# Show annotations in YAML output (annotations are under metadata)
+# kubectl get replicaset webapp-replicaset -o yaml
+
+# Get a specific annotation using jsonpath
+# kubectl get rs webapp-replicaset -o jsonpath='{.metadata.annotations.buildVersion}'
+
+# Get all annotations as JSON
+# kubectl get rs webapp-replicaset -o jsonpath='{.metadata.annotations}'
+
+# List Pods managed by the ReplicaSet (they inherit the ownerReferences)
+# kubectl get pods -l app=webapp --show-labels
+
+# Check which Pods a Service is targeting (via Endpoints)
+# kubectl get endpoints webapp-service
+
+# Verify selector alignment — compare RS selector with Pod labels
+# kubectl get rs webapp-replicaset -o jsonpath='{.spec.selector.matchLabels}'
+# kubectl get pods -l app=webapp -o jsonpath='{range .items[*]}{.metadata.name}: {.metadata.labels}{"\n"}{end}'
+
+
+# =============================================================================
+# Debugging Label/Selector Mismatches
+# =============================================================================
+
+# ReplicaSet has 0 pods? Check if selector matches template labels
+# kubectl describe rs webapp-replicaset | grep -A5 Selector
+
+# Service has no endpoints? Check if Service selector matches Pod labels
+# kubectl get endpoints webapp-service
+
+# Pods exist but Service doesn't find them? Compare selectors
+# kubectl get svc webapp-service -o jsonpath='{.spec.selector}'
+# kubectl get pods --show-labels
+
+# Check ownership — which RS controls a specific Pod
+# kubectl get pod <pod-name> -o jsonpath='{.metadata.ownerReferences[0].name}'
+
+
+# =============================================================================
+# Scale ReplicaSet
+# =============================================================================
+
+# Scale to 5 replicas
+# kubectl scale replicaset webapp-replicaset --replicas=5
+
+# Scale down to 1 replica
+# kubectl scale replicaset webapp-replicaset --replicas=1
+
+# Check current replica count
+# kubectl get rs webapp-replicaset
+
+
+# =============================================================================
+# Delete / Clean up
+# =============================================================================
+
+# Delete all resources defined in this file
+# kubectl delete -f 02-label-annotation-replicaset.yaml
+
+# Delete only the ReplicaSet (also deletes its Pods)
+# kubectl delete replicaset webapp-replicaset
+
+# Delete the ReplicaSet but keep its Pods running (orphan them)
+# kubectl delete replicaset webapp-replicaset --cascade=orphan
+
+# Delete by label selector
+# kubectl delete rs -l app=webapp
+
