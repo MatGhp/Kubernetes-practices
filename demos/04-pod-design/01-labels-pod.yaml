@@ -1,27 +1,307 @@
+# =============================================================================
+# Kubernetes Labels & Selectors — Educational Reference
+# =============================================================================
+#
+# Labels are key-value pairs attached to Kubernetes objects (Pods, Services,
+# Deployments, etc.). They are the primary mechanism for organizing, grouping,
+# and selecting resources. Labels have no direct effect on the system — they
+# are metadata that other objects and tools use for filtering and targeting.
+#
+# Why labels matter:
+#   - Services use label selectors to route traffic to the right Pods.
+#   - Deployments/ReplicaSets use selectors to manage their Pod replicas.
+#   - kubectl uses selectors to filter and query resources.
+#   - Network Policies, PodDisruptionBudgets, and scheduling (affinity) all
+#     rely on labels to identify targets.
+#
+# Label rules:
+#   - Keys: optional prefix + "/" + name (e.g., app.kubernetes.io/name)
+#     - Prefix: max 253 chars, must be a DNS subdomain
+#     - Name: max 63 chars, alphanumeric + "-", "_", "."
+#   - Values: max 63 chars, alphanumeric + "-", "_", "." (or empty string)
+#   - A resource can have any number of labels.
+#   - Label keys must be unique within a single resource.
+#
+# Labels vs Annotations:
+#   - Labels   → Used for selection and grouping. Keep them short and queryable.
+#   - Annotations → Used for non-identifying metadata (build info, URLs,
+#                   tool config). Not queryable via selectors.
+#   See 02-label-annotation-replicaset.yaml for annotation examples.
+#
+# Recommended label conventions (kubernetes.io):
+#   - app.kubernetes.io/name        → Name of the application (e.g., "nginx")
+#   - app.kubernetes.io/instance    → Instance identifier (e.g., "nginx-abc")
+#   - app.kubernetes.io/version     → App version (e.g., "1.25.0")
+#   - app.kubernetes.io/component   → Role in architecture (e.g., "frontend")
+#   - app.kubernetes.io/part-of     → Higher-level app it belongs to
+#   - app.kubernetes.io/managed-by  → Tool managing the resource (e.g., "helm")
+#
+# Simple shorthand labels (used in this repo for clarity):
+#   - app       → Application name
+#   - type      → Role (frontend, backend, database, cache)
+#   - env       → Environment (dev, staging, prod)
+#   - version   → Release version (blue, green, v1, v2)
+#   - tier      → Architecture tier (frontend, backend, data)
+#   - bu        → Business unit (finance, engineering, marketing)
+#
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1. Pod with Basic Labels
+# -----------------------------------------------------------------------------
+# The simplest use of labels — tagging a Pod with app identity and role.
+# These labels are used by Services and kubectl to target this Pod.
+#
+#   Pod: myapp-pod
+#       labels:
+#         app: myapp       ← Service selector matches this
+#         type: frontend   ← Used for filtering (kubectl -l type=frontend)
+# -----------------------------------------------------------------------------
+
 apiVersion: v1
 kind: Pod
 metadata:
-  name: myapp
+  name: myapp-pod
   labels:
-    app: myapp  # Label to identify the pod
-    type: frontend  # Additional label to categorize the pod
+    app: myapp             # Application name — primary identifier
+    type: frontend         # Role — distinguishes frontend from backend/db pods
 spec:
   containers:
-  - name: myapp
-    image: nginx:latest
-    ports:
-    - containerPort: 8080 
+    - name: nginx
+      image: nginx:1.25
+      ports:
+        - containerPort: 80
 
-    # kubectl get pods --selector app=myapp
-    # kubectl get pods --selector type=frontend
-    # kubectl get pods --selector bu=finance | --no-headers wc -l
-    # kubectl get all --selector env=prod --no-headers
-    # kubectl get pods --selector env=prod,bu=finance,tier=frontend
+---
 
-    # kubectl get pods -l app=myapp
-    # kubectl get pods -l type=frontend
-    # kubectl get pods -l app=myapp,type=frontend
-    # kubectl get pods -l app=myapp -l type=frontend
-    # kubectl get pods -l app=myapp,type=frontend --show-labels
-    # kubectl get pods -l app=myapp,type=frontend -o wide
+# -----------------------------------------------------------------------------
+# 2. Pod with Multi-Dimensional Labels
+# -----------------------------------------------------------------------------
+# Real-world pods often need labels across several dimensions so different
+# consumers can select them independently:
+#   - Service selects by: app + type
+#   - Monitoring dashboard filters by: env + tier
+#   - Cost reports filter by: bu
+#
+#   Pod: webapp-pod
+#       labels:
+#         app: webapp
+#         type: frontend
+#         env: prod
+#         tier: frontend
+#         bu: finance
+#         version: v1
+# -----------------------------------------------------------------------------
 
+apiVersion: v1
+kind: Pod
+metadata:
+  name: webapp-pod
+  labels:
+    app: webapp            # Application name
+    type: frontend         # Role in the system
+    env: prod              # Environment (dev, staging, prod)
+    tier: frontend         # Architecture tier
+    bu: finance            # Business unit (for cost tracking / org filtering)
+    version: v1            # Release version
+spec:
+  containers:
+    - name: webapp
+      image: nginx:1.25
+      ports:
+        - containerPort: 80
+
+---
+
+# -----------------------------------------------------------------------------
+# 3. Multiple Pods for Selector Demonstrations
+# -----------------------------------------------------------------------------
+# These pods exist to show how different selectors match different subsets.
+# Together with the pods above they create a queryable set:
+#
+#   myapp-pod:     app=myapp,  type=frontend
+#   webapp-pod:    app=webapp, type=frontend, env=prod, bu=finance, version=v1
+#   backend-pod:   app=webapp, type=backend,  env=prod, bu=finance, version=v1
+#   staging-pod:   app=webapp, type=frontend, env=staging, bu=engineering
+# -----------------------------------------------------------------------------
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend-pod
+  labels:
+    app: webapp
+    type: backend          # Different role than frontend pods above
+    env: prod
+    tier: backend
+    bu: finance
+    version: v1
+spec:
+  containers:
+    - name: backend
+      image: nginx:1.25
+      ports:
+        - containerPort: 8080
+
+---
+
+apiVersion: v1
+kind: Pod
+metadata:
+  name: staging-pod
+  labels:
+    app: webapp
+    type: frontend
+    env: staging           # Different environment
+    tier: frontend
+    bu: engineering        # Different business unit
+    version: v2
+spec:
+  containers:
+    - name: webapp
+      image: nginx:1.25
+      ports:
+        - containerPort: 80
+
+
+# =============================================================================
+# Label Selectors — Two Types
+# =============================================================================
+#
+# 1. Equality-based selectors (used by Services, ReplicationControllers):
+#      selector:
+#        app: myapp          ← matches pods where app EQUALS myapp
+#        type: frontend      ← AND type EQUALS frontend
+#
+# 2. Set-based selectors (used by Deployments, ReplicaSets, Jobs, etc.):
+#      selector:
+#        matchLabels:
+#          app: myapp        ← equality match
+#        matchExpressions:
+#          - key: env
+#            operator: In    ← In, NotIn, Exists, DoesNotExist
+#            values:
+#              - prod
+#              - staging
+#
+# In kubectl, both types are available via the -l / --selector flag.
+# =============================================================================
+
+
+# =============================================================================
+# Imperative Commands — Add / Update / Remove Labels
+# =============================================================================
+
+# Add a label to an existing pod
+# kubectl label pod myapp-pod env=dev
+
+# Add labels to multiple pods at once (by selector)
+# kubectl label pods -l app=webapp tier=web
+
+# Update an existing label (requires --overwrite)
+# kubectl label pod myapp-pod type=backend --overwrite
+
+# Remove a label (use key followed by a minus sign)
+# kubectl label pod myapp-pod env-
+
+# Add labels from a file (apply updates labels too)
+# kubectl apply -f 01-labels-pod.yaml
+
+
+# =============================================================================
+# Querying with Selectors — kubectl -l / --selector
+# =============================================================================
+
+# --- Equality-based selectors ---
+
+# Get pods with a specific label
+# kubectl get pods -l app=myapp
+
+# Get pods matching multiple labels (AND logic — comma-separated)
+# kubectl get pods -l app=webapp,type=frontend
+
+# Get pods NOT matching a value (!=)
+# kubectl get pods -l type!=backend
+
+# --- Set-based selectors ---
+
+# Get pods where env is "prod" OR "staging" (In operator)
+# kubectl get pods -l 'env in (prod, staging)'
+
+# Get pods where env is NOT "staging" (NotIn operator)
+# kubectl get pods -l 'env notin (staging)'
+
+# Get pods that HAVE a label key (Exists operator)
+# kubectl get pods -l env
+
+# Get pods that DO NOT have a label key (DoesNotExist operator)
+# kubectl get pods -l '!env'
+
+# --- Combining both types ---
+
+# Equality + set-based in one query
+# kubectl get pods -l 'app=webapp,env in (prod, staging)'
+
+# Multiple set-based expressions
+# kubectl get pods -l 'env in (prod),bu in (finance, engineering)'
+
+
+# =============================================================================
+# Display Options for Labels
+# =============================================================================
+
+# Show all labels as extra columns
+# kubectl get pods --show-labels
+
+# Show specific labels as columns (-L flag)
+# kubectl get pods -L app,env,type
+
+# Wide output with labels
+# kubectl get pods -l app=webapp --show-labels -o wide
+
+# Count matching pods (pipe to wc -l, skip header with --no-headers)
+# kubectl get pods -l bu=finance --no-headers | wc -l
+
+# Get all resource types matching a selector (not just pods)
+# kubectl get all -l env=prod --no-headers
+
+# Output as JSON with labels visible
+# kubectl get pods -l app=myapp -o json
+
+# Get just the label values using jsonpath
+# kubectl get pod myapp-pod -o jsonpath='{.metadata.labels}'
+
+# Get a specific label value
+# kubectl get pod myapp-pod -o jsonpath='{.metadata.labels.app}'
+
+
+# =============================================================================
+# Apply / Inspect
+# =============================================================================
+
+# Apply all pods from this file
+# kubectl apply -f 01-labels-pod.yaml
+
+# List all pods created by this file
+# kubectl get pods -l 'app in (myapp, webapp)' --show-labels
+
+# Describe a specific pod (labels shown under "Labels:" section)
+# kubectl describe pod myapp-pod
+
+# Get pod in YAML (labels visible under metadata)
+# kubectl get pod myapp-pod -o yaml
+
+
+# =============================================================================
+# Delete / Clean up
+# =============================================================================
+
+# Delete all pods defined in this file
+# kubectl delete -f 01-labels-pod.yaml
+
+# Delete pods by selector (handy for bulk cleanup)
+# kubectl delete pods -l app=webapp
+
+# Delete a single pod by name
+# kubectl delete pod myapp-pod
