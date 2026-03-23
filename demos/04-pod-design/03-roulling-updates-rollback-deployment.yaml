@@ -1,57 +1,328 @@
+# =============================================================================
+# Kubernetes Rolling Updates & Rollbacks — Educational Reference
+# =============================================================================
+#
+# A Deployment manages ReplicaSets, which in turn manage Pods. When you
+# update a Deployment (e.g., change the container image), Kubernetes creates
+# a NEW ReplicaSet and gradually shifts Pods from the old RS to the new one.
+# This process is called a "rolling update."
+#
+# How rolling updates work:
+#   1. You change something in the Deployment's Pod template (image, env, etc.)
+#   2. Kubernetes creates a new ReplicaSet with the updated Pod spec.
+#   3. Pods in the new RS are scaled UP while pods in the old RS are scaled
+#      DOWN, according to maxSurge and maxUnavailable settings.
+#   4. Once all new Pods are ready, the old RS is scaled to 0 (but kept for
+#      rollback history).
+#
+#   Before update:    RS-v1 (4 Pods)
+#
+#   During update:    RS-v1 (3 Pods)  ──►  RS-v2 (1 Pod, starting)
+#                     RS-v1 (2 Pods)  ──►  RS-v2 (2 Pods, ready)
+#                     RS-v1 (1 Pod)   ──►  RS-v2 (3 Pods, ready)
+#                     RS-v1 (0 Pods)  ──►  RS-v2 (4 Pods, ready)
+#
+#   After update:     RS-v2 (4 Pods)       RS-v1 (0 Pods, kept for rollback)
+#
+# Update strategies:
+#   - RollingUpdate (default) → Gradual replacement. Zero-downtime.
+#   - Recreate               → Kill all old Pods first, then create new ones.
+#                              Causes downtime. Use for stateful workloads that
+#                              can't run two versions simultaneously.
+#
+# Key parameters (RollingUpdate):
+#   - maxSurge         → Max extra Pods above desired replicas during update.
+#                        Can be a number (2) or percentage (25%).
+#                        Higher = faster rollout, more resources used.
+#   - maxUnavailable   → Max Pods that can be unavailable during update.
+#                        Can be a number (1) or percentage (25%).
+#                        Higher = faster rollout, less availability.
+#   - Both cannot be 0 at the same time (rollout would stall).
+#
+# Rollback:
+#   Kubernetes keeps a history of ReplicaSets (controlled by
+#   revisionHistoryLimit, default 10). You can roll back to any previous
+#   revision instantly because the old RS still exists — Kubernetes just
+#   scales it back up.
+#
+# See also:
+#   - 04-blue-green-deployment.yaml for blue-green deployment strategy
+#   - 05-canary-deployment.yaml for canary deployment strategy
+#   - 02-label-annotation-replicaset.yaml for ReplicaSet fundamentals
+#
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1. RollingUpdate Strategy (default)
+# -----------------------------------------------------------------------------
+# Gradually replaces Pods with zero downtime. Best for stateless web
+# applications and microservices.
+#
+#   With replicas=4, maxSurge=25%, maxUnavailable=25%:
+#     - maxSurge 25% of 4 = 1 extra Pod → up to 5 Pods at once
+#     - maxUnavailable 25% of 4 = 1 Pod → at least 3 Pods always available
+#
+#   Step 1:  Old: 4  New: 0       (start)
+#   Step 2:  Old: 3  New: 1+1     (1 old terminated, 1 new running + 1 surge)
+#   Step 3:  Old: 2  New: 2+1     (rolling continues)
+#   Step 4:  Old: 1  New: 3+1     (almost done)
+#   Step 5:  Old: 0  New: 4       (complete)
+# -----------------------------------------------------------------------------
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: mydeployment
+  name: webapp-rolling
+  labels:
+    app: webapp
+    strategy: rolling
 spec:
-  replicas: 4
+  replicas: 4              # Desired number of Pod replicas
+  revisionHistoryLimit: 10 # Number of old ReplicaSets to keep for rollback (default: 10)
   strategy:
-    type: RollingUpdate # RollingUpdate is the default strategy for deployments
-    # type: Recreate # Recreate strategy is used to terminate all existing pods before creating new ones
+    type: RollingUpdate    # Default strategy — zero-downtime updates
     rollingUpdate:
-      maxUnavailable: 25% # Maximum number of pods that can be unavailable during the update
-      maxSurge: 25% # Maximum number of pods that can be created above the desired number of pods during the update
+      maxSurge: 25%        # Allow 1 extra Pod (25% of 4) during update for speed
+      maxUnavailable: 25%  # Allow 1 Pod to be down (25% of 4) during update
   selector:
     matchLabels:
-      app: myapp
+      app: webapp
   template:
     metadata:
       labels:
-        app: myapp
+        app: webapp
+        strategy: rolling
     spec:
       containers:
-      - name: mycontainer
-        image: nginx
+        - name: webapp
+          image: nginx:1.24   # ← Change this to trigger a rolling update
+          ports:
+            - containerPort: 80
+
+---
+
+# -----------------------------------------------------------------------------
+# 2. Recreate Strategy
+# -----------------------------------------------------------------------------
+# Terminates ALL existing Pods before creating new ones. Causes downtime
+# but guarantees only one version runs at a time.
+#
+# Use when:
+#   - The app can't run two versions simultaneously (schema migrations,
+#     singleton workers, license-locked software)
+#   - You need a clean cut-over
+#
+#   Step 1:  Old: 3  New: 0   (start — all old Pods terminated)
+#   Step 2:  Old: 0  New: 0   (brief downtime — no Pods running)
+#   Step 3:  Old: 0  New: 3   (all new Pods created and starting)
+# -----------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-recreate
+  labels:
+    app: webapp-recreate
+    strategy: recreate
+spec:
+  replicas: 3
+  strategy:
+    type: Recreate         # Kill all old Pods first, then create new ones
+    # No rollingUpdate block — not applicable for Recreate
+  selector:
+    matchLabels:
+      app: webapp-recreate
+  template:
+    metadata:
+      labels:
+        app: webapp-recreate
+        strategy: recreate
+    spec:
+      containers:
+        - name: webapp
+          image: nginx:1.24
+          ports:
+            - containerPort: 80
+
+---
+
+# -----------------------------------------------------------------------------
+# 3. RollingUpdate with Aggressive Settings
+# -----------------------------------------------------------------------------
+# Demonstrates tuning maxSurge and maxUnavailable for different trade-offs:
+#
+# Aggressive (fast rollout, uses more resources):
+#   maxSurge: 50%         → up to 6 Pods at once (4 + 50%)
+#   maxUnavailable: 50%   → only 2 Pods must be available
+#
+# Conservative (slow rollout, high availability):
+#   maxSurge: 1           → at most 5 Pods at once
+#   maxUnavailable: 0     → all 4 Pods must remain available (new Pod must be
+#                           ready before any old Pod is terminated)
+# -----------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp-conservative
+  labels:
+    app: webapp-conservative
+    strategy: conservative
+spec:
+  replicas: 4
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1          # Only 1 extra Pod at a time
+      maxUnavailable: 0    # Zero downtime — new Pod must be Ready before old is killed
+  selector:
+    matchLabels:
+      app: webapp-conservative
+  template:
+    metadata:
+      labels:
+        app: webapp-conservative
+        strategy: conservative
+    spec:
+      containers:
+        - name: webapp
+          image: nginx:1.24
+          ports:
+            - containerPort: 80
 
 
+# =============================================================================
+# Triggering a Rolling Update
+# =============================================================================
+#
+# A rolling update is triggered when anything in spec.template changes
+# (image, env vars, resource limits, labels, etc.). Changes to replicas
+# or metadata do NOT trigger a rollout.
 
-# kubectl create deployment nginx --image=nginx:1.16 deployment.apps/nginx created
+# Method 1: Change the image with kubectl set image
+# kubectl set image deployment/webapp-rolling webapp=nginx:1.25
 
+# Method 2: Edit the Deployment interactively
+# kubectl edit deployment webapp-rolling
+#   (change the image field, save, and exit — rollout begins immediately)
+
+# Method 3: Apply an updated YAML file
 # kubectl apply -f 03-roulling-updates-rollback-deployment.yaml
-# kubectl set image deployment/mydeployment mycontainer=nginx:latest
-# kubectl delete deployment mydeployment
 
-# --revision flag is used to specify the revision number of the deployment to roll back to.
-# This allows you to revert to a previous version of the deployment if needed.
-# kubectl rollout undo deployment/mydeployment --to-revision=1
-
-# --record flag is used to record the command in the deployment's history
-# This allows you to track changes made to the deployment and roll back if necessary.
-# You can now see that the change-cause is recorded for the revision 2 of this deployment.
-# kubectl set image deployment/mydeployment mycontainer=nginx:1.20 --record
+# Method 4: Patch a specific field
+# kubectl patch deployment webapp-rolling -p '{"spec":{"template":{"spec":{"containers":[{"name":"webapp","image":"nginx:1.25"}]}}}}'
 
 
+# =============================================================================
+# Monitoring a Rollout
+# =============================================================================
+
+# Watch the rollout progress in real time (blocks until complete or failed)
+# kubectl rollout status deployment/webapp-rolling
+
+# Watch Pods being replaced live
+# kubectl get pods -l app=webapp --watch
+
+# Check which ReplicaSets exist and their replica counts
+# kubectl get replicasets -l app=webapp
+
+# Describe the deployment (shows Events with scaling up/down actions)
+# kubectl describe deployment webapp-rolling
 
 
-# kubectl rollout status deployment/mydeployment
+# =============================================================================
+# Rollout History & Rollback
+# =============================================================================
 
-# kubectl rollout status deployment/mydeployment
-# kubectl rollout history deployment/mydeployment
-# kubectl rollout undo deployment/mydeployment
+# View rollout history (shows revision numbers and change-cause)
+# kubectl rollout history deployment/webapp-rolling
 
-# Undo a change:
-# kubectl rollout undo deployment/mydeployment --to-revision=1
-# kubectl rollout undo deployment/mydeployment --revision=1
+# View details of a specific revision
+# kubectl rollout history deployment/webapp-rolling --revision=2
 
-# kubectl rollout pause deployment/mydeployment
-# kubectl rollout resume deployment/mydeployment
-# kubectl rollout restart deployment/mydeployment
+# Roll back to the previous revision
+# kubectl rollout undo deployment/webapp-rolling
+
+# Roll back to a specific revision number
+# kubectl rollout undo deployment/webapp-rolling --to-revision=1
+
+# Add a change-cause annotation (shows in rollout history for traceability)
+# kubectl annotate deployment/webapp-rolling kubernetes.io/change-cause="Upgraded to nginx:1.25"
+# (Note: the --record flag is deprecated; use annotations instead)
+
+
+# =============================================================================
+# Pause / Resume / Restart
+# =============================================================================
+
+# Pause a rollout (make multiple changes without triggering intermediate rollouts)
+# kubectl rollout pause deployment/webapp-rolling
+
+# Make changes while paused (no rollout triggered yet)
+# kubectl set image deployment/webapp-rolling webapp=nginx:1.25
+# kubectl set resources deployment/webapp-rolling -c webapp --limits=cpu=200m,memory=256Mi
+
+# Resume the rollout (all accumulated changes roll out as a single update)
+# kubectl rollout resume deployment/webapp-rolling
+
+# Restart all Pods (triggers a new rollout with the same spec — useful for
+# picking up ConfigMap/Secret changes or refreshing the app)
+# kubectl rollout restart deployment/webapp-rolling
+
+
+# =============================================================================
+# Imperative Commands — Create Deployments
+# =============================================================================
+
+# Create a deployment imperatively
+# kubectl create deployment webapp-rolling --image=nginx:1.24 --replicas=4
+
+# Generate YAML without creating (dry-run for review)
+# kubectl create deployment webapp-rolling --image=nginx:1.24 --replicas=4 --dry-run=client -o yaml
+
+# Scale a deployment
+# kubectl scale deployment webapp-rolling --replicas=6
+
+
+# =============================================================================
+# Apply / Inspect
+# =============================================================================
+
+# Apply all deployments from this file
+# kubectl apply -f 03-roulling-updates-rollback-deployment.yaml
+
+# List deployments with status
+# kubectl get deployments
+
+# Wide output (shows UP-TO-DATE, AVAILABLE, AGE)
+# kubectl get deployments -o wide
+
+# Describe a deployment (shows strategy, conditions, RS references, events)
+# kubectl describe deployment webapp-rolling
+
+# Get deployment in YAML (shows full strategy config and status)
+# kubectl get deployment webapp-rolling -o yaml
+
+# Get the current image using jsonpath
+# kubectl get deployment webapp-rolling -o jsonpath='{.spec.template.spec.containers[0].image}'
+
+# Get the strategy type
+# kubectl get deployment webapp-rolling -o jsonpath='{.spec.strategy.type}'
+
+# List ReplicaSets owned by the deployment (shows revision history)
+# kubectl get rs -l app=webapp --sort-by=.metadata.creationTimestamp
+
+
+# =============================================================================
+# Delete / Clean up
+# =============================================================================
+
+# Delete all deployments defined in this file
+# kubectl delete -f 03-roulling-updates-rollback-deployment.yaml
+
+# Delete a single deployment by name
+# kubectl delete deployment webapp-rolling
+
+# Delete by label selector
+# kubectl delete deployments -l app=webapp
