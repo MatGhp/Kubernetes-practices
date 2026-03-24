@@ -1,33 +1,146 @@
-# Stable Deployment
+# =============================================================================
+# Kubernetes Canary Deployment — Educational Reference
+# =============================================================================
+#
+# A canary deployment gradually shifts a small percentage of production traffic
+# to a new version while the stable version continues serving the majority.
+# If the canary behaves well (latency, errors, business metrics), you
+# progressively scale it up until it replaces the stable version entirely.
+# If it fails, you scale it back to zero — only a small fraction of users
+# were ever exposed.
+#
+# How it works with native Kubernetes (no service mesh):
+#   1. A "Stable" Deployment runs the current version with N replicas.
+#   2. You create a "Canary" Deployment with the new version and 1 replica.
+#   3. A single Service selects Pods from BOTH Deployments using a shared
+#      label (e.g., app=myapp). Kubernetes distributes traffic roughly
+#      proportional to the number of ready Pods behind the Service.
+#   4. With 3 stable + 1 canary → ~25% traffic goes to canary.
+#   5. You observe metrics. If healthy, scale canary up and stable down
+#      until canary fully replaces stable.
+#
+#   Traffic distribution (initial — 75/25):
+#
+#     Users ──► myapp-service (selector: app=myapp)
+#                  │
+#                  ├──► Stable Deployment (3 replicas)  ≈ 75% traffic
+#                  │    ┌──────┐ ┌──────┐ ┌──────┐
+#                  │    │v1.21 │ │v1.21 │ │v1.21 │
+#                  │    └──────┘ └──────┘ └──────┘
+#                  │
+#                  └──► Canary Deployment (1 replica)   ≈ 25% traffic
+#                       ┌──────┐
+#                       │v1.22 │
+#                       └──────┘
+#
+#   Gradual promotion (50/50):
+#
+#     Stable (2 replicas)       Canary (2 replicas)
+#     ┌──────┐ ┌──────┐        ┌──────┐ ┌──────┐
+#     │v1.21 │ │v1.21 │        │v1.22 │ │v1.22 │
+#     └──────┘ └──────┘        └──────┘ └──────┘
+#           ≈ 50%                    ≈ 50%
+#
+#   Full promotion (0/100):
+#
+#     Stable (0 replicas)       Canary (4 replicas → rename to stable)
+#                               ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐
+#                               │v1.22 │ │v1.22 │ │v1.22 │ │v1.22 │
+#                               └──────┘ └──────┘ └──────┘ └──────┘
+#                                        ≈ 100%
+#
+# Key concept — traffic split via replica ratio:
+#   ┌───────────┬────────────────┬────────────────┬───────────────────┐
+#   │ Stable    │ Canary         │ Total Pods     │ Canary Traffic %  │
+#   ├───────────┼────────────────┼────────────────┼───────────────────┤
+#   │ 3         │ 1              │ 4              │ ~25%              │
+#   │ 3         │ 3              │ 6              │ ~50%              │
+#   │ 1         │ 3              │ 4              │ ~75%              │
+#   │ 0         │ 4              │ 4              │ 100% (promoted)   │
+#   └───────────┴────────────────┴────────────────┴───────────────────┘
+#
+# Canary vs Blue-Green vs Rolling Update:
+#   ┌─────────────┬───────────────────┬──────────────────┬────────────────┐
+#   │             │ Canary            │ Blue-Green       │ Rolling Update │
+#   ├─────────────┼───────────────────┼──────────────────┼────────────────┤
+#   │ Exposure    │ Small % first     │ All-or-nothing   │ Gradual per Pod│
+#   │ Rollback    │ Scale canary to 0 │ Switch selector  │ Rollout undo   │
+#   │ Observation │ Real user traffic │ Pre-switch tests │ During rollout │
+#   │ Resource    │ ~1x + small extra │ 2x               │ ~1x + surge    │
+#   │ Precision   │ Coarse (Pod ratio)│ Exact (selector) │ Built-in       │
+#   └─────────────┴───────────────────┴──────────────────┴────────────────┘
+#
+# Limitations of native Kubernetes canary:
+#   - Traffic split is approximate — based on Pod count, not exact percentages
+#   - No per-request routing (e.g., header-based, cookie-based)
+#   - For fine-grained traffic control, use a service mesh (Istio, Linkerd)
+#     with VirtualService/TrafficSplit resources
+#
+# See also:
+#   - 03-roulling-updates-rollback-deployment.yaml for rolling update strategy
+#   - 04-blue-green-deployment.yaml for blue-green deployment strategy
+#
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1. Stable Deployment (current production version)
+# -----------------------------------------------------------------------------
+# This Deployment runs the proven, current version. It has the majority of
+# replicas, so it receives the majority of traffic from the shared Service.
+#
+# Important: The Pod template labels include app=myapp (shared with canary)
+# AND track=stable (unique to this Deployment). The Service only selects on
+# app=myapp, so it matches Pods from BOTH stable and canary.
+# -----------------------------------------------------------------------------
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: myapp-stable
+  labels:
+    app: myapp
+    track: stable          # Identifies this as the stable environment
 spec:
-  replicas: 3
+  replicas: 3              # 3 of 4 total Pods → ~75% of traffic
   selector:
     matchLabels:
       app: myapp
-      track: stable
+      track: stable        # Must match template labels exactly
   template:
     metadata:
       labels:
-        app: myapp
-        track: stable
+        app: myapp         # Shared label — Service selects on this
+        track: stable      # Unique label — use to query stable Pods only
     spec:
       containers:
-      - name: myapp
-        image: nginx:1.21
-        ports:
-        - containerPort: 80
+        - name: myapp
+          image: nginx:1.21  # Current production version
+          ports:
+            - containerPort: 80
+
 ---
-# Canary Deployment
+
+# -----------------------------------------------------------------------------
+# 2. Canary Deployment (new version, small scale)
+# -----------------------------------------------------------------------------
+# This Deployment runs the new version with a small number of replicas.
+# Because it shares the app=myapp label with stable, the Service routes
+# a proportional share of traffic to it (1 of 4 Pods → ~25%).
+#
+# Start with 1 replica. If metrics look good, scale up gradually while
+# scaling down the stable Deployment.
+# -----------------------------------------------------------------------------
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: myapp-canary
+  labels:
+    app: myapp
+    track: canary          # Identifies this as the canary environment
 spec:
-  replicas: 1 # set the replicas to 1, so that 25% of the trafic routes to this canary deployment (75% goes to stable)
+  replicas: 1              # 1 of 4 total Pods → ~25% of traffic
   selector:
     matchLabels:
       app: myapp
@@ -35,42 +148,147 @@ spec:
   template:
     metadata:
       labels:
-        app: myapp
-        track: canary
+        app: myapp         # Same shared label as stable
+        track: canary      # Unique label — use to query canary Pods only
     spec:
       containers:
-      - name: myapp
-        image: nginx:1.22
-        ports:
-        - containerPort: 80
+        - name: myapp
+          image: nginx:1.22  # New version under test
+          ports:
+            - containerPort: 80
+
 ---
-# Service to route traffic to both stable and canary
+
+# -----------------------------------------------------------------------------
+# 3. Service (routes to BOTH stable and canary)
+# -----------------------------------------------------------------------------
+# The Service selector uses ONLY the shared label (app: myapp).
+# This means ALL Pods with app=myapp — regardless of track — receive traffic.
+# Traffic is distributed roughly by Pod count (round-robin by default).
+#
+#   selector: app=myapp  →  matches stable Pods AND canary Pods
+#
+# This is the key difference from blue-green, where the Service selector
+# includes the version label to target only ONE environment at a time.
+# -----------------------------------------------------------------------------
+
 apiVersion: v1
 kind: Service
 metadata:
   name: myapp-service
-spec:
-  selector:
+  labels:
     app: myapp
+spec:
+  type: ClusterIP
+  selector:
+    app: myapp             # Matches BOTH stable and canary Pods
   ports:
-  - port: 80
-    targetPort: 80
+    - protocol: TCP
+      port: 80             # Service port
+      targetPort: 80       # Pod port
 
-# ---
-# Sample commands for canary deployment management:
-#
-# Apply the deployments and service:
+
+# =============================================================================
+# Step-by-Step: Performing a Canary Deployment
+# =============================================================================
+
+# STEP 1: Deploy stable version and Service
 # kubectl apply -f 05-canary-deployment.yaml
+
+# STEP 2: Verify all Pods are running with labels
+# kubectl get pods -l app=myapp --show-labels
+#   You should see 3 stable + 1 canary = 4 Pods total
+
+# STEP 3: Verify the Service endpoints include all Pods
+# kubectl get endpoints myapp-service
+#   Should list IPs from both stable and canary Pods
+
+# STEP 4: Observe canary behavior
+# Send test traffic and check responses:
+# kubectl run test-canary --image=curlimages/curl --rm -it --restart=Never -- \
+#   sh -c 'for i in $(seq 1 20); do curl -s http://myapp-service; done'
 #
-# Check which pods are running:
-# kubectl get pods -l app=myapp
+# Monitor logs from canary Pods specifically:
+# kubectl logs -l track=canary --follow
 #
-# To increase or decrease canary traffic, scale the canary deployment:
-# kubectl scale deployment --replicas=2 myapp-canary
-#
-# To remove the canary, scale down or delete the canary deployment:
-# kubectl scale deployment --replicas=0 myapp-canary
+# Check canary Pod resource usage:
+# kubectl top pods -l track=canary
+
+
+# =============================================================================
+# Gradual Promotion (scaling up canary traffic)
+# =============================================================================
+
+# Increase canary to ~50% (2 stable + 2 canary):
+# kubectl scale deployment myapp-canary --replicas=2
+# kubectl scale deployment myapp-stable --replicas=2
+
+# Increase canary to ~75% (1 stable + 3 canary):
+# kubectl scale deployment myapp-canary --replicas=3
+# kubectl scale deployment myapp-stable --replicas=1
+
+# Full promotion — 100% canary (0 stable + 4 canary):
+# kubectl scale deployment myapp-canary --replicas=4
+# kubectl scale deployment myapp-stable --replicas=0
+
+# After full promotion, update the stable Deployment image to the new version
+# and scale it back up, then remove the canary:
+# kubectl set image deployment/myapp-stable myapp=nginx:1.22
+# kubectl scale deployment myapp-stable --replicas=4
 # kubectl delete deployment myapp-canary
-#
-# Clean up:
+
+
+# =============================================================================
+# Rollback (abort canary)
+# =============================================================================
+
+# If the canary shows errors, high latency, or bad metrics — scale it to 0:
+# kubectl scale deployment myapp-canary --replicas=0
+
+# Or delete the canary entirely:
+# kubectl delete deployment myapp-canary
+
+# Restore stable to full capacity if you scaled it down:
+# kubectl scale deployment myapp-stable --replicas=4
+
+# Verify only stable Pods are serving traffic:
+# kubectl get endpoints myapp-service
+# kubectl get pods -l app=myapp --show-labels
+
+
+# =============================================================================
+# Inspect / Debug
+# =============================================================================
+
+# List all Pods with their track labels
+# kubectl get pods -l app=myapp --show-labels -o wide
+
+# See only stable or only canary Pods
+# kubectl get pods -l track=stable
+# kubectl get pods -l track=canary
+
+# Check current replica counts
+# kubectl get deployments -l app=myapp
+
+# Verify endpoints (which Pod IPs are behind the Service)
+# kubectl get endpoints myapp-service -o yaml
+
+# Describe the Service to see selector and endpoints summary
+# kubectl describe service myapp-service
+
+# Watch Pod changes in real time during scaling
+# kubectl get pods -l app=myapp --watch
+
+# Compare image versions across all Pods
+# kubectl get pods -l app=myapp -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.spec.containers[0].image}{"\n"}{end}'
+
+
+# =============================================================================
+# Delete / Clean up
+# =============================================================================
+
+# Delete all resources defined in this file
 # kubectl delete -f 05-canary-deployment.yaml
+
+# Delete by label (both deployments + service)
+# kubectl delete all -l app=myapp
