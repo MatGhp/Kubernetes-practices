@@ -1,33 +1,124 @@
-# Blue Deployment
+# =============================================================================
+# Kubernetes Blue-Green Deployment — Educational Reference
+# =============================================================================
+#
+# Blue-green deployment is a release strategy that runs TWO identical
+# environments (called "blue" and "green") side by side. At any time, only
+# one environment receives live traffic. To release a new version, you deploy
+# it to the idle environment and then switch the Service selector to route
+# traffic to it — achieving an instant, zero-downtime cut-over.
+#
+# How it works:
+#   1. "Blue" Deployment is running and serving live traffic via a Service.
+#   2. You deploy the new version as the "Green" Deployment (same app, new image).
+#   3. You validate Green independently (smoke tests, health checks, manual QA).
+#   4. You update the Service selector from version=blue → version=green.
+#      Traffic switches instantly because the Service re-resolves Endpoints.
+#   5. If something goes wrong, switch the selector back to version=blue
+#      for instant rollback (Blue is still running and unchanged).
+#   6. Once Green is stable, you can scale down or delete the Blue Deployment.
+#
+#   BEFORE switch:
+#
+#     Users ──► Service (selector: version=blue)
+#                  │
+#                  ▼
+#              Blue Deployment (v1.21)     Green Deployment (v1.22)
+#              ┌──────┐ ┌──────┐           ┌──────┐ ┌──────┐
+#              │Pod v1│ │Pod v1│           │Pod v2│ │Pod v2│
+#              └──────┘ └──────┘           └──────┘ └──────┘
+#               ▲ LIVE                      idle (no traffic)
+#
+#   AFTER switch (edit Service selector → version=green):
+#
+#     Users ──► Service (selector: version=green)
+#                  │
+#                  ▼
+#              Blue Deployment (v1.21)     Green Deployment (v1.22)
+#              ┌──────┐ ┌──────┐           ┌──────┐ ┌──────┐
+#              │Pod v1│ │Pod v1│           │Pod v2│ │Pod v2│
+#              └──────┘ └──────┘           └──────┘ └──────┘
+#               idle (rollback ready)       ▲ LIVE
+#
+# Blue-green vs Rolling Update vs Canary:
+#   ┌─────────────┬──────────────────────┬───────────────┬────────────────────┐
+#   │             │ Blue-Green           │ Rolling Update│ Canary             │
+#   ├─────────────┼──────────────────────┼───────────────┼────────────────────┤
+#   │ Cut-over    │ Instant (selector)   │ Gradual       │ Gradual            │
+#   │ Rollback    │ Instant (selector)   │ Rollout undo  │ Scale down canary  │
+#   │ Resource    │ 2x (both versions)   │ ~1x + surge   │ ~1x + small canary │
+#   │ Risk        │ All-or-nothing       │ Incremental   │ Incremental        │
+#   │ Validation  │ Full env before live │ During rollout│ Subset of traffic  │
+#   │ Complexity  │ Simple (1 selector)  │ Built-in      │ Requires traffic % │
+#   └─────────────┴──────────────────────┴───────────────┴────────────────────┘
+#
+# When to use blue-green:
+#   - You need instant rollback capability
+#   - You want to validate the new version in production before exposing users
+#   - Database schema is backward-compatible (both versions must work with
+#     the same DB during the transition)
+#   - You can afford running 2x the Pods temporarily
+#
+# See also:
+#   - 03-roulling-updates-rollback-deployment.yaml for rolling update strategy
+#   - 05-canary-deployment.yaml for canary deployment strategy
+#
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1. Blue Deployment (current live version)
+# -----------------------------------------------------------------------------
+# This is the "active" environment currently serving production traffic.
+# The key is the version=blue label, which the Service selector matches.
+# -----------------------------------------------------------------------------
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: myapp-blue
+  labels:
+    app: myapp
+    version: blue          # Identifies this as the "blue" environment
 spec:
-  replicas: 2
+  replicas: 2              # Match production scale
   selector:
     matchLabels:
       app: myapp
-      version: blue
+      version: blue        # Must match template labels
   template:
     metadata:
       labels:
-        app: myapp
-        version: blue
+        app: myapp         # Shared label — both blue and green have app=myapp
+        version: blue      # Differentiator — Service uses this to pick blue OR green
     spec:
       containers:
-      - name: myapp
-        image: nginx:1.21
-        ports:
-        - containerPort: 80
+        - name: myapp
+          image: nginx:1.21  # Current production version
+          ports:
+            - containerPort: 80
+
 ---
-# Green Deployment
+
+# -----------------------------------------------------------------------------
+# 2. Green Deployment (new version, idle)
+# -----------------------------------------------------------------------------
+# This is the "standby" environment with the new version. After deploying,
+# you validate it independently before switching the Service to point here.
+#
+# Green has the SAME app=myapp label (so generic queries find both), but a
+# DIFFERENT version=green label (so the Service can target one or the other).
+# -----------------------------------------------------------------------------
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: myapp-green
+  labels:
+    app: myapp
+    version: green         # Identifies this as the "green" environment
 spec:
-  replicas: 2
+  replicas: 2              # Same replica count as blue for identical capacity
   selector:
     matchLabels:
       app: myapp
@@ -36,42 +127,151 @@ spec:
     metadata:
       labels:
         app: myapp
-        version: green
+        version: green     # Service will target this after the switch
     spec:
       containers:
-      - name: myapp
-        image: nginx:1.22
-        ports:
-        - containerPort: 80
+        - name: myapp
+          image: nginx:1.22  # New version to release
+          ports:
+            - containerPort: 80
+
 ---
-# Service to switch between blue and green
+
+# -----------------------------------------------------------------------------
+# 3. Service (traffic switch)
+# -----------------------------------------------------------------------------
+# The Service selector controls which Deployment receives traffic.
+# Changing version: blue → version: green instantly switches ALL traffic.
+#
+#   Users ──► myapp-service:80
+#                │
+#                │ selector: app=myapp, version=blue  (or green)
+#                ▼
+#            Matching Pods only
+# -----------------------------------------------------------------------------
+
 apiVersion: v1
 kind: Service
 metadata:
   name: myapp-service
+  labels:
+    app: myapp
 spec:
+  type: ClusterIP          # Internal-only by default
   selector:
     app: myapp
-    version: blue  # Change to 'green' to switch traffic
+    version: blue          # ← CHANGE TO 'green' TO SWITCH TRAFFIC
   ports:
-  - port: 80
-    targetPort: 80
-    
----
-# Sample commands for blue-green deployment management:
-#
-# Apply the blue and green deployments and the service:
+    - protocol: TCP
+      port: 80             # Service port
+      targetPort: 80       # Pod port
+
+
+# =============================================================================
+# Step-by-Step: Performing a Blue-Green Deployment
+# =============================================================================
+
+# STEP 1: Deploy both environments
 # kubectl apply -f 04-blue-green-deployment.yaml
-#
-# Check which pods are running:
-# kubectl get pods -l app=myapp
-#
-# To switch traffic from blue to green, edit the service selector:
-# kubectl edit service myapp-service
-#   # Change 'version: blue' to 'version: green' in the selector
-#
-# Check which pods the service is targeting:
+
+# STEP 2: Verify both deployments are running
+# kubectl get deployments -l app=myapp
+# kubectl get pods -l app=myapp --show-labels
+
+# STEP 3: Confirm Service is pointing to BLUE
+# kubectl get service myapp-service -o jsonpath='{.spec.selector}'
+#   Expected output: {"app":"myapp","version":"blue"}
+
 # kubectl get endpoints myapp-service
-#
-# Clean up:
+#   Should list IPs of blue Pods only
+
+# STEP 4: Validate the GREEN deployment independently (before switching)
+# kubectl port-forward deployment/myapp-green 8081:80
+#   Open http://localhost:8081 and verify the new version works
+
+# Or run a test from inside the cluster:
+# kubectl run test-green --image=curlimages/curl --rm -it --restart=Never -- \
+#   curl -s http://<green-pod-ip>:80
+
+# STEP 5: SWITCH traffic from blue to green
+# Method A — Patch the Service selector (recommended for scripting):
+# kubectl patch service myapp-service -p '{"spec":{"selector":{"version":"green"}}}'
+
+# Method B — Edit interactively:
+# kubectl edit service myapp-service
+#   Change 'version: blue' to 'version: green', save and exit
+
+# Method C — Apply a modified YAML file with version: green in the selector
+
+# STEP 6: Verify the switch
+# kubectl get service myapp-service -o jsonpath='{.spec.selector.version}'
+#   Expected output: green
+
+# kubectl get endpoints myapp-service
+#   Should now list IPs of green Pods only
+
+# Test from the client perspective:
+# kubectl run test-switch --image=curlimages/curl --rm -it --restart=Never -- \
+#   curl -s http://myapp-service:80
+
+
+# =============================================================================
+# Rollback (instant)
+# =============================================================================
+
+# If Green has issues, switch back to Blue immediately:
+# kubectl patch service myapp-service -p '{"spec":{"selector":{"version":"blue"}}}'
+
+# Verify rollback:
+# kubectl get endpoints myapp-service
+# kubectl get service myapp-service -o jsonpath='{.spec.selector.version}'
+
+
+# =============================================================================
+# Clean Up After Successful Release
+# =============================================================================
+
+# Once Green is confirmed stable, scale down Blue (keep for safety):
+# kubectl scale deployment myapp-blue --replicas=0
+
+# Or delete Blue entirely:
+# kubectl delete deployment myapp-blue
+
+# For the NEXT release, Blue becomes the new version:
+#   - Deploy the next version as myapp-blue with version=blue labels
+#   - Switch the Service back to version=blue
+#   - This alternation continues: blue → green → blue → green
+
+
+# =============================================================================
+# Inspect / Debug
+# =============================================================================
+
+# List all Pods from both environments with labels
+# kubectl get pods -l app=myapp --show-labels -o wide
+
+# Check which version the Service is targeting
+# kubectl describe service myapp-service
+
+# See Endpoints (Pod IPs behind the Service)
+# kubectl get endpoints myapp-service -o yaml
+
+# Compare replica counts of both deployments
+# kubectl get deployments -l app=myapp
+
+# Watch Pods in real time during the switch
+# kubectl get pods -l app=myapp --watch
+
+# Check events related to the Service
+# kubectl get events --field-selector involvedObject.name=myapp-service
+
+
+# =============================================================================
+# Delete / Clean up
+# =============================================================================
+
+# Delete all resources defined in this file
 # kubectl delete -f 04-blue-green-deployment.yaml
+
+# Delete by label (both deployments + service)
+# kubectl delete all -l app=myapp
