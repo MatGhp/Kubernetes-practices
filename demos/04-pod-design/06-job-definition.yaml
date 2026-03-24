@@ -1,23 +1,328 @@
+# =============================================================================
+# Kubernetes Job — Educational Reference
+# =============================================================================
+#
+# A Job creates one or more Pods and ensures that a specified number of them
+# successfully terminate. Once the required number of completions is reached,
+# the Job is considered complete. Unlike a Deployment (which runs forever),
+# a Job is designed for finite, run-to-completion workloads.
+#
+# How it works:
+#   1. You create a Job with a Pod template.
+#   2. The Job controller creates Pods to execute the work.
+#   3. Each Pod runs to completion (exit code 0 = success).
+#   4. The Job tracks successful completions.
+#   5. Once `completions` successes are reached, the Job is done.
+#   6. If a Pod fails, the Job creates a replacement (up to `backoffLimit`).
+#
+#   Job lifecycle:
+#
+#     Job created
+#         │
+#         ▼
+#     Create Pod(s) (up to `parallelism` at a time)
+#         │
+#         ├── Pod succeeds (exit 0) ──► count toward `completions`
+#         │
+#         ├── Pod fails (exit ≠ 0)
+#         │       │
+#         │       ├── retries < backoffLimit ──► create replacement Pod
+#         │       │
+#         │       └── retries ≥ backoffLimit ──► Job FAILS
+#         │
+#         ▼
+#     All `completions` reached ──► Job COMPLETE
+#
+# Key fields:
+#   ┌──────────────────┬─────────────────────────────────────────────────────┐
+#   │ Field            │ Description                                         │
+#   ├──────────────────┼─────────────────────────────────────────────────────┤
+#   │ completions      │ Total successful Pod completions needed (default: 1)│
+#   │ parallelism      │ Max Pods running concurrently (default: 1)          │
+#   │ backoffLimit     │ Retries before marking Job as failed (default: 6)   │
+#   │ activeDeadline   │ Max seconds the Job can run before being terminated │
+#   │   Seconds        │                                                     │
+#   │ ttlSecondsAfter  │ Auto-delete the Job N seconds after it finishes     │
+#   │   Finished       │ (requires TTL controller, enabled by default ≥1.23) │
+#   │ restartPolicy    │ Must be "Never" or "OnFailure" (not "Always")       │
+#   │ suspend          │ If true, suspends the Job (Pods are deleted)        │
+#   └──────────────────┴─────────────────────────────────────────────────────┘
+#
+# Job patterns:
+#   ┌──────────────────────┬──────────────┬─────────────┬─────────────────────┐
+#   │ Pattern              │ completions  │ parallelism │ Use case            │
+#   ├──────────────────────┼──────────────┼─────────────┼─────────────────────┤
+#   │ Single task          │ 1            │ 1           │ One-off script/task │
+#   │ Fixed completion     │ N            │ 1           │ Sequential batch    │
+#   │ Parallel fixed       │ N            │ M           │ Parallel batch work │
+#   │ Work queue           │ (unset)      │ M           │ Pods pull from queue│
+#   └──────────────────────┴──────────────┴─────────────┴─────────────────────┘
+#
+# restartPolicy for Jobs:
+#   - "Never"     → Failed Pods are NOT restarted; a NEW Pod is created instead
+#                    (you can inspect failed Pods for debugging)
+#   - "OnFailure" → The SAME Pod is restarted in-place on failure
+#                    (saves resources but loses failed container logs)
+#
+# See also:
+#   - 07-cron-job-definition.yaml for scheduled/recurring Jobs
+#
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1. Simple Job — single task, run once
+# -----------------------------------------------------------------------------
+# The most basic Job: run one Pod, wait for it to succeed, done.
+# No completions or parallelism specified → defaults to 1 each.
+# -----------------------------------------------------------------------------
+
 apiVersion: batch/v1
 kind: Job
 metadata:
   name: simple-job
+  labels:
+    app: pi-calculator
 spec:
-  completions: 3 # Number of successful completions required for the job to be considered complete
-  parallelism: 2 # Number of pods that can run in parallel 
   template:
+    metadata:
+      labels:
+        app: pi-calculator
+        job-type: simple       # Custom label for easy filtering
     spec:
       containers:
-      - name: pi
-        image: perl
-        command: ["perl",  "-Mbignum=bpi", "-wle", "print bpi(200)"]
-      restartPolicy: Never
-  backoffLimit: 4
+        - name: pi
+          image: perl:5.34      # Specific tag — never use :latest
+          command: ["perl", "-Mbignum=bpi", "-wle", "print bpi(200)"]
+          # Computes pi to 200 decimal places and prints it
+      restartPolicy: Never      # Don't restart — let the Job create a new Pod on failure
+  backoffLimit: 4               # Retry up to 4 times if the Pod fails
 
-# ---
-# Sample commands:
+---
+
+# -----------------------------------------------------------------------------
+# 2. Parallel Job with fixed completions
+# -----------------------------------------------------------------------------
+# Runs multiple Pods to process a batch of work. The Job needs 6 total
+# successful completions, running up to 3 Pods in parallel at a time.
+#
+#   Timeline (best case):
+#     t0: Pod-1, Pod-2, Pod-3 start (parallelism=3)
+#     t1: Pod-1 completes → Pod-4 starts  (completions so far: 1)
+#     t2: Pod-2 completes → Pod-5 starts  (completions so far: 2)
+#     t3: Pod-3 completes → Pod-6 starts  (completions so far: 3)
+#     t4: Pod-4 completes                 (completions so far: 4)
+#     t5: Pod-5 completes                 (completions so far: 5)
+#     t6: Pod-6 completes → Job COMPLETE  (completions: 6 ✓)
+# -----------------------------------------------------------------------------
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: parallel-job
+  labels:
+    app: batch-processor
+spec:
+  completions: 6               # Need 6 successful Pod completions total
+  parallelism: 3               # Run up to 3 Pods at the same time
+  template:
+    metadata:
+      labels:
+        app: batch-processor
+        job-type: parallel
+    spec:
+      containers:
+        - name: worker
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Processing batch item..."
+              sleep $(( RANDOM % 10 + 5 ))    # Simulate 5-15 seconds of work
+              echo "Done!"
+      restartPolicy: Never
+  backoffLimit: 6               # Allow up to 6 failures across all Pods
+
+---
+
+# -----------------------------------------------------------------------------
+# 3. Job with activeDeadlineSeconds and ttlSecondsAfterFinished
+# -----------------------------------------------------------------------------
+# Demonstrates two important lifecycle controls:
+#   - activeDeadlineSeconds: hard time limit for the entire Job
+#   - ttlSecondsAfterFinished: auto-cleanup after Job completes/fails
+#
+# If the Job doesn't finish within the deadline, Kubernetes terminates all
+# running Pods and marks the Job as failed with reason "DeadlineExceeded".
+# -----------------------------------------------------------------------------
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: deadline-job
+  labels:
+    app: time-limited-task
+spec:
+  activeDeadlineSeconds: 60    # Job must finish within 60 seconds or it's killed
+  ttlSecondsAfterFinished: 120 # Auto-delete Job + Pods 120 seconds after completion
+  template:
+    metadata:
+      labels:
+        app: time-limited-task
+        job-type: deadline
+    spec:
+      containers:
+        - name: worker
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              echo "Starting time-limited work..."
+              sleep 30
+              echo "Finished within deadline!"
+      restartPolicy: OnFailure  # Restart in-place on failure (saves Pod creation overhead)
+  backoffLimit: 2
+
+---
+
+# -----------------------------------------------------------------------------
+# 4. Job with restartPolicy: OnFailure
+# -----------------------------------------------------------------------------
+# When restartPolicy is OnFailure, the kubelet restarts the container in the
+# SAME Pod rather than creating a new Pod. This is more resource-efficient
+# but you lose the failed container's logs (they're overwritten on restart).
+#
+#   restartPolicy: Never      →  New Pod per failure  (keeps failed Pods for debugging)
+#   restartPolicy: OnFailure  →  Same Pod restarts    (fewer Pods, loses old logs)
+# -----------------------------------------------------------------------------
+
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: retry-in-place-job
+  labels:
+    app: retry-demo
+spec:
+  completions: 1
+  template:
+    metadata:
+      labels:
+        app: retry-demo
+        job-type: restart-on-failure
+    spec:
+      containers:
+        - name: flaky-task
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              # Simulate a task that fails randomly
+              if [ $(( RANDOM % 3 )) -eq 0 ]; then
+                echo "Task failed!" && exit 1
+              fi
+              echo "Task succeeded!"
+      restartPolicy: OnFailure  # Kubelet restarts container in-place
+  backoffLimit: 5               # Up to 5 restart attempts
+
+
+# =============================================================================
+# Creating and Running Jobs
+# =============================================================================
+
+# Apply all Jobs defined in this file
 # kubectl apply -f 06-job-definition.yaml
+
+# Apply just one Job (use --- separators in the file or split files)
+# kubectl apply -f 06-job-definition.yaml -l app=pi-calculator
+
+# Create a one-off Job imperatively (no YAML needed)
+# kubectl create job quick-job --image=busybox:1.36 -- echo "Hello from a Job!"
+
+
+# =============================================================================
+# Monitoring Jobs
+# =============================================================================
+
+# List all Jobs with status
 # kubectl get jobs
-# kubectl get pods --show-labels
-# kubectl logs <job-pod-name>
-# kubectl delete job <job-pod-name>
+#   COMPLETIONS column shows "succeeded/total" (e.g., "3/6")
+
+# Watch Job progress in real time
+# kubectl get jobs --watch
+
+# Get detailed Job info (events, conditions, Pod statuses)
+# kubectl describe job simple-job
+
+# List Pods created by a specific Job
+# kubectl get pods -l job-name=simple-job
+# kubectl get pods -l job-name=parallel-job --show-labels
+
+# View logs from a Job Pod
+# kubectl logs job/simple-job
+#   (picks one Pod if multiple exist)
+
+# View logs from a specific Pod
+# kubectl logs <pod-name>
+
+# View logs from ALL Pods of a Job
+# kubectl logs -l job-name=parallel-job
+
+# Check Pod exit codes and restart counts
+# kubectl get pods -l job-name=retry-in-place-job -o wide
+
+
+# =============================================================================
+# Suspend / Resume a Job (Kubernetes ≥ 1.24)
+# =============================================================================
+
+# Suspend a running Job (deletes active Pods, preserves progress)
+# kubectl patch job parallel-job -p '{"spec":{"suspend":true}}'
+
+# Resume a suspended Job (recreates Pods to continue)
+# kubectl patch job parallel-job -p '{"spec":{"suspend":false}}'
+
+
+# =============================================================================
+# Inspect / Debug
+# =============================================================================
+
+# See Job completion status and duration
+# kubectl get jobs -o wide
+
+# Check Job conditions (Complete, Failed, Suspended)
+# kubectl get job simple-job -o jsonpath='{.status.conditions[*].type}'
+
+# List failed Pods (restartPolicy: Never leaves them for inspection)
+# kubectl get pods -l job-name=simple-job --field-selector=status.phase=Failed
+
+# Inspect a failed Pod's logs
+# kubectl logs <failed-pod-name>
+
+# Check how many retries have occurred
+# kubectl get job simple-job -o jsonpath='{.status.failed}'
+
+# View Job events for troubleshooting
+# kubectl get events --field-selector involvedObject.name=simple-job
+
+
+# =============================================================================
+# Delete / Clean up
+# =============================================================================
+
+# Delete a Job and its Pods
+# kubectl delete job simple-job
+
+# Delete all Jobs defined in this file
+# kubectl delete -f 06-job-definition.yaml
+
+# Delete all Jobs in the namespace
+# kubectl delete jobs --all
+
+# Delete completed Jobs only (using field selector)
+# kubectl delete jobs --field-selector status.successful=1
+
+# Note: ttlSecondsAfterFinished auto-deletes Jobs — no manual cleanup needed
+# if you set it (see deadline-job example above)
