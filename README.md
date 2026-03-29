@@ -147,6 +147,7 @@ Follow this recommended path for structured learning:
 
 ### Advanced Level
 6. **02-multi-container/** - Multi-container design patterns
+   - Co-located and Init Container patterns
    - Sidecar pattern
    - Ambassador pattern
    - Adapter pattern
@@ -191,8 +192,11 @@ kubectl scale deployment myapp-deployment --replicas=5
 
 ### 02-multi-container
 Multi-container pod patterns demonstrating:
-- Co-located containers
-- Sidecar pattern for logging/monitoring
+- Co-located containers (shared volume/network)
+- Sidecar pattern (logging, monitoring, proxying)
+- Init Container pattern (pre-start initialization)
+- Ambassador pattern (proxy to external services)
+- Adapter pattern (normalize output for monitoring)
 
 ### 03-observability
 Health check configurations:
@@ -295,9 +299,9 @@ A demonstration of persistent storage in Kubernetes with a simple Node.js applic
 ```bash
 cd kub-persistent-volume
 
-# Build Docker image (replace <your-dockerhub-username> and tag as needed)
-docker build -t <your-dockerhub-username>/kub-data-demo:latest .
-docker push <your-dockerhub-username>/kub-data-demo:latest
+# Build Docker image (replace <your-dockerhub-username> and use a specific tag)
+docker build -t <your-dockerhub-username>/kub-data-demo:1.0 .
+docker push <your-dockerhub-username>/kub-data-demo:1.0
 
 # Note: Update the image reference in deployment.yaml to match your image name and tag
 
@@ -319,7 +323,7 @@ kubectl get services
 
 ### Creating a Simple Pod
 ```bash
-kubectl run nginx --image=nginx:latest
+kubectl run nginx --image=nginx:1.27
 kubectl get pods
 kubectl describe pod nginx
 kubectl logs nginx
@@ -329,13 +333,13 @@ kubectl delete pod nginx
 ### Working with Deployments
 ```bash
 # Create deployment
-kubectl create deployment nginx --image=nginx:latest --replicas=3
+kubectl create deployment nginx --image=nginx:1.27 --replicas=3
 
 # Scale deployment
 kubectl scale deployment nginx --replicas=5
 
 # Update image
-kubectl set image deployment/nginx nginx=nginx:1.21
+kubectl set image deployment/nginx nginx=nginx:1.27-alpine
 
 # Check rollout status
 kubectl rollout status deployment/nginx
@@ -369,7 +373,7 @@ kubectl create configmap app-config --from-literal=APP_ENV=production
 kubectl create secret generic app-secret --from-literal=API_KEY=secret123
 
 # Apply configuration with ConfigMap/Secret
-kubectl apply -f demos/01-configuration/08-pod-config-map-definition.yaml
+kubectl apply -f demos/01-configuration/08-2-pod-config-map.yaml
 ```
 
 ### Debugging
