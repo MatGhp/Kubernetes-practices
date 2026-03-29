@@ -1,44 +1,415 @@
+# =============================================================================
+# Kubernetes NetworkPolicy — Educational Reference
+# =============================================================================
+#
+# By default, all Pods in a cluster can communicate with every other Pod.
+# A NetworkPolicy restricts traffic to/from Pods based on labels, namespaces,
+# and IP blocks. Think of it as a firewall for Pod-to-Pod traffic.
+#
+# How it works:
+#   1. You create a NetworkPolicy with a podSelector (which Pods it applies to).
+#   2. You define allowed ingress (incoming) and/or egress (outgoing) rules.
+#   3. The CNI plugin (Calico, Cilium, Weave) enforces the rules at the network level.
+#   4. Any traffic not explicitly allowed is DENIED (once a policy selects a Pod).
+#
+# IMPORTANT — CNI requirement:
+#   NetworkPolicy resources are only enforced if your CNI plugin supports them.
+#   ┌──────────────────────┬───────────────────────┐
+#   │ CNI Plugin           │ NetworkPolicy Support  │
+#   ├──────────────────────┼───────────────────────┤
+#   │ Calico               │ ✓ Full support         │
+#   │ Cilium               │ ✓ Full support         │
+#   │ Weave Net            │ ✓ Full support         │
+#   │ Flannel              │ ✗ No support           │
+#   │ Kindnet (kind)       │ ✗ No support           │
+#   └──────────────────────┴───────────────────────┘
+#   With Flannel/Kindnet, policies are accepted but silently ignored!
+#
+# Key terminology:
+#   - podSelector:       Which Pods this policy applies to (by label)
+#   - policyTypes:       Ingress, Egress, or both
+#   - ingress.from:      Who can send traffic TO the selected Pods
+#   - egress.to:         Where the selected Pods can send traffic
+#   - podSelector:       Match Pods by label (within same namespace)
+#   - namespaceSelector: Match Pods in other namespaces (by namespace label)
+#   - ipBlock:           Match external IPs by CIDR range
+#   - ports:             Which ports/protocols to allow
+#
+# Three-tier app example (what we'll protect):
+#
+#   ┌──────────┐     ┌──────────┐     ┌──────────┐
+#   │ frontend │────►│   api    │────►│    db     │
+#   │ (nginx)  │     │ (node)   │     │ (mysql)   │
+#   │ role:    │     │ role:    │     │ role:     │
+#   │ frontend │     │ api      │     │ db        │
+#   └──────────┘     └──────────┘     └──────────┘
+#      ▲ external        ▲                 ▲
+#      traffic         only from         only from
+#                      frontend          api on 3306
+#
+# =============================================================================
+# AND vs OR Logic in from/to Arrays (common exam topic!)
+# =============================================================================
+#
+# This is one of the most confusing aspects of NetworkPolicy:
+#
+# SINGLE item in from = AND (all conditions must match):
+#   ingress:
+#   - from:
+#     - podSelector:            ◄── Pod must match BOTH conditions
+#         matchLabels:
+#           role: api
+#       namespaceSelector:      ◄── AND be in a namespace with this label
+#         matchLabels:
+#           name: prod
+#
+# SEPARATE items in from = OR (any condition can match):
+#   ingress:
+#   - from:
+#     - podSelector:            ◄── Allow from Pods with role=api
+#         matchLabels:          │
+#           role: api           │   OR
+#     - namespaceSelector:      ◄── Allow from any Pod in namespace name=prod
+#         matchLabels:
+#           name: prod
+#
+# The difference is subtle but critical:
+#   - Indented under same "-" = AND (conjunctive)
+#   - Separate "-" entries     = OR (disjunctive)
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Sample Pods — targets for NetworkPolicy rules below
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: api-pod
+  labels:
+    app: myapp
+    role: api                     # NetworkPolicies select on this label
+spec:
+  containers:
+  - name: api
+    image: nginx:1.25             # Simulates an API server
+    ports:
+    - containerPort: 80
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: db-pod
+  labels:
+    app: myapp
+    role: db                      # NetworkPolicies select on this label
+spec:
+  containers:
+  - name: db
+    image: mysql:8.0              # Database container
+    ports:
+    - containerPort: 3306
+    env:
+    - name: MYSQL_ROOT_PASSWORD
+      value: "demo-only"          # For demo only — use Secrets in production
+
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: frontend-pod
+  labels:
+    app: myapp
+    role: frontend
+spec:
+  containers:
+  - name: frontend
+    image: nginx:1.25
+    ports:
+    - containerPort: 80
+
+---
+# =============================================================================
+# 1. Default Deny All Ingress
+# =============================================================================
+#
+# Baseline security: deny ALL incoming traffic to ALL Pods in this namespace.
+# After applying this, Pods can only receive traffic if explicitly allowed
+# by another NetworkPolicy.
+#
+#   All Pods in namespace
+#       ▲
+#       │  BLOCKED (no ingress rules = deny all)
+#       │
+#   Any source
+#
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: db-policy
+  name: default-deny-ingress
+spec:
+  podSelector: {}                 # Empty = selects ALL Pods in the namespace
+  policyTypes:
+  - Ingress                       # Only ingress — egress is still allowed
+  # No ingress rules = deny all incoming traffic
+
+---
+# =============================================================================
+# 2. Default Deny All Egress
+# =============================================================================
+#
+# Deny ALL outgoing traffic from ALL Pods in this namespace.
+# WARNING: This also blocks DNS (port 53), so Pods cannot resolve Service names.
+# You'll typically need to add a DNS egress exception (see Policy 6).
+#
+#   All Pods in namespace
+#       │
+#       │  BLOCKED (no egress rules = deny all)
+#       ▼
+#   Any destination
+#
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-egress
+spec:
+  podSelector: {}                 # Selects ALL Pods
+  policyTypes:
+  - Egress                        # Only egress — ingress is still allowed
+  # No egress rules = deny all outgoing traffic
+
+---
+# =============================================================================
+# 3. Allow Specific Ingress — podSelector (api → db on port 3306)
+# =============================================================================
+#
+# Allow Pods with role=api to send traffic to Pods with role=db on port 3306.
+# This is the typical pattern for database access control.
+#
+#   api-pod (role: api)
+#       │
+#       │  ALLOWED on TCP 3306
+#       ▼
+#   db-pod (role: db)
+#
+#   frontend-pod (role: frontend)
+#       │
+#       │  DENIED (no matching rule)
+#       ▼
+#   db-pod (role: db)
+#
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-allow-api-ingress
 spec:
   podSelector:
     matchLabels:
-      role: db # Ensure the policy applies to pods with the label 'role: db'
+      role: db                    # This policy applies to db Pods
   policyTypes:
-    - Ingress # This policy only applies to incoming traffic
-    - Egress # This policy also applies to outgoing traffic
+  - Ingress
   ingress:
-    - from:
-        - podSelector: # Allow traffic from pods with the label 'role: api'
-            matchLabels:
-              role: api
-          # namespaceSelector: # Optionally, specify the namespace if needed
-          #   matchLabels:
-          #     name: prod
-        # - namespaceSelector: # Allow traffic from all pods in the 'prod' namespace
-        #     matchLabels:
-        #       name: prod
-        # - ipBlock: # Allow traffic from a specific IP block (can be a single IP or CIDR out of the kubernetes cluster)
-        #     cidr: 192.168.5.10/32
-      ports:
-        - protocol: TCP
-          port: 3306 # Allow traffic on port 3306 (commonly used for MySQL)
+  - from:
+    - podSelector:                # Allow from Pods in the SAME namespace
+        matchLabels:
+          role: api               # Only Pods with role=api
+    ports:
+    - protocol: TCP
+      port: 3306                  # Only on MySQL port
+
+---
+# =============================================================================
+# 4. Allow Ingress from Namespace — namespaceSelector
+# =============================================================================
+#
+# Allow traffic to db Pods from ANY Pod in a namespace labeled name=monitoring.
+# Useful for allowing Prometheus or monitoring tools to scrape metrics.
+#
+# Note: The target namespace must have the label:
+#   kubectl label namespace monitoring name=monitoring
+#
+#   Any Pod in namespace "monitoring"
+#       │
+#       │  ALLOWED on TCP 3306
+#       ▼
+#   db-pod (role: db) in current namespace
+#
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-allow-monitoring-namespace
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:          # Allow from a different namespace
+        matchLabels:
+          name: monitoring        # Namespace must have this label
+    ports:
+    - protocol: TCP
+      port: 3306
+
+---
+# =============================================================================
+# 5. Allow Ingress from IP Block — ipBlock (external backup server)
+# =============================================================================
+#
+# Allow traffic from a specific external IP range (outside the cluster).
+# Useful for external backup agents, monitoring systems, or CI/CD runners.
+#
+#   External IP 192.168.5.0/24
+#       │
+#       │  ALLOWED on TCP 3306
+#       ▼
+#   db-pod (role: db)
+#
+#   External IP 10.0.0.0/8
+#       │
+#       │  DENIED (not in allowed CIDR)
+#       ▼
+#   db-pod (role: db)
+#
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-allow-external-ip
+spec:
+  podSelector:
+    matchLabels:
+      role: db
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - ipBlock:
+        cidr: 192.168.5.0/24     # Allow this CIDR range
+        except:
+        - 192.168.5.100/32       # Except this specific IP (optional)
+    ports:
+    - protocol: TCP
+      port: 3306
+
+---
+# =============================================================================
+# 6. Combined Ingress + Egress — full db isolation
+# =============================================================================
+#
+# Comprehensive policy combining multiple rules:
+# - Ingress: allow from api Pods AND from monitoring namespace
+# - Egress: allow to api Pods on port 80 AND DNS (port 53) for name resolution
+#   AND to external backup server
+#
+# This demonstrates the real-world pattern of layering multiple rules.
+#
+#   INGRESS to db-pod:
+#   ┌─────────────────┐
+#   │  api-pod         │──► TCP 3306 ──► db-pod  ✓
+#   │  (role: api)     │
+#   └─────────────────┘
+#   ┌─────────────────┐
+#   │  monitoring ns   │──► TCP 3306 ──► db-pod  ✓
+#   └─────────────────┘
+#   ┌─────────────────┐
+#   │  frontend-pod    │──────────────► db-pod  ✗ DENIED
+#   └─────────────────┘
+#
+#   EGRESS from db-pod:
+#   db-pod ──► TCP 80 ──► api-pod (role: api)       ✓
+#   db-pod ──► UDP 53 ──► kube-dns                   ✓ (DNS resolution)
+#   db-pod ──► TCP 3306 ──► 192.168.5.10/32          ✓ (backup server)
+#   db-pod ──► anything else                          ✗ DENIED
+#
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: db-full-isolation
+spec:
+  podSelector:
+    matchLabels:
+      role: db                    # Applies to db Pods
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Rule 1: Allow from api Pods (OR — separate "-" items)
+  - from:
+    - podSelector:
+        matchLabels:
+          role: api
+    ports:
+    - protocol: TCP
+      port: 3306
+  # Rule 2: Allow from monitoring namespace
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    ports:
+    - protocol: TCP
+      port: 3306
   egress:
-    - to:
-        - podSelector: # Allow traffic to pods with the label 'role: api'
-            matchLabels:
-              role: api
-          # namespaceSelector: # Optionally, specify the namespace if needed
-          #   matchLabels:
-          #     name: prod
-      ports:
-        - protocol: TCP
-          port: 3306 # Allow traffic on port 3306 (commonly used for MySQL)
-    - to:
-        - ipBlock: # Allow traffic to all IPs to an external backup server (can be restricted to specific CIDR)
-            cidr: 192.168.5.10/32
+  # Rule 1: Allow to api Pods
+  - to:
+    - podSelector:
+        matchLabels:
+          role: api
+    ports:
+    - protocol: TCP
+      port: 80
+  # Rule 2: Allow DNS (essential — without this, Pods can't resolve names)
+  - to: []                        # To any destination
+    ports:
+    - protocol: UDP
+      port: 53                    # DNS
+    - protocol: TCP
+      port: 53                    # DNS over TCP (fallback)
+  # Rule 3: Allow to external backup server
+  - to:
+    - ipBlock:
+        cidr: 192.168.5.10/32    # Single IP for the backup server
+    ports:
+    - protocol: TCP
+      port: 3306
 
-
-
+---
+# =============================================================================
+# kubectl Commands — Network Policies
+# =============================================================================
+#
+# --- Create ---
+#   kubectl apply -f 04-network-policy.yaml
+#
+# --- Inspect ---
+#   kubectl get networkpolicies
+#   kubectl get netpol                          (short alias)
+#   kubectl get netpol db-allow-api-ingress -o yaml
+#   kubectl describe netpol db-full-isolation
+#
+# --- Test connectivity (from api-pod to db-pod) ---
+#   kubectl exec api-pod -- curl -s --connect-timeout 3 db-pod:3306
+#   kubectl exec api-pod -- nc -zv db-pod 3306
+#
+# --- Test connectivity (should be BLOCKED — frontend to db) ---
+#   kubectl exec frontend-pod -- curl -s --connect-timeout 3 db-pod:3306
+#   (should timeout / connection refused)
+#
+# --- Test with a temporary Pod ---
+#   kubectl run test-pod --rm -it --image=busybox:1.36 --restart=Never -- wget -qO- --timeout=3 http://db-pod:3306
+#
+# --- Verify which policies apply to a Pod ---
+#   kubectl get netpol -o wide
+#   kubectl get pods --show-labels
+#
+# --- Debug DNS (if egress deny blocks DNS) ---
+#   kubectl exec db-pod -- nslookup api-pod
+#   (will fail if deny-all-egress is applied without DNS exception)
+#
+# --- Delete / Clean up ---
+#   kubectl delete -f 04-network-policy.yaml
+#   kubectl delete netpol --all
+#   kubectl delete pod api-pod db-pod frontend-pod

@@ -1,0 +1,335 @@
+# =============================================================================
+# Kubernetes Ingress Resource — Educational Reference
+# =============================================================================
+#
+# An Ingress is a set of routing rules that map external HTTP/HTTPS traffic
+# to internal Services. It acts as a "virtual host" configuration for the
+# Ingress Controller (see 02-ingress-controller-setup.yaml).
+#
+# How it works:
+#   1. You create an Ingress resource with host/path rules.
+#   2. The Ingress Controller watches for Ingress resources.
+#   3. It configures its reverse proxy (NGINX) based on the rules.
+#   4. External requests are matched by host, then path, then routed to
+#      the specified backend Service.
+#
+# Key terminology:
+#   - host:        The domain name to match (e.g., wear.example.com)
+#   - path:        The URL path to match (e.g., /wear, /api)
+#   - pathType:    How the path is matched:
+#       - Prefix:                  Matches path + any sub-path (/wear → /wear/*)
+#       - Exact:                   Matches only the exact path (/wear ≠ /wear/)
+#       - ImplementationSpecific:  Up to the controller (avoid — not portable)
+#   - backend:     The Service + port to route traffic to
+#   - defaultBackend: Catch-all when no rule matches (404 page)
+#   - ingressClassName: Which Ingress Controller handles this Ingress
+#   - TLS:         Terminate HTTPS at the controller using a Secret
+#
+# Routing decision flow:
+#
+#   Incoming request: https://wear.example.com/wear/shirts
+#       │
+#       ├── Match host? ──► wear.example.com ✓
+#       │       │
+#       │       ├── Match path? ──► /wear (Prefix) ✓
+#       │       │       │
+#       │       │       ▼
+#       │       │   Route to: wear-service:80
+#       │       │
+#       │       └── No path match ──► defaultBackend (if set) or 404
+#       │
+#       └── No host match ──► check rules without host, then defaultBackend or 404
+#
+# pathType comparison:
+#   ┌─────────────────────────┬────────────────────────────────────────────┐
+#   │ pathType                │ Request /wear/shirts                       │
+#   ├─────────────────────────┼────────────────────────────────────────────┤
+#   │ Prefix  (path: /wear)   │ ✓ matches (prefix match)                  │
+#   │ Exact   (path: /wear)   │ ✗ does NOT match (exact is /wear only)    │
+#   │ Prefix  (path: /)       │ ✓ matches everything (catch-all)          │
+#   │ Exact   (path: /wear/)  │ ✗ trailing slash matters for Exact        │
+#   └─────────────────────────┴────────────────────────────────────────────┘
+#
+# Prerequisites:
+#   - An Ingress Controller must be running (see 02-ingress-controller-setup.yaml)
+#   - Backend Services must exist (wear-service, watch-service)
+#
+# See also:
+#   02-ingress-controller-setup.yaml — deploys the NGINX Ingress Controller
+#   01-service-definition.yaml — Service types explained
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Default Backend (catch-all)
+# -----------------------------------------------------------------------------
+#
+# A minimal Ingress with only a defaultBackend. All traffic goes to one Service
+# regardless of host or path. Useful as a fallback / custom 404 page.
+#
+#   Any request (any host, any path)
+#       │
+#       ▼
+#   default-backend-service:80
+#
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-default-backend
+  labels:
+    app: ingress-demo
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"   # Disable HTTPS redirect for demo
+spec:
+  ingressClassName: nginx         # Which controller handles this Ingress
+  defaultBackend:
+    service:
+      name: default-backend-service
+      port:
+        number: 80                # Port on the Service
+
+---
+# -----------------------------------------------------------------------------
+# 2. Single-Host, Path-Based Routing
+# -----------------------------------------------------------------------------
+#
+# Routes different URL paths on the same host to different Services.
+# This is the most common Ingress pattern.
+#
+#   Client ──► store.example.com
+#       │
+#       ├── /wear/*   ──► wear-service:80
+#       │
+#       ├── /watch/*  ──► watch-service:80
+#       │
+#       └── /*        ──► default-backend-service:80 (catch-all)
+#
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-path-based
+  labels:
+    app: ingress-demo
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /       # Strip the matched path prefix
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  defaultBackend:
+    service:
+      name: default-backend-service
+      port:
+        number: 80
+  rules:
+  - host: store.example.com       # All paths are under this host
+    http:
+      paths:
+      - path: /wear
+        pathType: Prefix           # Matches /wear, /wear/, /wear/shirts, etc.
+        backend:
+          service:
+            name: wear-service
+            port:
+              number: 80
+      - path: /watch
+        pathType: Prefix
+        backend:
+          service:
+            name: watch-service
+            port:
+              number: 80
+
+---
+# -----------------------------------------------------------------------------
+# 3. Multi-Host Routing (virtual hosts)
+# -----------------------------------------------------------------------------
+#
+# Routes traffic based on the Host header. Each domain goes to a different
+# backend. This is how you serve multiple apps from one Ingress Controller.
+#
+#   wear.example.com    ──► wear-service:80
+#   watch.example.com   ──► watch-service:80
+#
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-multi-host
+  labels:
+    app: ingress-demo
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+spec:
+  ingressClassName: nginx
+  rules:
+  - host: wear.example.com        # Virtual host 1
+    http:
+      paths:
+      - path: /
+        pathType: Prefix           # Catch-all for this host
+        backend:
+          service:
+            name: wear-service
+            port:
+              number: 80
+  - host: watch.example.com        # Virtual host 2
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: watch-service
+            port:
+              number: 80
+
+---
+# -----------------------------------------------------------------------------
+# 4. TLS Termination (HTTPS)
+# -----------------------------------------------------------------------------
+#
+# Terminates TLS at the Ingress Controller. The controller decrypts HTTPS
+# using a certificate stored in a Kubernetes Secret, then forwards plain
+# HTTP to the backend Services.
+#
+#   Client ──HTTPS──► Ingress Controller (TLS termination)
+#       │                      │
+#       │                      ├── decrypts with Secret "tls-secret"
+#       │                      │
+#       │                      ▼
+#       │               HTTP ──► wear-service:80
+#       │               HTTP ──► watch-service:80
+#
+# The Secret must contain:
+#   tls.crt — the certificate (PEM)
+#   tls.key — the private key (PEM)
+#
+# Create the Secret:
+#   kubectl create secret tls tls-secret --cert=tls.crt --key=tls.key
+#
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-tls
+  labels:
+    app: ingress-demo
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"    # Force HTTPS
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - store.example.com            # Domain(s) covered by this cert
+    secretName: tls-secret         # Secret containing tls.crt and tls.key
+  rules:
+  - host: store.example.com
+    http:
+      paths:
+      - path: /wear
+        pathType: Prefix
+        backend:
+          service:
+            name: wear-service
+            port:
+              number: 80
+      - path: /watch
+        pathType: Prefix
+        backend:
+          service:
+            name: watch-service
+            port:
+              number: 80
+
+---
+# =============================================================================
+# Legacy vs Modern Syntax (common exam topic)
+# =============================================================================
+#
+# Before networking.k8s.io/v1 (K8s < 1.19), Ingress used different syntax:
+#
+#   DEPRECATED (extensions/v1beta1):
+#     apiVersion: extensions/v1beta1       ◄── removed in K8s 1.22
+#     kind: Ingress
+#     spec:
+#       rules:
+#       - host: store.example.com
+#         http:
+#           paths:
+#           - path: /wear
+#             backend:
+#               serviceName: wear-service   ◄── flat fields
+#               servicePort: 80
+#
+#   CURRENT (networking.k8s.io/v1):
+#     apiVersion: networking.k8s.io/v1     ◄── stable since K8s 1.19
+#     kind: Ingress
+#     spec:
+#       rules:
+#       - host: store.example.com
+#         http:
+#           paths:
+#           - path: /wear
+#             pathType: Prefix              ◄── required field (new)
+#             backend:
+#               service:                    ◄── nested under service
+#                 name: wear-service
+#                 port:
+#                   number: 80
+#
+# Key differences:
+#   - pathType is REQUIRED in networking.k8s.io/v1
+#   - backend uses nested service.name / service.port.number
+#   - ingressClassName replaces the kubernetes.io/ingress.class annotation
+#
+# =============================================================================
+
+# =============================================================================
+# Common NGINX Ingress Annotations
+# =============================================================================
+#
+#   ┌─────────────────────────────────────────────────┬──────────────────────┐
+#   │ Annotation                                      │ Purpose              │
+#   ├─────────────────────────────────────────────────┼──────────────────────┤
+#   │ nginx.ingress.kubernetes.io/rewrite-target: /   │ Strip path prefix    │
+#   │ nginx.ingress.kubernetes.io/ssl-redirect: "true"│ Force HTTPS          │
+#   │ nginx.ingress.kubernetes.io/proxy-body-size: 8m │ Max upload size      │
+#   │ nginx.ingress.kubernetes.io/affinity: cookie    │ Session affinity      │
+#   │ nginx.ingress.kubernetes.io/cors-allow-origin:  │ Enable CORS          │
+#   │   "https://example.com"                         │                      │
+#   │ nginx.ingress.kubernetes.io/limit-rps: "10"     │ Rate limiting        │
+#   └─────────────────────────────────────────────────┴──────────────────────┘
+#
+# =============================================================================
+
+# =============================================================================
+# kubectl Commands — Ingress Resources
+# =============================================================================
+#
+# --- Create ---
+#   kubectl apply -f 03-ingress-resource.yaml
+#
+# Imperative equivalents (K8s 1.20+):
+#   kubectl create ingress ingress-default-backend --default-backend=default-backend-service:80
+#   kubectl create ingress ingress-path-based --rule="store.example.com/wear*=wear-service:80" --rule="store.example.com/watch*=watch-service:80"
+#   kubectl create ingress ingress-multi-host --rule="wear.example.com/*=wear-service:80" --rule="watch.example.com/*=watch-service:80"
+#
+# --- Dry-run (generate YAML without creating) ---
+#   kubectl create ingress ingress-test --rule="host/path=service:port" --dry-run=client -o yaml
+#
+# --- Inspect ---
+#   kubectl get ingress
+#   kubectl get ingress ingress-path-based -o wide
+#   kubectl describe ingress ingress-path-based
+#   kubectl get ingress ingress-tls -o yaml
+#
+# --- Debug (check Address, Backends, Events) ---
+#   kubectl describe ingress ingress-path-based | grep -E "Address|Backend|Events"
+#   kubectl get events --field-selector involvedObject.kind=Ingress
+#
+# --- Test connectivity ---
+#   curl -H "Host: wear.example.com" http://<node-ip>:30080/wear
+#   curl -H "Host: watch.example.com" http://<node-ip>:30080/watch
+#   curl -k https://store.example.com/wear    (with TLS, -k to skip cert verify)
+#
+# --- Delete / Clean up ---
+#   kubectl delete -f 03-ingress-resource.yaml
+#   kubectl delete ingress ingress-default-backend ingress-path-based ingress-multi-host ingress-tls

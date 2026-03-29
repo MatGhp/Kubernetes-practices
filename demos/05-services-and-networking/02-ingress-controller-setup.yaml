@@ -1,0 +1,327 @@
+# =============================================================================
+# Kubernetes Ingress Controller Setup — Educational Reference
+# =============================================================================
+#
+# An Ingress Controller is the component that actually implements Ingress rules.
+# The Ingress resource (see 03-ingress-resource.yaml) is just configuration —
+# without a running Ingress Controller, Ingress resources have no effect.
+#
+# How it works:
+#   1. The Ingress Controller watches the API server for Ingress resources.
+#   2. It reads the routing rules (hosts, paths, backends).
+#   3. It configures its reverse proxy (NGINX, Traefik, HAProxy, etc.).
+#   4. External traffic enters through a Service (NodePort or LoadBalancer)
+#      that fronts the controller Pods.
+#   5. The controller routes each request to the correct backend Service/Pods.
+#
+# Ingress Controller vs Ingress Resource:
+#   ┌────────────────────────┐     ┌──────────────────────────┐
+#   │   Ingress Resource     │     │   Ingress Controller     │
+#   │   (routing rules)      │────►│   (NGINX/Traefik/etc.)   │
+#   │   networking.k8s.io/v1 │     │   Deployment + Service   │
+#   └────────────────────────┘     └──────────────────────────┘
+#
+# Traffic flow (end-to-end):
+#
+#   Internet
+#       │
+#       ▼
+#   LoadBalancer / NodePort Service   ◄── exposes the controller
+#       │
+#       ▼
+#   Ingress Controller Pod(s)        ◄── NGINX reverse proxy
+#       │
+#       │  reads Ingress rules
+#       ▼
+#   Backend Service (ClusterIP)      ◄── e.g., wear-service, watch-service
+#       │
+#       ▼
+#   Application Pod(s)
+#
+# Components needed (all in this file):
+#   1. ServiceAccount — identity for the controller Pods
+#   2. ClusterRole + ClusterRoleBinding — RBAC permissions to watch Ingress,
+#      Services, Endpoints, Secrets, ConfigMaps, IngressClasses
+#   3. ConfigMap — NGINX configuration overrides
+#   4. Deployment — the controller Pods themselves
+#   5. Service — exposes the controller to receive external traffic
+#
+# Production note:
+#   In real clusters you would install the official ingress-nginx via Helm:
+#     helm install ingress-nginx ingress-nginx/ingress-nginx
+#   or via the static manifest:
+#     kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.10.0/deploy/static/provider/cloud/deploy.yaml
+#   This file teaches the individual components for educational purposes.
+#
+# See also:
+#   03-ingress-resource.yaml — Ingress routing rules that this controller reads
+#   01-service-definition.yaml — Service types used to expose the controller
+#
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. ServiceAccount — identity for the Ingress Controller
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: nginx-ingress-sa
+  namespace: ingress-nginx        # Dedicated namespace (best practice)
+  labels:
+    app: nginx-ingress
+
+---
+# -----------------------------------------------------------------------------
+# 2. ClusterRole — permissions the controller needs cluster-wide
+# -----------------------------------------------------------------------------
+#
+# The controller must watch/get/list these resources across all namespaces
+# to discover Ingress rules and their backend Services.
+#
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: nginx-ingress-role
+  labels:
+    app: nginx-ingress
+rules:
+- apiGroups: [""]                 # Core API group
+  resources:
+  - configmaps
+  - endpoints
+  - nodes
+  - pods
+  - secrets
+  - services
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources:
+  - ingresses
+  - ingressclasses
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["networking.k8s.io"]
+  resources:
+  - ingresses/status              # Update Ingress status with LB IP
+  verbs: ["update"]
+- apiGroups: [""]
+  resources:
+  - events                        # Create events for debugging
+  verbs: ["create", "patch"]
+- apiGroups: ["coordination.k8s.io"]
+  resources:
+  - leases                        # Leader election for HA
+  verbs: ["get", "create", "update"]
+
+---
+# -----------------------------------------------------------------------------
+# 3. ClusterRoleBinding — bind the role to the ServiceAccount
+# -----------------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: nginx-ingress-binding
+  labels:
+    app: nginx-ingress
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: nginx-ingress-role        # References the ClusterRole above
+subjects:
+- kind: ServiceAccount
+  name: nginx-ingress-sa          # References the ServiceAccount above
+  namespace: ingress-nginx
+
+---
+# -----------------------------------------------------------------------------
+# 4. ConfigMap — NGINX configuration overrides
+# -----------------------------------------------------------------------------
+#
+# The controller reads this ConfigMap for global NGINX settings.
+# Any key here maps to an NGINX directive.
+# See: https://kubernetes.github.io/ingress-nginx/user-guide/nginx-configuration/configmap/
+#
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-ingress-config
+  namespace: ingress-nginx
+  labels:
+    app: nginx-ingress
+data:
+  proxy-connect-timeout: "10"     # Timeout for connecting to backends (seconds)
+  proxy-read-timeout: "120"       # Timeout waiting for backend response
+  proxy-send-timeout: "120"       # Timeout sending data to backend
+  use-forwarded-headers: "true"   # Trust X-Forwarded-* headers from upstream LB
+
+---
+# -----------------------------------------------------------------------------
+# 5. IngressClass — tells K8s which controller handles which Ingress resources
+# -----------------------------------------------------------------------------
+#
+# Starting in K8s 1.18+, Ingress resources reference an IngressClass.
+# The controller only processes Ingresses whose ingressClassName matches.
+#
+apiVersion: networking.k8s.io/v1
+kind: IngressClass
+metadata:
+  name: nginx                     # Referenced by Ingress resources
+  labels:
+    app: nginx-ingress
+  annotations:
+    ingressclass.kubernetes.io/is-default-class: "true"   # Make this the default
+spec:
+  controller: k8s.io/ingress-nginx   # Must match the controller's --controller-class flag
+
+---
+# -----------------------------------------------------------------------------
+# 6. Deployment — the Ingress Controller Pods
+# -----------------------------------------------------------------------------
+#
+#   Deployment
+#       │
+#       ▼
+#   ReplicaSet (1 replica)
+#       │
+#       ▼
+#   Pod: nginx-ingress-controller
+#       ├── container: controller (NGINX + Lua)
+#       ├── ports: 80 (HTTP), 443 (HTTPS)
+#       └── args: --configmap, --ingress-class, --election-id
+#
+apiVersion: apps/v1               # Correct API (not extensions/v1beta1)
+kind: Deployment
+metadata:
+  name: nginx-ingress-controller
+  namespace: ingress-nginx
+  labels:
+    app: nginx-ingress
+spec:
+  replicas: 1                     # Scale up for HA in production
+  selector:
+    matchLabels:
+      app: nginx-ingress          # Must match template labels
+  template:
+    metadata:
+      labels:
+        app: nginx-ingress        # Matches selector AND Service selector
+    spec:
+      serviceAccountName: nginx-ingress-sa   # Use the SA with RBAC permissions
+      containers:
+      - name: controller
+        image: registry.k8s.io/ingress-nginx/controller:v1.10.0   # Latest stable
+        args:
+        - /nginx-ingress-controller
+        - --configmap=$(POD_NAMESPACE)/nginx-ingress-config
+        - --election-id=ingress-controller-leader
+        - --controller-class=k8s.io/ingress-nginx
+        - --ingress-class=nginx
+        - --watch-namespace=$(POD_NAMESPACE)
+        env:
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name        # Inject Pod name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace   # Inject Pod namespace
+        ports:
+        - name: http
+          containerPort: 80       # HTTP traffic
+          protocol: TCP
+        - name: https
+          containerPort: 443      # HTTPS traffic
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        livenessProbe:
+          httpGet:
+            path: /healthz        # Built-in health endpoint
+            port: 10254           # Controller health port
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 10254
+          initialDelaySeconds: 10
+          periodSeconds: 10
+
+---
+# -----------------------------------------------------------------------------
+# 7. Service — exposes the Ingress Controller to external traffic
+# -----------------------------------------------------------------------------
+#
+#   External ──► NodePort Service ──► Controller Pod(s)
+#
+# On cloud providers, change type to LoadBalancer to get an external IP.
+#
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-ingress-service
+  namespace: ingress-nginx
+  labels:
+    app: nginx-ingress
+spec:
+  type: NodePort                  # Use LoadBalancer on cloud (GKE, AKS, EKS)
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80                      # Service port
+    targetPort: 80                # Container port
+    nodePort: 30080               # Accessible at <NodeIP>:30080
+  - name: https
+    protocol: TCP
+    port: 443
+    targetPort: 443
+    nodePort: 30443               # Accessible at <NodeIP>:30443
+  selector:
+    app: nginx-ingress            # Must match Deployment template labels
+
+---
+# =============================================================================
+# kubectl Commands — Ingress Controller Setup
+# =============================================================================
+#
+# --- Create the namespace first ---
+#   kubectl create namespace ingress-nginx
+#
+# --- Deploy all resources ---
+#   kubectl apply -f 02-ingress-controller-setup.yaml
+#
+# --- Verify the controller is running ---
+#   kubectl get all -n ingress-nginx
+#   kubectl get pods -n ingress-nginx
+#   kubectl get deployment nginx-ingress-controller -n ingress-nginx
+#
+# --- Check IngressClass ---
+#   kubectl get ingressclass
+#   kubectl describe ingressclass nginx
+#
+# --- View controller logs ---
+#   kubectl logs -n ingress-nginx -l app=nginx-ingress --tail=50
+#   kubectl logs -n ingress-nginx -l app=nginx-ingress -f
+#
+# --- Check RBAC ---
+#   kubectl get clusterrole nginx-ingress-role
+#   kubectl get clusterrolebinding nginx-ingress-binding
+#   kubectl auth can-i list ingresses --as=system:serviceaccount:ingress-nginx:nginx-ingress-sa
+#
+# --- Test controller health ---
+#   kubectl port-forward -n ingress-nginx svc/nginx-ingress-service 8080:80
+#   curl http://localhost:8080    (should return 404 — no Ingress rules yet)
+#
+# --- Production installation (Helm) ---
+#   helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+#   helm repo update
+#   helm install ingress-nginx ingress-nginx/ingress-nginx --namespace ingress-nginx --create-namespace
+#
+# --- Delete / Clean up ---
+#   kubectl delete -f 02-ingress-controller-setup.yaml
+#   kubectl delete namespace ingress-nginx

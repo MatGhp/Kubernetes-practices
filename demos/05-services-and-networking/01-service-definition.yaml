@@ -1,36 +1,278 @@
-# apiVersion: v1
-# kind: Pod
-# metadata:
-#   name: myapp-pod
-#   labels:
-#     name: myapp-label-example
-#     type: frontend
-# spec:
-#   containers:
-#   - name: nginx-container
-#     image: nginx
+# =============================================================================
+# Kubernetes Service — Educational Reference
+# =============================================================================
+#
+# A Service is a stable networking abstraction that provides a fixed IP address
+# and DNS name to reach a dynamic set of Pods. Pods are ephemeral — they can be
+# rescheduled, scaled, or replaced at any time. Services decouple consumers
+# from the ever-changing set of Pod IPs.
+#
+# How it works:
+#   1. You create a Service with a label selector.
+#   2. The Endpoints controller watches for Pods matching that selector.
+#   3. kube-proxy programs iptables/IPVS rules on every node.
+#   4. Traffic to the Service ClusterIP is load-balanced across matching Pods.
+#   5. CoreDNS creates a DNS record: <service-name>.<namespace>.svc.cluster.local
+#
+# Key terminology:
+#   - ClusterIP:    Virtual IP allocated inside the cluster (default type)
+#   - NodePort:     Exposes the Service on each node's IP at a static port
+#   - LoadBalancer: Provisions a cloud load balancer (GKE, AKS, EKS)
+#   - ExternalName: Maps a Service to an external DNS name (CNAME)
+#   - Headless:     ClusterIP set to "None" — returns Pod IPs directly (for StatefulSets)
+#   - port:         The port the Service listens on
+#   - targetPort:   The port on the Pod where traffic is forwarded
+#   - nodePort:     The port opened on each node (30000-32767)
+#   - Endpoints:    The list of Pod IP:port pairs backing a Service
+#
+# Port mapping summary:
+#   ┌──────────────────────────────────────────────────────────────────────┐
+#   │  Client ──► nodePort (on Node) ──► port (Service) ──► targetPort   │
+#   │                                                        (Pod/container)│
+#   └──────────────────────────────────────────────────────────────────────┘
+#
+# See also:
+#   demos/01-configuration/07-service-definition.yaml  — configuration-focused
+#     Service reference with detailed config patterns
+#
+# =============================================================================
 
-# ---
+# -----------------------------------------------------------------------------
+# Sample Pod — target backend for all Service examples below
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: myapp-pod
+  labels:
+    app: myapp                    # All Services below select on this label
+    type: frontend
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.25             # Specific tag, never :latest
+    ports:
+    - containerPort: 80           # Port the container listens on
 
+---
+# =============================================================================
+# 1. ClusterIP Service (default)
+# =============================================================================
+#
+# The most common type. Exposes the Service on a cluster-internal IP only.
+# Other Pods within the cluster can reach it, but external traffic cannot.
+#
+#   Client Pod (inside cluster)
+#       │
+#       ▼
+#   myapp-clusterip:80       ◄── ClusterIP (virtual IP)
+#       │
+#       ▼
+#   Pod(s) with app=myapp    :80 (targetPort)
+#
 apiVersion: v1
 kind: Service
 metadata:
-  name: myapp-service
+  name: myapp-clusterip
+  labels:
+    app: myapp
 spec:
-  type: NodePort # Change to LoadBalancer for cloud environments or ClusterIP for internal services
+  type: ClusterIP                 # Default — can be omitted
   ports:
-  - port: 80 # required, Port exposed by the service
-    targetPort: 80 # optional, if not given, it defaults to the same value as port / Port on the container/pod to forward traffic to
-    nodePort: 30008 # Optional, specify a port for NodePort service
+  - protocol: TCP
+    port: 80                      # Service port (what clients connect to)
+    targetPort: 80                # Pod port (where traffic is forwarded)
   selector:
-    name: myapp-label-example # Match the label of the pod to route traffic to it
-    type: frontend
+    app: myapp                    # Must match Pod labels exactly
 
 ---
-
-# kubectl create -f 01-service-definition.yaml
-# kubectl get services
+# =============================================================================
+# 2. NodePort Service
+# =============================================================================
 #
-# Example: Expose a deployment as a service
-# kubectl expose deployment myapp-deployment --port=80 --target-port=80 --name=myapp-service --type=NodePort
+# Extends ClusterIP by also opening a port on every node in the cluster.
+# External traffic can reach the Service via <NodeIP>:<nodePort>.
+# Useful for development/testing or bare-metal clusters without a load balancer.
+#
+#   External Client
+#       │
+#       ▼
+#   <NodeIP>:30080            ◄── nodePort (30000-32767)
+#       │
+#       ▼
+#   myapp-nodeport:80         ◄── ClusterIP (auto-assigned)
+#       │
+#       ▼
+#   Pod(s) with app=myapp     :80 (targetPort)
+#
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-nodeport
+  labels:
+    app: myapp
+spec:
+  type: NodePort
+  ports:
+  - protocol: TCP
+    port: 80                      # Service port (cluster-internal)
+    targetPort: 80                # Pod port
+    nodePort: 30080               # Node port (30000-32767). Omit to let K8s auto-assign.
+  selector:
+    app: myapp
+
+---
+# =============================================================================
+# 3. LoadBalancer Service
+# =============================================================================
+#
+# Extends NodePort by provisioning an external load balancer from the cloud
+# provider (GKE, AKS, EKS). The LB gets a public IP and forwards traffic to
+# the NodePort, which routes to the ClusterIP, which reaches the Pods.
+#
+#   Internet Client
+#       │
+#       ▼
+#   Cloud Load Balancer       ◄── External IP (provisioned by cloud)
+#       │
+#       ▼
+#   <NodeIP>:30081            ◄── nodePort (auto-assigned)
+#       │
+#       ▼
+#   myapp-loadbalancer:80     ◄── ClusterIP
+#       │
+#       ▼
+#   Pod(s) with app=myapp     :80 (targetPort)
+#
+# Note: On bare-metal clusters without a cloud LB, this stays in "Pending"
+# state unless you install MetalLB or similar.
+#
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-loadbalancer
+  labels:
+    app: myapp
+spec:
+  type: LoadBalancer
+  ports:
+  - protocol: TCP
+    port: 80                      # Service port
+    targetPort: 80                # Pod port
+  selector:
+    app: myapp
+
+---
+# =============================================================================
+# 4. ExternalName Service
+# =============================================================================
+#
+# Maps the Service to an external DNS name via a CNAME record.
+# No proxying or port forwarding happens — CoreDNS simply returns the CNAME.
+# Useful for referencing external databases or APIs with a stable in-cluster name.
+#
+#   Pod (inside cluster)
+#       │
+#       │  DNS lookup: myapp-external.default.svc.cluster.local
+#       ▼
+#   CoreDNS returns CNAME ──► db.example.com
+#       │
+#       ▼
+#   External database at db.example.com
+#
+# No selector, no ClusterIP, no Endpoints — just a DNS alias.
+#
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-external
+  labels:
+    app: myapp
+spec:
+  type: ExternalName
+  externalName: db.example.com    # The external DNS name to alias
+
+---
+# =============================================================================
+# 5. Headless Service (clusterIP: None)
+# =============================================================================
+#
+# A Headless Service does NOT allocate a ClusterIP. Instead, DNS returns the
+# individual Pod IPs directly. This is essential for StatefulSets where each
+# Pod needs a stable, addressable identity (e.g., database replicas).
+#
+#   Client Pod
+#       │
+#       │  DNS lookup: myapp-headless.default.svc.cluster.local
+#       ▼
+#   CoreDNS returns A records:
+#       10.244.0.5    ◄── Pod 1 IP
+#       10.244.1.8    ◄── Pod 2 IP
+#       10.244.2.3    ◄── Pod 3 IP
+#
+# With a StatefulSet, each Pod also gets a DNS record:
+#   <pod-name>.myapp-headless.default.svc.cluster.local
+#
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-headless
+  labels:
+    app: myapp
+spec:
+  clusterIP: None                 # This makes it headless
+  ports:
+  - protocol: TCP
+    port: 80
+    targetPort: 80
+  selector:
+    app: myapp
+
+---
+# =============================================================================
+# kubectl Commands — Services
+# =============================================================================
+#
+# --- Create ---
+#
+# Apply this manifest:
+#   kubectl apply -f 01-service-definition.yaml
+#
+# Imperative equivalents:
+#   kubectl expose pod myapp-pod --port=80 --target-port=80 --name=myapp-clusterip --type=ClusterIP
+#   kubectl expose pod myapp-pod --port=80 --target-port=80 --name=myapp-nodeport --type=NodePort
+#   kubectl expose pod myapp-pod --port=80 --target-port=80 --name=myapp-loadbalancer --type=LoadBalancer
+#   kubectl create service externalname myapp-external --external-name=db.example.com
+#   kubectl create service clusterip myapp-headless --clusterip="None" --tcp=80:80
+#
+# --- Dry-run (generate YAML without creating) ---
+#   kubectl expose pod myapp-pod --port=80 --type=NodePort --dry-run=client -o yaml
+#
+# --- Inspect ---
+#   kubectl get services
+#   kubectl get svc myapp-nodeport -o wide
+#   kubectl describe svc myapp-clusterip
+#   kubectl get svc myapp-loadbalancer -o yaml
+#   kubectl get svc myapp-loadbalancer -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+#
+# --- Endpoints (which Pods back each Service) ---
+#   kubectl get endpoints myapp-clusterip
+#   kubectl get endpointslices -l kubernetes.io/service-name=myapp-clusterip
+#
+# --- DNS debugging (from inside a temp Pod) ---
+#   kubectl run dns-test --rm -it --image=busybox:1.36 --restart=Never -- nslookup myapp-clusterip
+#   kubectl run dns-test --rm -it --image=busybox:1.36 --restart=Never -- nslookup myapp-headless
+#
+# --- Connectivity testing ---
+#   kubectl run curl-test --rm -it --image=curlimages/curl:8.5.0 --restart=Never -- curl http://myapp-clusterip
+#   kubectl port-forward svc/myapp-nodeport 8080:80
+#
+# --- Watch ---
+#   kubectl get svc --watch
+#   kubectl get endpoints --watch
+#
+# --- Delete / Clean up ---
+#   kubectl delete -f 01-service-definition.yaml
+#   kubectl delete svc myapp-clusterip myapp-nodeport myapp-loadbalancer myapp-external myapp-headless
+#   kubectl delete pod myapp-pod
 
