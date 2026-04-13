@@ -1,0 +1,63 @@
+# =============================================================================
+# Kubernetes Volume (hostPath) — Educational Reference
+# =============================================================================
+#
+# What: A Volume provides storage to containers within a Pod. Unlike container
+#   filesystems (which are ephemeral), volumes persist across container restarts
+#   within the same Pod lifecycle.
+#
+# Key concepts:
+#   - emptyDir:  Temporary storage, created when Pod starts, deleted when Pod is removed
+#   - hostPath:  Mounts a file/directory from the host node's filesystem into a Pod
+#   - Volume lifecycle is tied to the Pod — when Pod is deleted, the volume is gone
+#
+# Common volume types:
+#   - emptyDir:               Scratch space, caching, shared data between containers
+#   - hostPath:               Access host files — single-node testing only (NOT production)
+#   - nfs:                    Network File System mount
+#   - configMap / secret:     Mount ConfigMaps or Secrets as files
+#   - persistentVolumeClaim:  Access pre-provisioned or dynamically provisioned storage
+#
+# See also:
+#   - 02-1-persistent-volume.yaml for PersistentVolume (cluster-level storage)
+#   - 02-2-persistent-volume-claim.yaml for PersistentVolumeClaim
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: random-number-generator
+  labels:
+    app: random-number-generator
+spec:
+  containers:
+  - name: alpine
+    image: alpine:3.20                          # Always pin image tags
+    command: ["/bin/sh", "-c"]
+    args: ["shuf -i 0-100 -n 1 >> /opt/number.out"]
+    volumeMounts:
+    - name: data-volume
+      mountPath: /opt                           # Mount the volume at /opt in the container
+    resources:
+      requests:
+        memory: "32Mi"
+        cpu: "50m"
+      limits:
+        memory: "64Mi"
+        cpu: "100m"
+  volumes:
+  - name: data-volume                           # Must match volumeMounts.name above
+    hostPath:
+      path: /data                               # Path on the host node's filesystem
+      type: DirectoryOrCreate                   # Create the directory if it doesn't exist
+
+# Apply this manifest:
+#   kubectl apply -f 01-volume-pod.yaml
+#
+# Inspect:
+#   kubectl get pod random-number-generator
+#   kubectl describe pod random-number-generator
+#   kubectl exec random-number-generator -- cat /opt/number.out
+#
+# Clean up:
+#   kubectl delete -f 01-volume-pod.yaml
+
