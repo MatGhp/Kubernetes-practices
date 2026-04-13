@@ -1,16 +1,53 @@
+# =============================================================================
+# Pod with PersistentVolumeClaim — Educational Reference
+# =============================================================================
+#
+# What: This Pod mounts a PersistentVolumeClaim (PVC) as a volume, giving
+#   the container access to persistent storage that survives Pod restarts.
+#
+# How it works:
+#   1. PV is created (02-1-persistent-volume.yaml)
+#   2. PVC requests and binds to the PV (02-2-persistent-volume-claim.yaml)
+#   3. Pod references the PVC by name — data is mounted into the container
+#
+#   Pod ──volumeMount──> PVC ──binds──> PV ──> Underlying Storage
+#
+# See also:
+#   - 02-1-persistent-volume.yaml
+#   - 02-2-persistent-volume-claim.yaml
+# =============================================================================
 apiVersion: v1
 kind: Pod
 metadata:
-  name: pod-which-uses-persistent-volume-claim
-  # This pod will use the PersistentVolumeClaim defined in 022-persistent-volume-claim
+  name: pod-with-pvc
+  labels:
+    app: pod-with-pvc
 spec:
   containers:
-    - name: myfrontend
-      image: nginx
-      volumeMounts:
-      - mountPath: "/var/www/html" # Mount the volume at /var/www/html in the container
-        name: mypd
-  volumes:
+  - name: nginx
+    image: nginx:1.27                           # Always pin image tags
+    volumeMounts:
     - name: mypd
-      persistentVolumeClaim:
-        claimName: myclaim # Reference the PersistentVolumeClaim named myclaim in the 02-2-persistent-volume-claim-definition.yaml file
+      mountPath: /var/www/html                  # Mount persistent storage here
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "100m"
+      limits:
+        memory: "128Mi"
+        cpu: "250m"
+  volumes:
+  - name: mypd
+    persistentVolumeClaim:
+      claimName: myclaim                        # Must match PVC name from 02-2
+
+# Apply this manifest (after PV and PVC are created):
+#   kubectl apply -f 02-3-persistent-volume-claim-pod.yaml
+#
+# Inspect:
+#   kubectl get pod pod-with-pvc
+#   kubectl describe pod pod-with-pvc
+#   kubectl exec pod-with-pvc -- ls /var/www/html
+#
+# Clean up:
+#   kubectl delete -f 02-3-persistent-volume-claim-pod.yaml

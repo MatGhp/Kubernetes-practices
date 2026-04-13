@@ -1,0 +1,61 @@
+# =============================================================================
+# Kubernetes PersistentVolume (PV) — Educational Reference
+# =============================================================================
+#
+# What: A PersistentVolume is a cluster-level storage resource provisioned by
+#   an admin (or dynamically via StorageClass). It exists independently of any
+#   Pod and persists beyond Pod lifecycle.
+#
+# Key concepts:
+#   - PV is a cluster-scoped resource (not namespaced)
+#   - Access Modes:
+#       ReadWriteOnce (RWO) — mount read-write by a single node
+#       ReadOnlyMany  (ROX) — mount read-only by many nodes
+#       ReadWriteMany (RWX) — mount read-write by many nodes
+#   - Reclaim Policies:
+#       Retain  — Keep data after PVC is deleted (manual cleanup required)
+#       Delete  — Delete the underlying storage when PVC is deleted
+#       Recycle — (deprecated) Basic scrub (rm -rf) before reuse
+#   - Status lifecycle: Available → Bound → Released → Failed
+#
+# See also:
+#   - 02-2-persistent-volume-claim.yaml for the PVC that binds to this PV
+#   - 02-3-persistent-volume-claim-pod.yaml for a Pod consuming the PVC
+#   - 03-1-storage-class.yaml for dynamic provisioning (no manual PV needed)
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pv-vol1
+  labels:
+    app: pv-vol1
+spec:
+  accessModes:
+    - ReadWriteOnce                             # RWO — mount read-write by a single node
+  capacity:
+    storage: 1Gi                                # Storage size (e.g., 1Gi, 10Gi)
+  persistentVolumeReclaimPolicy: Retain         # Keep data when PVC is deleted
+  # persistentVolumeReclaimPolicy: Delete       # Delete storage when PVC is deleted
+  # persistentVolumeReclaimPolicy: Recycle      # (deprecated) Scrub and reuse
+  hostPath:
+    path: /tmp/data                             # Host path — for single-node testing only
+  # --- Cloud provider alternatives (uncomment one for production) ---
+  # awsElasticBlockStore:
+  #   volumeID: <volume-id>
+  #   fsType: ext4
+  # gcePersistentDisk:
+  #   pdName: <disk-name>
+  #   fsType: ext4
+  # azureDisk:
+  #   diskName: <disk-name>
+  #   diskURI: <disk-uri>
+
+# Apply this manifest:
+#   kubectl apply -f 02-1-persistent-volume.yaml
+#
+# Inspect:
+#   kubectl get pv
+#   kubectl describe pv pv-vol1
+#
+# Clean up:
+#   kubectl delete pv pv-vol1

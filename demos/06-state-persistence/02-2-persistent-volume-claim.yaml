@@ -1,0 +1,43 @@
+# =============================================================================
+# Kubernetes PersistentVolumeClaim (PVC) — Educational Reference
+# =============================================================================
+#
+# What: A PVC is a request for storage by a user. It binds to an available PV
+#   that meets the requested size and access mode. Think of PV as the actual
+#   disk, and PVC as a "ticket" to use that disk.
+#
+# Binding rules:
+#   - K8s matches PVC to PV by accessMode, capacity, and storageClassName
+#   - A PVC binds to exactly one PV (1:1 relationship)
+#   - If no matching PV exists, the PVC stays in Pending state
+#
+# See also:
+#   - 02-1-persistent-volume.yaml for the PV this PVC will bind to
+#   - 02-3-persistent-volume-claim-pod.yaml for mounting this PVC in a Pod
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+  labels:
+    app: myclaim
+spec:
+  accessModes:
+    - ReadWriteOnce                             # Must match the PV's access mode
+  resources:
+    requests:
+      storage: 500Mi                            # Must be <= the PV's capacity
+  volumeMode: Filesystem                        # Filesystem (default) or Block
+
+# Apply this manifest:
+#   kubectl apply -f 02-2-persistent-volume-claim.yaml
+#
+# Inspect:
+#   kubectl get pvc
+#   kubectl describe pvc myclaim
+#
+# Check PV binding:
+#   kubectl get pv
+#
+# Clean up:
+#   kubectl delete pvc myclaim
