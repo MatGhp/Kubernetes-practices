@@ -1,50 +1,123 @@
+# =============================================================================
+# Kubernetes Headless Service — Educational Reference
+# =============================================================================
+#
+# What: A headless Service (clusterIP: None) does not load-balance or proxy.
+#   Instead, it creates DNS records for each Pod directly, enabling clients
+#   to discover and connect to specific Pod instances.
+#
+# Regular Service vs Headless Service:
+#
+#   Regular Service:
+#     Client -> Service VIP (10.96.x.x) -> random Pod
+#
+#   Headless Service:
+#     Client -> DNS lookup -> list of all Pod IPs
+#     Client -> connect to specific Pod by name
+#
+# DNS records created:
+#   Service: <service-name>.<namespace>.svc.cluster.local
+#   Pod:     <pod-name>.<service-name>.<namespace>.svc.cluster.local
+#
+# Use cases:
+#   - StatefulSets (database replicas with specific roles: master/replica)
+#   - Service discovery where clients need all Pod endpoints
+#
+# See also:
+#   - 04-statefulset.yaml for the StatefulSet that uses this headless Service
+# =============================================================================
+
+# --- 1. Headless Service ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: mysql-h # Headless service for MySQL
-spec:
-  ports:
-    - port: 3306
-  selector:
+  name: mysql-h
+  labels:
     app: mysql
-  clusterIP: None  # This makes it a headless service, allowing direct access to the pods
-
-
-
+spec:
+  clusterIP: None                               # Makes this a headless service
+  selector:
+    app: mysql                                  # Selects Pods with label app=mysql
+  ports:
+  - port: 3306
 
 ---
+# --- 2. Standalone Pod with headless Service DNS ---
+# Demonstrates how a standalone Pod can register with a headless Service
+# using subdomain and hostname fields.
 apiVersion: v1
 kind: Pod
 metadata:
   name: myapp-pod
   labels:
     app: mysql
-spec:    
+spec:
+  subdomain: mysql-h                            # Must match headless Service name
+  hostname: myapp-pod                           # DNS: myapp-pod.mysql-h.default.svc.cluster.local
   containers:
   - name: mysql
-    image: mysql
-  subdomain: mysql-h # This is the headless service name. It creates a DNS entry for the pod at mysql-h.default.svc.cluster.local
-  hostname: myapp-pod # This is the hostname of the pod. It will be accessible at my-sql-pod.mysql-h.default.svc.cluster.local
+    image: mysql:8.0                            # Pinned tag
+    env:
+    - name: MYSQL_ROOT_PASSWORD
+      value: "changeme"                         # Use a Secret in production
+    ports:
+    - containerPort: 3306
+    resources:
+      requests:
+        memory: "256Mi"
+        cpu: "250m"
+      limits:
+        memory: "512Mi"
+        cpu: "500m"
 
 ---
-# StatefulSet for MySQL with headless service
+# --- 3. StatefulSet with headless Service ---
+# StatefulSets automatically set subdomain and hostname for each Pod.
+# Pod DNS: mysql-deployment-0.mysql-h.default.svc.cluster.local
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
   name: mysql-deployment
+  labels:
+    app: mysql
 spec:
-  serviceName: mysql-h # This is the headless service name
+  serviceName: mysql-h                          # Links to the headless Service above
   replicas: 3
-  selector: 
+  selector:
     matchLabels:
       app: mysql
   template:
     metadata:
-      name: myapp-pod
       labels:
         app: mysql
     spec:
       containers:
       - name: mysql
-        image: mysql
+        image: mysql:8.0                        # Pinned tag
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "changeme"                     # Use a Secret in production
+        ports:
+        - containerPort: 3306
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+# Apply this manifest:
+#   kubectl apply -f 05-headless-service.yaml
+#
+# Inspect:
+#   kubectl get svc mysql-h
+#   kubectl get endpoints mysql-h
+#   kubectl get pods -l app=mysql
+#
+# Test DNS resolution:
+#   kubectl run -it --rm dns-test --image=busybox:1.36 --restart=Never -- nslookup mysql-h
+#
+# Clean up:
+#   kubectl delete -f 05-headless-service.yaml
 

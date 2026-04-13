@@ -1,9 +1,48 @@
+# =============================================================================
+# Kubernetes StorageClass — Educational Reference
+# =============================================================================
+#
+# What: A StorageClass enables dynamic provisioning of PersistentVolumes.
+#   Instead of an admin manually creating PVs, the StorageClass instructs
+#   K8s to automatically create storage when a PVC requests it.
+#
+# Key concepts:
+#   - provisioner:       The volume plugin that creates storage (cloud-specific)
+#   - parameters:        Provider-specific settings (disk type, replication, etc.)
+#   - reclaimPolicy:     What happens when PVC is deleted (Delete or Retain)
+#   - volumeBindingMode: Immediate (bind at PVC creation) or
+#                        WaitForFirstConsumer (bind when Pod is scheduled)
+#
+# Common provisioners:
+#   - kubernetes.io/gce-pd       (Google Cloud Persistent Disk)
+#   - kubernetes.io/aws-ebs      (AWS Elastic Block Store)
+#   - kubernetes.io/azure-disk   (Azure Managed Disk)
+#   - k8s.io/minikube-hostpath   (Minikube local testing)
+#
+# See also:
+#   - 03-2-pvc-with-storage-class.yaml for a PVC using this StorageClass
+#   - 03-3-pod-with-storage-class.yaml for a Pod consuming the dynamic PVC
+# =============================================================================
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
   name: google-storage
-provisioner: kubernetes.io/gce-pd # Specify the provisioner for Google Cloud Persistent Disk
+  labels:
+    app: google-storage
+provisioner: kubernetes.io/gce-pd               # Google Cloud Persistent Disk provisioner
 parameters:
-  type: pd-standard # Specify the type of disk, e.g., pd-standard or pd-ssd
-  replication-type: none  # Specify the replication type, e.g., none, regional-pd, etc.
+  type: pd-standard                             # pd-standard (HDD) or pd-ssd (SSD)
+  replication-type: none                        # none or regional-pd
+reclaimPolicy: Delete                           # Delete or Retain
+volumeBindingMode: Immediate                    # Immediate or WaitForFirstConsumer
+
+# Apply this manifest:
+#   kubectl apply -f 03-1-storage-class.yaml
+#
+# Inspect:
+#   kubectl get storageclass
+#   kubectl describe storageclass google-storage
+#
+# Clean up:
+#   kubectl delete storageclass google-storage
 

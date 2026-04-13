@@ -1,0 +1,46 @@
+# =============================================================================
+# Pod with Dynamically Provisioned PVC — Educational Reference
+# =============================================================================
+#
+# What: This Pod mounts a PVC that was dynamically provisioned via a
+#   StorageClass. The usage is identical to manually provisioned PVCs —
+#   the Pod doesn't know or care how the storage was provisioned.
+#
+# See also:
+#   - 03-1-storage-class.yaml for the StorageClass
+#   - 03-2-pvc-with-storage-class.yaml for the PVC
+# =============================================================================
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-dynamic-pvc
+  labels:
+    app: pod-with-dynamic-pvc
+spec:
+  containers:
+  - name: nginx
+    image: nginx:1.27                           # Always pin image tags
+    volumeMounts:
+    - name: data-volume
+      mountPath: /var/www/html
+    resources:
+      requests:
+        memory: "64Mi"
+        cpu: "100m"
+      limits:
+        memory: "128Mi"
+        cpu: "250m"
+  volumes:
+  - name: data-volume
+    persistentVolumeClaim:
+      claimName: myclaim                        # PVC from 03-2-pvc-with-storage-class.yaml
+
+# Apply this manifest (after StorageClass and PVC are created):
+#   kubectl apply -f 03-3-pod-with-storage-class.yaml
+#
+# Inspect:
+#   kubectl get pod pod-with-dynamic-pvc
+#   kubectl describe pod pod-with-dynamic-pvc
+#
+# Clean up:
+#   kubectl delete -f 03-3-pod-with-storage-class.yaml

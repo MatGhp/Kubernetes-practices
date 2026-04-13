@@ -1,0 +1,70 @@
+# =============================================================================
+# Kubernetes StatefulSet — Educational Reference
+# =============================================================================
+#
+# What: A StatefulSet manages stateful applications that need stable network
+#   identities and persistent storage. Unlike Deployments, each Pod gets:
+#   - A stable hostname: <statefulset-name>-<ordinal> (e.g., mysql-0, mysql-1)
+#   - Ordered deployment: Pods are created sequentially (0, 1, 2...)
+#   - Stable persistent storage via volumeClaimTemplates
+#
+# Key differences from Deployment:
+#   - Pods are created/deleted in order (unless podManagementPolicy: Parallel)
+#   - Each Pod has a persistent identity that survives rescheduling
+#   - Requires a headless Service for DNS-based pod discovery
+#
+# DNS pattern (with headless service):
+#   <pod-name>.<headless-service>.<namespace>.svc.cluster.local
+#   e.g., mysql-0.mysql-h.default.svc.cluster.local
+#
+# See also:
+#   - 05-headless-service.yaml for the headless Service required by StatefulSets
+# =============================================================================
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  labels:
+    app: mysql
+spec:
+  serviceName: mysql-h                          # Headless service for stable network identity
+  replicas: 3
+  podManagementPolicy: Parallel                 # Parallel (fast) or OrderedReady (sequential, default)
+  selector:
+    matchLabels:
+      app: mysql                                # Must match template labels
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0                        # Pinned tag (mysql:5.7 is EOL)
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "changeme"                     # Use a Secret in production
+        ports:
+        - containerPort: 3306
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+
+# Apply this manifest (create headless service first):
+#   kubectl apply -f 05-headless-service.yaml
+#   kubectl apply -f 04-statefulset.yaml
+#
+# Inspect:
+#   kubectl get statefulset mysql
+#   kubectl get pods -l app=mysql
+#   kubectl describe statefulset mysql
+#
+# Scale:
+#   kubectl scale statefulset mysql --replicas=5
+#
+# Clean up:
+#   kubectl delete statefulset mysql

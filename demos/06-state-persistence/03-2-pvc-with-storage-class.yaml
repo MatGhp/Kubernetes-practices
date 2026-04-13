@@ -1,0 +1,40 @@
+# =============================================================================
+# PersistentVolumeClaim with StorageClass — Educational Reference
+# =============================================================================
+#
+# What: This PVC references a StorageClass instead of binding to a manually
+#   created PV. Kubernetes dynamically provisions a PV matching the requested
+#   size and access mode using the specified StorageClass.
+#
+# Flow:
+#   PVC (storageClassName: google-storage)
+#     -> StorageClass (provisioner: gce-pd)
+#       -> Dynamically creates a PV + underlying cloud disk
+#
+# See also:
+#   - 03-1-storage-class.yaml for the StorageClass definition
+#   - 03-3-pod-with-storage-class.yaml for a Pod using this PVC
+# =============================================================================
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: myclaim
+  labels:
+    app: myclaim
+spec:
+  accessModes:
+    - ReadWriteOnce
+  storageClassName: google-storage              # Must match StorageClass metadata.name
+  resources:
+    requests:
+      storage: 500Mi
+
+# Apply this manifest (after StorageClass is created):
+#   kubectl apply -f 03-2-pvc-with-storage-class.yaml
+#
+# Inspect:
+#   kubectl get pvc
+#   kubectl describe pvc myclaim
+#
+# Clean up:
+#   kubectl delete pvc myclaim
