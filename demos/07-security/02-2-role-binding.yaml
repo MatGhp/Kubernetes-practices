@@ -1,0 +1,56 @@
+# =============================================================================
+# Kubernetes RoleBinding — Educational Reference
+# =============================================================================
+#
+# What: A RoleBinding grants the permissions defined in a Role to a user,
+#   group, or ServiceAccount within a specific namespace.
+#
+# Binding model:
+#   Subject (user/group/SA)  <---RoleBinding--->  Role (permissions)
+#
+#   devuser ──RoleBinding──> developer-role ──> pods, services, deployments (in default ns)
+#
+# Key concepts:
+#   - subjects:   Who gets the permissions (User, Group, or ServiceAccount)
+#   - roleRef:    Which Role (or ClusterRole) to bind — cannot be changed after creation
+#   - A RoleBinding with a ClusterRole restricts its permissions to the binding's namespace
+#
+# See also:
+#   - 02-1-role.yaml for the Role being bound here
+#   - 03-2-cluster-role-binding.yaml for cluster-wide bindings
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: devuser-developer-binding
+  namespace: default                              # RoleBinding is namespaced
+  labels:
+    app: devuser-developer-binding
+subjects:
+- kind: User
+  name: devuser                                   # The user receiving permissions
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: developer-role                            # Must match the Role name from 02-1
+  apiGroup: rbac.authorization.k8s.io
+
+# Apply this manifest:
+#   kubectl apply -f 02-2-role-binding.yaml
+#
+# Inspect:
+#   kubectl get rolebindings -n default
+#   kubectl describe rolebinding devuser-developer-binding -n default
+#
+# Test permissions (impersonate devuser):
+#   kubectl auth can-i get pods --as=devuser
+#   kubectl auth can-i create pods --as=devuser
+#   kubectl auth can-i delete nodes --as=devuser
+#   kubectl auth can-i get pods --as=devuser --namespace=test-namespace
+#
+# Imperative equivalent:
+#   kubectl create rolebinding devuser-developer-binding \
+#     --role=developer-role --user=devuser -n default
+#
+# Clean up:
+#   kubectl delete rolebinding devuser-developer-binding -n default

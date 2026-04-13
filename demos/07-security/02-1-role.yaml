@@ -1,0 +1,54 @@
+# =============================================================================
+# Kubernetes Role (RBAC) — Educational Reference
+# =============================================================================
+#
+# What: A Role defines a set of permissions (verbs on resources) within a
+#   single namespace. It does NOT grant access by itself — a RoleBinding is
+#   needed to assign the Role to a user, group, or ServiceAccount.
+#
+# Key concepts:
+#   - Role:           Namespaced permissions (applies to one namespace only)
+#   - ClusterRole:    Cluster-wide permissions (see 03-1-cluster-role.yaml)
+#   - apiGroups:      The API group containing the resource
+#       ""            = core API (Pods, Services, ConfigMaps, Secrets, etc.)
+#       "apps"        = Deployments, ReplicaSets, StatefulSets, DaemonSets
+#       "batch"       = Jobs, CronJobs
+#   - verbs:          Actions allowed (get, list, watch, create, update, patch, delete)
+#   - resourceNames:  Optional — restrict to specific named resources
+#
+# See also:
+#   - 02-2-role-binding.yaml for binding this Role to a user
+#   - 03-1-cluster-role.yaml for cluster-scoped permissions
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: developer-role
+  namespace: default
+  labels:
+    app: developer-role
+rules:
+# Core API resources (Pods, Services, ConfigMaps)
+- apiGroups: [""]                                 # Core API group
+  resources: ["pods", "services", "configmaps"]
+  verbs: ["get", "list", "watch", "create", "update", "delete"]
+# Apps API group (Deployments)
+- apiGroups: ["apps"]                             # Deployments live in the "apps" API group
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch", "create", "update", "delete"]
+
+# Apply this manifest:
+#   kubectl apply -f 02-1-role.yaml
+#
+# Inspect:
+#   kubectl get roles -n default
+#   kubectl describe role developer-role -n default
+#
+# Imperative equivalent:
+#   kubectl create role developer-role \
+#     --verb=get,list,watch,create,update,delete \
+#     --resource=pods,services,configmaps \
+#     -n default
+#
+# Clean up:
+#   kubectl delete role developer-role -n default
