@@ -1,0 +1,73 @@
+# =============================================================================
+# Kubernetes ValidatingWebhookConfiguration — Educational Reference
+# =============================================================================
+#
+# What: A ValidatingWebhookConfiguration tells the API server to send
+#   admission requests to an external webhook service for validation.
+#   The webhook can ALLOW or DENY the request (but cannot modify it —
+#   that's what MutatingWebhookConfiguration does).
+#
+# How it works:
+#   1. User sends request (e.g., kubectl create pod)
+#   2. API server receives the request
+#   3. API server sends an AdmissionReview to the webhook service
+#   4. Webhook validates and responds with allowed: true/false
+#   5. API server accepts or rejects the request
+#
+#   kubectl create pod
+#       |
+#       v
+#   API Server --AdmissionReview--> Webhook Service (validates)
+#       |                                  |
+#       v                                  v
+#   Allowed? ----yes----> Object created
+#            ----no-----> Request denied (403)
+#
+# Required fields (admissionregistration.k8s.io/v1):
+#   - admissionReviewVersions: Which AdmissionReview versions the webhook supports
+#   - sideEffects: Whether the webhook has side effects (None, NoneOnDryRun, etc.)
+#
+# See also:
+#   - 02-1-role.yaml for RBAC needed by the webhook ServiceAccount
+# =============================================================================
+apiVersion: admissionregistration.k8s.io/v1
+kind: ValidatingWebhookConfiguration
+metadata:
+  name: pod-policy.webhook.com
+  labels:
+    app: pod-policy-webhook
+webhooks:
+- name: pod-policy.webhook.com
+  admissionReviewVersions: ["v1", "v1beta1"]      # Required — API versions the webhook understands
+  sideEffects: None                                # Required — None means no side effects on dry-run
+  failurePolicy: Fail                              # Fail (reject) or Ignore (allow) if webhook is unreachable
+  clientConfig:
+    # Option 1: External URL (uncomment to use)
+    # url: "https://external-server.example.com/validate"
+    # Option 2: In-cluster Service
+    service:
+      name: webhook-service                        # The Service fronting the webhook Pod
+      namespace: webhook-namespace                 # Namespace where the webhook Service lives
+      path: /validate                              # Endpoint path on the webhook
+    caBundle: "Q0FfQ0VSVElGSUNBVEVfQkFTRTY0"     # Base64-encoded CA cert to verify the webhook TLS
+  rules:
+  - apiGroups: [""]
+    apiVersions: ["v1"]
+    operations: ["CREATE", "UPDATE"]               # Intercept create and update operations
+    resources: ["pods"]                            # Only validate Pod resources
+    scope: "Namespaced"                            # Namespaced or Cluster or "*"
+
+# Apply this manifest:
+#   kubectl apply -f 04-validating-webhook.yaml
+#
+# Inspect:
+#   kubectl get validatingwebhookconfigurations
+#   kubectl describe validatingwebhookconfiguration pod-policy.webhook.com
+#
+# Test (create a pod and check webhook logs):
+#   kubectl run test-pod --image=nginx:1.27 --dry-run=server
+#   kubectl logs -n webhook-namespace -l app=webhook-service
+#
+# Clean up:
+#   kubectl delete validatingwebhookconfiguration pod-policy.webhook.com
+    
