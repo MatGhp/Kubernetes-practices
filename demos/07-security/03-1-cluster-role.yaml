@@ -1,0 +1,50 @@
+# =============================================================================
+# Kubernetes ClusterRole — Educational Reference
+# =============================================================================
+#
+# What: A ClusterRole defines permissions that apply cluster-wide (across all
+#   namespaces). Unlike a Role, it can also grant access to cluster-scoped
+#   resources like nodes, namespaces, and PersistentVolumes.
+#
+# When to use ClusterRole vs Role:
+#   - Role:        Permissions within a single namespace
+#   - ClusterRole: Permissions across all namespaces, or on cluster-scoped resources
+#
+# Key concept — ClusterRole can be bound two ways:
+#   - ClusterRoleBinding: Grants permissions cluster-wide
+#   - RoleBinding:        Grants ClusterRole permissions only within the binding's namespace
+#
+# See also:
+#   - 02-1-role.yaml for namespace-scoped Role
+#   - 03-2-cluster-role-binding.yaml for binding this ClusterRole
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: cluster-administrator
+  labels:
+    app: cluster-administrator
+rules:
+# Core API resources
+- apiGroups: [""]                                 # Core API group
+  resources: ["pods", "services", "configmaps", "secrets", "nodes", "namespaces", "persistentvolumes"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+# Apps API group (Deployments, StatefulSets, etc.)
+- apiGroups: ["apps"]                             # Deployments are in the "apps" group
+  resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+  verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+# Apply this manifest:
+#   kubectl apply -f 03-1-cluster-role.yaml
+#
+# Inspect:
+#   kubectl get clusterroles cluster-administrator
+#   kubectl describe clusterrole cluster-administrator
+#
+# Imperative equivalent:
+#   kubectl create clusterrole cluster-administrator \
+#     --verb=get,list,watch,create,update,patch,delete \
+#     --resource=pods,services,configmaps,nodes,namespaces
+#
+# Clean up:
+#   kubectl delete clusterrole cluster-administrator

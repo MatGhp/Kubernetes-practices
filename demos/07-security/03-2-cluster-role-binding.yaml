@@ -1,0 +1,56 @@
+# =============================================================================
+# Kubernetes ClusterRoleBinding — Educational Reference
+# =============================================================================
+#
+# What: A ClusterRoleBinding grants the permissions defined in a ClusterRole
+#   to subjects (users, groups, or ServiceAccounts) across the entire cluster.
+#
+# Binding model:
+#   Subject  <---ClusterRoleBinding--->  ClusterRole
+#
+#   cluster-admin-user ──ClusterRoleBinding──> cluster-administrator
+#                                                 |
+#                                                 +--> pods, services, nodes...
+#                                                      (all namespaces)
+#
+# Key difference from RoleBinding:
+#   - RoleBinding:         Grants permissions in a single namespace
+#   - ClusterRoleBinding:  Grants permissions across ALL namespaces
+#
+# See also:
+#   - 03-1-cluster-role.yaml for the ClusterRole being bound here
+#   - 02-2-role-binding.yaml for namespace-scoped binding
+# =============================================================================
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: cluster-admin-binding
+  labels:
+    app: cluster-admin-binding
+subjects:
+- kind: User
+  name: cluster-admin-user                        # The user receiving cluster-wide permissions
+  apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: cluster-administrator                     # Must match ClusterRole name from 03-1
+  apiGroup: rbac.authorization.k8s.io
+
+# Apply this manifest:
+#   kubectl apply -f 03-2-cluster-role-binding.yaml
+#
+# Inspect:
+#   kubectl get clusterrolebindings cluster-admin-binding
+#   kubectl describe clusterrolebinding cluster-admin-binding
+#
+# Test permissions (impersonate the user):
+#   kubectl auth can-i get pods --as=cluster-admin-user
+#   kubectl auth can-i create pods --as=cluster-admin-user
+#   kubectl auth can-i delete nodes --as=cluster-admin-user
+#
+# Imperative equivalent:
+#   kubectl create clusterrolebinding cluster-admin-binding \
+#     --clusterrole=cluster-administrator --user=cluster-admin-user
+#
+# Clean up:
+#   kubectl delete clusterrolebinding cluster-admin-binding
