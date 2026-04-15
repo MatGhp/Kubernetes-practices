@@ -1,0 +1,222 @@
+# =============================================================================
+# Kubernetes MutatingWebhookConfiguration — Educational Reference
+# =============================================================================
+#
+# What: A MutatingWebhookConfiguration tells the API server to send
+#   admission requests to an external webhook service that can MODIFY
+#   (mutate) the object before it is persisted. Unlike a
+#   ValidatingWebhookConfiguration (which can only allow/deny), a mutating
+#   webhook can inject fields, add labels, set defaults, or even add
+#   sidecar containers.
+#
+# How it works:
+#   1. User sends request (e.g., kubectl create pod)
+#   2. API server receives the request
+#   3. API server sends an AdmissionReview to the mutating webhook
+#   4. Webhook responds with allowed: true/false AND an optional JSON patch
+#   5. API server applies the patch to the object
+#   6. The (possibly modified) object then passes through validating webhooks
+#   7. Object is persisted to etcd
+#
+#   Admission order:
+#     Mutating webhooks --> Object schema validation --> Validating webhooks
+#
+#   kubectl create pod
+#       |
+#       v
+#   API Server --AdmissionReview--> Mutating Webhook (modifies object)
+#       |                                  |
+#       |                      JSON Patch response
+#       v                                  |
+#   Apply patch <--------------------------+
+#       |
+#       v
+#   Validating webhooks (see 04-validating-webhook.yaml)
+#       |
+#       v
+#   Object persisted to etcd
+#
+# Common use cases:
+#   - Inject sidecar containers (e.g., Istio envoy proxy, logging agents)
+#   - Add default labels or annotations to every resource
+#   - Set default resource requests/limits on containers
+#   - Inject environment variables or volumes
+#   - Enforce naming conventions by rewriting names
+#
+# Key terminology:
+#   - AdmissionReview: The request/response envelope between API server and webhook
+#   - JSON Patch (RFC 6902): The format used to describe mutations (add/remove/replace)
+#   - reinvocationPolicy: Controls whether the webhook is called again after other
+#     mutations modify the object (IfNeeded or Never)
+#   - sideEffects: Declares whether the webhook has side effects (None, NoneOnDryRun)
+#
+# Required fields (admissionregistration.k8s.io/v1):
+#   - admissionReviewVersions: Which AdmissionReview versions the webhook supports
+#   - sideEffects: Whether the webhook has side effects
+#
+# See also:
+#   - 04-validating-webhook.yaml for validation-only webhooks
+#   - 02-1-role.yaml for RBAC needed by the webhook ServiceAccount
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Sidecar Injector — Injects a logging sidecar into every new Pod
+# -----------------------------------------------------------------------------
+#
+# A classic mutating webhook pattern. When a new Pod is created, the webhook
+# adds a logging sidecar container to the Pod spec via a JSON patch.
+#
+#   User creates Pod (1 container)
+#       |
+#       v
+#   API Server --AdmissionReview--> sidecar-injector webhook
+#       |                                  |
+#       |                      JSON Patch: add container
+#       v                                  |
+#   Pod now has 2 containers <-------------+
+#       |
+#       v
+#   Persisted to etcd
+#
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: sidecar-injector.webhook.com
+  labels:
+    app: sidecar-injector
+webhooks:
+- name: sidecar-injector.webhook.com
+  admissionReviewVersions: ["v1", "v1beta1"]       # Required — API versions the webhook understands
+  sideEffects: None                                 # Required — None means no side effects on dry-run
+  failurePolicy: Fail                               # Fail (reject) or Ignore (allow) if webhook is unreachable
+  reinvocationPolicy: IfNeeded                      # Re-invoke if another webhook mutates the object after us
+  matchPolicy: Equivalent                           # Match equivalent API group versions (e.g., apps/v1 and apps/v1beta1)
+  timeoutSeconds: 10                                # Max time to wait for webhook response (1-30, default 10)
+  clientConfig:
+    # Option 1: External URL (uncomment to use)
+    # url: "https://external-server.example.com/mutate"
+    # Option 2: In-cluster Service
+    service:
+      name: sidecar-injector-service                # The Service fronting the webhook Pod
+      namespace: webhook-namespace                  # Namespace where the webhook Service lives
+      path: /mutate                                 # Endpoint path on the webhook
+      port: 443                                     # Port the service listens on (default 443)
+    caBundle: "Q0FfQ0VSVElGSUNBVEVfQkFTRTY0"      # Base64-encoded CA cert to verify the webhook TLS
+  namespaceSelector:                                # Only intercept resources in namespaces with this label
+    matchLabels:
+      sidecar-injection: enabled                    # Namespaces must have this label to trigger injection
+  objectSelector:                                   # Only intercept objects matching this label selector
+    matchExpressions:
+    - key: sidecar-injector.webhook.com/inject
+      operator: NotIn
+      values: ["false"]                             # Skip pods explicitly opting out of injection
+  rules:
+  - apiGroups: [""]
+    apiVersions: ["v1"]
+    operations: ["CREATE"]                          # Only intercept Pod creation (not updates)
+    resources: ["pods"]                             # Only mutate Pod resources
+    scope: "Namespaced"                             # Namespaced or Cluster or "*"
+
+---
+# -----------------------------------------------------------------------------
+# 2. Default Labels Injector — Adds standard labels to all new Deployments
+# -----------------------------------------------------------------------------
+#
+# This webhook ensures every Deployment gets a set of standard labels
+# (e.g., managed-by, environment) even if the user forgets them.
+#
+#   User creates Deployment (no managed-by label)
+#       |
+#       v
+#   API Server --AdmissionReview--> default-labels webhook
+#       |                                  |
+#       |                      JSON Patch: add labels
+#       v                                  |
+#   Deployment now has standard labels <---+
+#       |
+#       v
+#   Persisted to etcd
+#
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: default-labels.webhook.com
+  labels:
+    app: default-labels-webhook
+webhooks:
+- name: default-labels.webhook.com
+  admissionReviewVersions: ["v1"]                   # Only v1 supported
+  sideEffects: None                                 # No side effects
+  failurePolicy: Ignore                             # Allow the request through if webhook is down
+  reinvocationPolicy: Never                         # No need to re-invoke for label injection
+  timeoutSeconds: 5                                 # Short timeout for a simple mutation
+  clientConfig:
+    service:
+      name: default-labels-service
+      namespace: webhook-namespace
+      path: /add-labels
+    caBundle: "Q0FfQ0VSVElGSUNBVEVfQkFTRTY0"
+  namespaceSelector:
+    matchExpressions:
+    - key: kubernetes.io/metadata.name
+      operator: NotIn
+      values: ["kube-system", "kube-public"]        # Don't mutate system namespaces
+  rules:
+  - apiGroups: ["apps"]
+    apiVersions: ["v1"]
+    operations: ["CREATE", "UPDATE"]                # Add labels on create and update
+    resources: ["deployments"]                      # Only mutate Deployment resources
+    scope: "Namespaced"
+
+# =============================================================================
+# Imperative Commands
+# =============================================================================
+#
+# --- Apply ---
+# Apply this manifest:
+#   kubectl apply -f 05-mutating-webhook.yaml
+#
+# --- Inspect ---
+# List all mutating webhook configurations:
+#   kubectl get mutatingwebhookconfigurations
+#
+# Describe a specific mutating webhook:
+#   kubectl describe mutatingwebhookconfiguration sidecar-injector.webhook.com
+#   kubectl describe mutatingwebhookconfiguration default-labels.webhook.com
+#
+# View the full YAML of a webhook:
+#   kubectl get mutatingwebhookconfiguration sidecar-injector.webhook.com -o yaml
+#
+# --- Label a namespace for sidecar injection ---
+# Enable sidecar injection on a namespace:
+#   kubectl label namespace my-app-namespace sidecar-injection=enabled
+#
+# Verify the label:
+#   kubectl get namespace my-app-namespace --show-labels
+#
+# --- Test sidecar injection ---
+# Create a test pod in the labeled namespace and check if the sidecar was injected:
+#   kubectl run test-pod --image=nginx:1.27 -n my-app-namespace --dry-run=server -o yaml
+#
+# Check webhook logs:
+#   kubectl logs -n webhook-namespace -l app=sidecar-injector
+#
+# --- Opt out a specific pod from injection ---
+# Add the opt-out label:
+#   kubectl run skip-pod --image=nginx:1.27 -n my-app-namespace \
+#     --labels="sidecar-injector.webhook.com/inject=false"
+#
+# --- Debug ---
+# Check if the webhook is registered:
+#   kubectl get mutatingwebhookconfigurations -o jsonpath='{.items[*].metadata.name}'
+#
+# View admission webhook events in API server logs:
+#   kubectl logs -n kube-system -l component=kube-apiserver | grep -i webhook
+#
+# --- Clean up ---
+# Delete the mutating webhook configurations:
+#   kubectl delete mutatingwebhookconfiguration sidecar-injector.webhook.com
+#   kubectl delete mutatingwebhookconfiguration default-labels.webhook.com
+#
+# Or delete using the manifest file:
+#   kubectl delete -f 05-mutating-webhook.yaml
