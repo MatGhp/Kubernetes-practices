@@ -1,0 +1,135 @@
+# =============================================================================
+# Kubernetes Custom Resource Instance — Educational Reference
+# =============================================================================
+#
+# What: This file creates an instance (Custom Resource / CR) of the
+#   FlightTicket type defined by the CRD in 01-flightticket-crd.yaml.
+#   Once the CRD is registered, you can create CRs just like built-in
+#   resources.
+#
+# How it works:
+#   1. The CRD must be applied first (01-flightticket-crd.yaml)
+#   2. You apply this CR manifest
+#   3. The API server validates the spec against the CRD's openAPIV3Schema
+#   4. If valid, the CR is stored in etcd
+#   5. A controller (03-flightticket-controller.go) watches for the CR and reconciles
+#
+#   kubectl apply -f 02-flightticket-resource.yaml
+#       |
+#       v
+#   API Server
+#       |-- Validate against CRD schema (openAPIV3Schema)
+#       |       |
+#       |       |-- from: string, minLength 1  ✓
+#       |       |-- to: string, minLength 1    ✓
+#       |       |-- number: integer, 1-10      ✓
+#       |
+#       v
+#   Stored in etcd
+#       |
+#       v
+#   Controller receives watch event --> Reconcile
+#
+# Prerequisites:
+#   - CRD must be applied first: kubectl apply -f 01-flightticket-crd.yaml
+#   - Namespace must exist (or use default)
+#
+# See also:
+#   - 01-flightticket-crd.yaml for the CRD that defines this type
+#   - 03-flightticket-controller.go for the controller that processes this CR
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. Single Flight Ticket — Basic example
+# -----------------------------------------------------------------------------
+apiVersion: flight.com/v1                            # Must match CRD group/version
+kind: FlightTicket                                   # Must match CRD names.kind
+metadata:
+  name: nyc-to-lax                                   # Unique name within the namespace
+  namespace: default                                 # Namespace where this CR lives
+  labels:
+    app: flightticket                                # Standard app label
+    route: domestic                                  # Custom label for filtering
+spec:
+  from: "New York"                                   # Departure city (required, minLength: 1)
+  to: "Los Angeles"                                  # Destination city (required, minLength: 1)
+  number: 2                                          # Number of tickets (required, 1-10)
+
+---
+# -----------------------------------------------------------------------------
+# 2. International Flight — Another example with different values
+# -----------------------------------------------------------------------------
+apiVersion: flight.com/v1
+kind: FlightTicket
+metadata:
+  name: london-to-tokyo
+  namespace: default
+  labels:
+    app: flightticket
+    route: international
+spec:
+  from: "London"
+  to: "Tokyo"
+  number: 4
+
+# =============================================================================
+# Imperative Commands
+# =============================================================================
+#
+# --- Prerequisites ---
+# Make sure the CRD is registered first:
+#   kubectl apply -f 01-flightticket-crd.yaml
+#   kubectl get crd flighttickets.flight.com
+#
+# --- Create Custom Resources ---
+# Apply this manifest (creates both flight tickets):
+#   kubectl apply -f 02-flightticket-resource.yaml
+#
+# --- Inspect ---
+# List all flight tickets (uses additionalPrinterColumns from the CRD):
+#   kubectl get flighttickets
+#
+# List using the short name:
+#   kubectl get ft
+#
+# List with full details:
+#   kubectl get ft -o wide
+#
+# Describe a specific flight ticket:
+#   kubectl describe flightticket nyc-to-lax
+#
+# View the full YAML:
+#   kubectl get flightticket nyc-to-lax -o yaml
+#
+# --- Filter by label ---
+# Get only domestic flights:
+#   kubectl get ft -l route=domestic
+#
+# Get only international flights:
+#   kubectl get ft -l route=international
+#
+# --- Watch for changes ---
+#   kubectl get ft --watch
+#
+# --- Validation test ---
+# This should FAIL because number=0 violates the minimum: 1 constraint:
+#   kubectl apply -f - <<EOF
+#   apiVersion: flight.com/v1
+#   kind: FlightTicket
+#   metadata:
+#     name: invalid-ticket
+#   spec:
+#     from: "Paris"
+#     to: "Berlin"
+#     number: 0
+#   EOF
+#
+# --- Delete ---
+# Delete a specific flight ticket:
+#   kubectl delete flightticket nyc-to-lax
+#
+# Delete all flight tickets:
+#   kubectl delete flighttickets --all
+#
+# Or delete using the manifest:
+#   kubectl delete -f 02-flightticket-resource.yaml

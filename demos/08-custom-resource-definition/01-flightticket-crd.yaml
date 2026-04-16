@@ -1,0 +1,166 @@
+# =============================================================================
+# Kubernetes CustomResourceDefinition (CRD) — Educational Reference
+# =============================================================================
+#
+# What: A CustomResourceDefinition (CRD) extends the Kubernetes API by
+#   defining a new resource type. Once registered, you can create, read,
+#   update, and delete instances of your custom resource using kubectl
+#   just like built-in resources (Pods, Services, etc.).
+#
+# How it works:
+#   1. You apply a CRD manifest to register a new resource type
+#   2. The API server creates REST endpoints for the new type
+#   3. You can now create instances (Custom Resources / CRs) of that type
+#   4. A custom controller watches for CR events and reconciles desired state
+#
+#   Developer                  API Server                     etcd
+#     |                            |                            |
+#     |-- kubectl apply CRD ------>|                            |
+#     |                            |-- Register new API type -->|
+#     |                            |<-- Endpoints ready --------|
+#     |                            |                            |
+#     |-- kubectl create CR ------>|                            |
+#     |                            |-- Validate via schema ---->|
+#     |                            |-- Store CR in etcd ------->|
+#     |                            |                            |
+#   Controller (watches CRs)       |                            |
+#     |<-- Watch event: CR added --|                            |
+#     |-- Reconcile logic -------->|                            |
+#
+# Key terminology:
+#   - CRD: The schema definition that registers the new type with the API server
+#   - CR (Custom Resource): An instance of the type defined by the CRD
+#   - Group: The API group (e.g., flight.com) — acts like a namespace for types
+#   - Version: API versioning (e.g., v1, v1beta1) — allows schema evolution
+#   - Scope: Namespaced (per-namespace) or Cluster (cluster-wide)
+#   - openAPIV3Schema: JSON Schema validation for the CR spec fields
+#   - additionalPrinterColumns: Extra columns shown in kubectl get output
+#   - Subresources: status (separate status updates) and scale (HPA integration)
+#
+# Prerequisites:
+#   - Cluster admin permissions to create CRDs
+#   - A custom controller to act on CRs (see 03-flightticket-controller.go)
+#
+# See also:
+#   - 02-flightticket-resource.yaml for a Custom Resource instance
+#   - 03-flightticket-controller.go for the controller that reconciles FlightTickets
+# =============================================================================
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: flighttickets.flight.com                    # Must be <plural>.<group>
+  labels:
+    app: flightticket
+spec:
+  scope: Namespaced                                 # Namespaced = resources live in a namespace; Cluster = cluster-wide
+  group: flight.com                                 # API group — used in CR apiVersion (flight.com/v1)
+  names:
+    kind: FlightTicket                              # PascalCase — used in CR kind field
+    singular: flightticket                          # Lowercase singular — used in kubectl get flightticket <name>
+    plural: flighttickets                           # Lowercase plural — used in kubectl get flighttickets
+    shortNames:                                     # Short aliases for kubectl (kubectl get ft)
+    - ft
+    categories:                                     # Group this CRD under "all" so kubectl get all includes it
+    - all
+  versions:
+  - name: v1                                        # Version name — appears in apiVersion: flight.com/v1
+    served: true                                    # This version is served by the API server
+    storage: true                                   # This version is used for storage in etcd (only one can be true)
+    subresources:
+      status: {}                                    # Enable /status subresource — allows controllers to update status separately
+    additionalPrinterColumns:                       # Extra columns shown in kubectl get flighttickets
+    - name: From
+      type: string
+      jsonPath: .spec.from                          # JSONPath to extract value from the CR
+      description: Departure city
+    - name: To
+      type: string
+      jsonPath: .spec.to
+      description: Destination city
+    - name: Tickets
+      type: integer
+      jsonPath: .spec.number
+      description: Number of tickets
+    - name: Status
+      type: string
+      jsonPath: .status.phase
+      description: Current status phase
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    schema:
+      openAPIV3Schema:                              # JSON Schema validation for the CR (required in v1)
+        type: object
+        description: FlightTicket represents a flight booking request
+        properties:
+          spec:
+            type: object
+            description: Desired flight ticket configuration
+            required:                               # These fields must be provided when creating a CR
+            - from
+            - to
+            - number
+            properties:
+              from:
+                type: string
+                description: "Departure city (e.g., New York)"
+                minLength: 1                        # Must not be empty
+              to:
+                type: string
+                description: "Destination city (e.g., Los Angeles)"
+                minLength: 1
+              number:
+                type: integer
+                description: "Number of tickets to book"
+                minimum: 1                          # At least 1 ticket
+                maximum: 10                         # At most 10 tickets per booking
+          status:
+            type: object
+            description: Observed state populated by the controller
+            properties:
+              phase:
+                type: string
+                description: "Current phase (Pending, Confirmed, Cancelled)"
+                enum:                               # Restrict to known values
+                - Pending
+                - Confirmed
+                - Cancelled
+              bookingReference:
+                type: string
+                description: "Reference ID assigned after confirmation"
+
+# =============================================================================
+# Imperative Commands
+# =============================================================================
+#
+# --- Create the CRD ---
+# Register the FlightTicket type with the API server:
+#   kubectl apply -f 01-flightticket-crd.yaml
+#
+# --- Inspect ---
+# List all CRDs:
+#   kubectl get crd
+#
+# Get the FlightTicket CRD:
+#   kubectl get crd flighttickets.flight.com
+#
+# Describe the CRD (shows schema, versions, conditions):
+#   kubectl describe crd flighttickets.flight.com
+#
+# View the full CRD YAML:
+#   kubectl get crd flighttickets.flight.com -o yaml
+#
+# --- Verify the API is registered ---
+# Check available API resources for the flight.com group:
+#   kubectl api-resources --api-group=flight.com
+#
+# --- Check CRD status conditions ---
+# The CRD should have NamesAccepted=True and Established=True:
+#   kubectl get crd flighttickets.flight.com -o jsonpath='{.status.conditions[*].type}'
+#
+# --- Delete ---
+# WARNING: Deleting a CRD deletes ALL Custom Resources of that type!
+#   kubectl delete crd flighttickets.flight.com
+#
+# Or delete using the manifest:
+#   kubectl delete -f 01-flightticket-crd.yaml
