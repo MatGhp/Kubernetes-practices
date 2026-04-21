@@ -1,0 +1,52 @@
+<!-- =======================================================================
+  .NET Project File for DatabaseBackup Controller — Educational Reference
+  =======================================================================
+
+  What: MSBuild project file that defines the .NET version target and
+    NuGet package dependencies for the KubeOps-based controller.
+
+  KubeOps packages:
+    - KubeOps.Operator — core framework: hosting, reconciliation loop,
+        leader election, Kubernetes client integration
+    - KubeOps.Generator — C# source generator that auto-creates:
+        - Parameterless constructor (sets ApiVersion + Kind)
+        - CRD YAML generation at build time
+        - RBAC manifest generation
+
+  IMPORTANT — Generator PrivateAssets:
+    KubeOps.Generator is a source generator. It must be configured with
+    PrivateAssets=all and IncludeAssets listing only build-time assets.
+    Without this, the generator DLL gets copied to the output directory
+    and may cause runtime conflicts.
+
+  See also:
+    - DatabaseBackupController.cs — entity + controller code
+    - Program.cs — entry point
+    - Dockerfile — builds this project into a container image
+  ======================================================================= -->
+
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>DatabaseBackupOperator</RootNamespace>
+    <AssemblyName>DatabaseBackupOperator</AssemblyName>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Core operator framework — reconciliation, hosting, K8s client -->
+    <PackageReference Include="KubeOps.Operator" Version="10.3.4" />
+
+    <!-- Source generator — auto-creates constructors, CRD/RBAC YAML at build time.
+         PrivateAssets=all ensures the generator DLL is NOT copied to output.
+         IncludeAssets restricts it to build-time-only assets. -->
+    <PackageReference Include="KubeOps.Generator" Version="10.3.4">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

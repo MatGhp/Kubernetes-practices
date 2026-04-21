@@ -1,0 +1,231 @@
+# =============================================================================
+# Kubernetes Deployment + RBAC for DatabaseBackup Controller — Educational Reference
+# =============================================================================
+#
+# What: Deploys the .NET DatabaseBackup controller into the cluster with the
+#   necessary RBAC (Role-Based Access Control) permissions. The controller
+#   needs permissions to watch/update DatabaseBackup custom resources, manage
+#   events, and acquire leader election leases.
+#
+# Architecture:
+#
+#   ┌──────────────────────────────────────────────────────────────────────┐
+#   │  Cluster                                                            │
+#   │                                                                     │
+#   │  ┌────────────────┐    binds     ┌────────────────────────────────┐ │
+#   │  │ ServiceAccount │<────────────>│ ClusterRoleBinding             │ │
+#   │  │ databasebackup-│              │ (databasebackup-controller-    │ │
+#   │  │ controller     │              │  binding)                      │ │
+#   │  └───────┬────────┘              └──────────────┬─────────────────┘ │
+#   │          │ used by                              │                   │
+#   │          v                                      │ references        │
+#   │  ┌────────────────┐                             v                   │
+#   │  │ Deployment     │              ┌────────────────────────────────┐ │
+#   │  │ (1 replica)    │              │ ClusterRole                   │ │
+#   │  │                │              │ (databasebackup-controller-   │ │
+#   │  │ Pod:           │              │  role)                        │ │
+#   │  │  container:    │              │                                │ │
+#   │  │   databasebkp- │              │ Rules:                         │ │
+#   │  │   controller   │              │  - databasebackups  (CRUD)     │ │
+#   │  │   :2.0.0       │              │  - databasebackups/ (get,      │ │
+#   │  └────────────────┘              │    status           update,    │ │
+#   │                                  │                     patch)     │ │
+#   │                                  │  - events           (create)   │ │
+#   │                                  │  - leases           (leader)   │ │
+#   │                                  └────────────────────────────────┘ │
+#   └──────────────────────────────────────────────────────────────────────┘
+#
+# Why ClusterRole (not Role):
+#   DatabaseBackup CRs can exist in any namespace, so the controller needs
+#   cluster-wide access. A namespaced Role would only grant access to one
+#   namespace. Use Role + RoleBinding if your controller is namespace-scoped.
+#
+# Prerequisites:
+#   - CRD applied: kubectl apply -f 01-databasebackup-crd.yaml
+#   - Container image built and pushed (see Dockerfile)
+#   - Update the image field below with your registry path
+#
+# See also:
+#   - 01-databasebackup-crd.yaml — CRD that defines the DatabaseBackup type
+#   - 02-databasebackup-resource.yaml — example DatabaseBackup instances to test
+#   - Dockerfile — builds the container image referenced below
+#   - DatabaseBackupController.cs — .NET controller source code
+#   - DatabaseBackupOperator.csproj — .NET project file
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# 1. ServiceAccount — Identity for the controller pod
+# -----------------------------------------------------------------------------
+# The Deployment's pod runs under this ServiceAccount. Kubernetes mounts
+# a token at /var/run/secrets/kubernetes.io/serviceaccount/token that the
+# KubeOps SDK uses to authenticate API requests.
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: databasebackup-controller                    # Referenced by Deployment spec.serviceAccountName
+  namespace: default
+  labels:
+    app: databasebackup-controller
+
+---
+# -----------------------------------------------------------------------------
+# 2. ClusterRole — Permissions the controller needs
+# -----------------------------------------------------------------------------
+# Grants access to DatabaseBackup CRs (all verbs), their status subresource,
+# events (for recording reconciliation events), and leases (for leader
+# election so only one replica reconciles at a time).
+# -----------------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: databasebackup-controller-role
+  labels:
+    app: databasebackup-controller
+rules:
+  # DatabaseBackup custom resources — full CRUD access
+  - apiGroups: ["backup.example.com"]
+    resources: ["databasebackups"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # DatabaseBackup status subresource — controller updates status separately
+  - apiGroups: ["backup.example.com"]
+    resources: ["databasebackups/status"]
+    verbs: ["get", "update", "patch"]
+
+  # Events — record reconciliation events visible via kubectl describe
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create", "patch"]
+
+  # Leases — used by KubeOps for leader election (only one pod reconciles)
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+---
+# -----------------------------------------------------------------------------
+# 3. ClusterRoleBinding — Connects ServiceAccount to ClusterRole
+# -----------------------------------------------------------------------------
+# Without this binding, the ServiceAccount has no permissions even though
+# the ClusterRole defines them. The binding is the "glue" between identity
+# and permissions.
+# -----------------------------------------------------------------------------
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: databasebackup-controller-binding
+  labels:
+    app: databasebackup-controller
+subjects:
+  - kind: ServiceAccount
+    name: databasebackup-controller                  # Must match ServiceAccount name above
+    namespace: default                               # Must match ServiceAccount namespace
+roleRef:
+  kind: ClusterRole
+  name: databasebackup-controller-role               # Must match ClusterRole name above
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# -----------------------------------------------------------------------------
+# 4. Deployment — Runs the controller pod
+# -----------------------------------------------------------------------------
+# Single replica is typical for controllers with leader election.
+# KubeOps handles leader election internally — if you scale to multiple
+# replicas, only one will actively reconcile.
+# -----------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: databasebackup-controller
+  namespace: default
+  labels:
+    app: databasebackup-controller
+spec:
+  replicas: 1                                        # One active controller (leader election handles failover)
+  selector:
+    matchLabels:
+      app: databasebackup-controller
+  template:
+    metadata:
+      labels:
+        app: databasebackup-controller
+    spec:
+      serviceAccountName: databasebackup-controller  # Use the ServiceAccount above for RBAC
+      containers:
+        - name: controller
+          image: databasebackup-controller:2.0.0     # TODO: Replace with your registry (e.g., myregistry.azurecr.io/databasebackup-controller:2.0.0)
+          ports:
+            - containerPort: 8080                    # Health/metrics port (KubeOps default)
+              protocol: TCP
+          resources:
+            requests:
+              cpu: 100m                              # Minimum CPU — controllers are lightweight
+              memory: 128Mi                          # Minimum memory
+            limits:
+              cpu: 500m                              # Maximum CPU
+              memory: 256Mi                          # Maximum memory
+          securityContext:
+            runAsNonRoot: true                       # Must run as non-root (matches USER 1001 in Dockerfile)
+            readOnlyRootFilesystem: true             # Prevent writes to container filesystem
+            allowPrivilegeEscalation: false          # Block privilege escalation attacks
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: 8080
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+
+# =============================================================================
+# Imperative Commands
+# =============================================================================
+#
+# --- Deploy the controller ---
+#
+# 1. Build and push the container image:
+#    docker build -t <registry>/databasebackup-controller:2.0.0 .
+#    docker push <registry>/databasebackup-controller:2.0.0
+#
+# 2. Update the image field above with your registry path
+#
+# 3. Apply the CRD first (if not already done):
+#    kubectl apply -f 01-databasebackup-crd.yaml
+#
+# 4. Apply this deployment manifest:
+#    kubectl apply -f deployment.yaml
+#
+# --- Verify ---
+#
+# Check the controller pod is running:
+#    kubectl get pods -l app=databasebackup-controller
+#
+# Check controller logs:
+#    kubectl logs -l app=databasebackup-controller -f
+#
+# --- Test with a DatabaseBackup CR ---
+#
+# Apply a test resource:
+#    kubectl apply -f 02-databasebackup-resource.yaml
+#
+# Check the DatabaseBackup status was updated by the controller:
+#    kubectl get dbb
+#    kubectl describe dbb prod-postgres
+#
+# Expected: status.phase = "Completed", status.message = "Backup completed: orders-db ..."
+#
+# --- Cleanup ---
+#
+# Delete the controller and RBAC:
+#    kubectl delete -f deployment.yaml
+#
+# Delete test resources:
+#    kubectl delete -f 02-databasebackup-resource.yaml
+#
+# Delete the CRD (also removes all DatabaseBackup CRs):
+#    kubectl delete -f 01-databasebackup-crd.yaml

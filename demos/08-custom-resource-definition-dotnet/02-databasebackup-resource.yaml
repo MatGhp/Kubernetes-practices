@@ -1,0 +1,135 @@
+# =============================================================================
+# Example DatabaseBackup Custom Resources — Educational Reference
+# =============================================================================
+#
+# What: Three sample DatabaseBackup CRs that demonstrate different backup
+#   configurations. Apply these after the CRD and controller are running
+#   to see the controller reconcile them in real time.
+#
+# How to use:
+#
+#   1. Apply the CRD first:
+#      kubectl apply -f 01-databasebackup-crd.yaml
+#
+#   2. Deploy the controller:
+#      kubectl apply -f deployment.yaml
+#
+#   3. Apply these resources:
+#      kubectl apply -f 02-databasebackup-resource.yaml
+#
+#   4. Watch the controller reconcile:
+#      kubectl get dbb -w
+#
+#   Expected output:
+#
+#   NAME             DATABASE       SCHEDULE       RETENTION   STATUS      LAST BACKUP              AGE
+#   prod-postgres    orders-db      0 2 * * *      30          Completed   2024-01-15T02:00:00Z     10s
+#   staging-mysql    analytics-db   0 */6 * * *    7           Completed   2024-01-15T12:00:00Z     10s
+#   dev-sqlite       test-db        0 3 * * 0      3           Completed   2024-01-15T03:00:00Z     10s
+#
+# Prerequisites:
+#   - CRD applied: kubectl apply -f 01-databasebackup-crd.yaml
+#   - Controller running: kubectl apply -f deployment.yaml
+#
+# See also:
+#   - 01-databasebackup-crd.yaml — CRD schema that validates these resources
+#   - DatabaseBackupController.cs — controller that reconciles these CRs
+#   - deployment.yaml — deploys the controller
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Example 1: Production PostgreSQL — Daily backup with 30-day retention
+# -----------------------------------------------------------------------------
+# Scenario: A production orders database that needs daily backups at 2 AM
+# with 30-day retention for compliance. Stored in S3 for durability.
+# The controller will reconcile this CR, simulate the backup, and set
+# status.phase = "Completed" with a generated backup size.
+# -----------------------------------------------------------------------------
+apiVersion: backup.example.com/v1
+kind: DatabaseBackup
+metadata:
+  name: prod-postgres                                # Descriptive name for the backup config
+  namespace: default
+  labels:
+    app: databasebackup-controller
+    environment: production                          # Label for filtering: kubectl get dbb -l environment=production
+spec:
+  databaseName: orders-db                            # The database to back up
+  schedule: "0 2 * * *"                              # Cron: daily at 2:00 AM UTC
+  retentionDays: 30                                  # Keep backups for 30 days (compliance)
+  storageLocation: "s3://company-backups/prod/postgres"  # S3 bucket path
+
+---
+# -----------------------------------------------------------------------------
+# Example 2: Staging MySQL — Every 6 hours with 7-day retention
+# -----------------------------------------------------------------------------
+# Scenario: A staging analytics database with more frequent backups to
+# protect ongoing development work. Shorter retention since staging data
+# is less critical. Also stored in S3 for consistency.
+# -----------------------------------------------------------------------------
+apiVersion: backup.example.com/v1
+kind: DatabaseBackup
+metadata:
+  name: staging-mysql
+  namespace: default
+  labels:
+    app: databasebackup-controller
+    environment: staging
+spec:
+  databaseName: analytics-db
+  schedule: "0 */6 * * *"                            # Cron: every 6 hours (00:00, 06:00, 12:00, 18:00)
+  retentionDays: 7                                   # Keep backups for 1 week
+  storageLocation: "s3://company-backups/staging/mysql"
+
+---
+# -----------------------------------------------------------------------------
+# Example 3: Dev SQLite — Weekly backup with minimal retention
+# -----------------------------------------------------------------------------
+# Scenario: A development test database backed up weekly on Sunday at 3 AM.
+# Minimal retention (3 days) since dev data can be recreated. Stored locally
+# for simplicity — demonstrates a non-cloud storage target.
+# -----------------------------------------------------------------------------
+apiVersion: backup.example.com/v1
+kind: DatabaseBackup
+metadata:
+  name: dev-sqlite
+  namespace: default
+  labels:
+    app: databasebackup-controller
+    environment: development
+spec:
+  databaseName: test-db
+  schedule: "0 3 * * 0"                              # Cron: weekly on Sunday at 3:00 AM UTC
+  retentionDays: 3                                   # Keep backups for 3 days only
+  storageLocation: "/backups/dev/sqlite"             # Local path (not cloud — for dev simplicity)
+
+# =============================================================================
+# Imperative Commands
+# =============================================================================
+#
+# Apply all three DatabaseBackup resources:
+#   kubectl apply -f 02-databasebackup-resource.yaml
+#
+# Watch the controller reconcile in real time:
+#   kubectl get dbb -w
+#
+# List all DatabaseBackup resources (short name):
+#   kubectl get dbb
+#
+# Filter by environment label:
+#   kubectl get dbb -l environment=production
+#
+# Inspect a specific resource:
+#   kubectl describe dbb prod-postgres
+#
+# Check the status fields set by the controller:
+#   kubectl get dbb prod-postgres -o jsonpath='{.status}'
+#
+# View as YAML (see full spec + status):
+#   kubectl get dbb prod-postgres -o yaml
+#
+# Delete a single resource:
+#   kubectl delete dbb staging-mysql
+#
+# Delete all resources from this file:
+#   kubectl delete -f 02-databasebackup-resource.yaml

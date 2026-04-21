@@ -1,0 +1,44 @@
+# ------------------------------
+# OS / Editor junk
+# ------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+
+# VS Code / Visual Studio
+.vscode/
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# ------------------------------
+# Python virtual environments / cache
+# ------------------------------
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# ------------------------------
+# .NET build artifacts
+# ------------------------------
+**/bin/
+**/obj/
+
+# ------------------------------
+# Node/npm artifacts
+# ------------------------------
+**/node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ------------------------------
+# Coverage / logs
+# ------------------------------
+coverage/
+*.log

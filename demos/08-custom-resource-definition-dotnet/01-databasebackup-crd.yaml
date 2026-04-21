@@ -1,0 +1,214 @@
+# =============================================================================
+# CustomResourceDefinition (CRD) for DatabaseBackup — Educational Reference
+# =============================================================================
+#
+# What: Registers the DatabaseBackup custom resource type with the Kubernetes
+#   API server. Once applied, you can create DatabaseBackup objects just like
+#   built-in resources (Pods, Deployments, etc.).
+#
+# How CRDs work:
+#
+#   1. You apply this CRD             2. API server registers
+#      manifest                          the new endpoint
+#
+#   kubectl apply -f                  /apis/backup.example.com/v1/
+#     01-databasebackup-crd.yaml        namespaces/{ns}/databasebackups
+#         |                                          |
+#         v                                          v
+#   ┌─────────────────┐              ┌────────────────────────────────┐
+#   │ CRD defines:    │              │ Now you can:                   │
+#   │  group, version │   ────────>  │  kubectl get databasebackups   │
+#   │  kind, schema   │              │  kubectl get dbb (short name)  │
+#   │  status, print  │              │  kubectl describe dbb/my-bkp   │
+#   │  columns        │              │  kubectl delete dbb/my-bkp     │
+#   └─────────────────┘              └────────────────────────────────┘
+#
+# Schema validation:
+#   The openAPIV3Schema section enforces that every DatabaseBackup CR must
+#   have a valid spec with databaseName, schedule, retentionDays (1-365),
+#   and storageLocation. Invalid CRs are rejected at admission time before
+#   the controller ever sees them.
+#
+# Status subresource:
+#   The `status: {}` line under subresources enables the /status subresource.
+#   This means status updates go through a separate API endpoint, so the
+#   controller can update status without conflicting with user spec updates.
+#
+# additionalPrinterColumns:
+#   Defines what `kubectl get databasebackups` shows. Without this, kubectl
+#   only shows NAME and AGE. With it, you get a useful dashboard:
+#
+#   NAME             DATABASE       SCHEDULE       RETENTION   STATUS      LAST BACKUP              AGE
+#   prod-postgres    prod-db        0 2 * * *      30          Completed   2024-01-15T02:00:00Z     5m
+#   staging-mysql    staging-db     0 */6 * * *    7           Completed   2024-01-15T12:00:00Z     3m
+#
+# Prerequisites:
+#   - kubectl access to the cluster with cluster-admin permissions
+#   - Apply this CRD BEFORE creating any DatabaseBackup resources
+#   - Apply this CRD BEFORE deploying the controller (deployment.yaml)
+#
+# See also:
+#   - 02-databasebackup-resource.yaml — example DatabaseBackup instances
+#   - DatabaseBackupController.cs — .NET controller that reconciles these CRs
+#   - deployment.yaml — deploys the controller with RBAC
+# =============================================================================
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: databasebackups.backup.example.com           # Must be {plural}.{group}
+  labels:
+    app: databasebackup-controller
+spec:
+  group: backup.example.com                          # API group — appears in apiVersion field of CRs
+  names:
+    kind: DatabaseBackup                             # PascalCase — used in YAML kind field
+    listKind: DatabaseBackupList                     # Auto-generated list type
+    plural: databasebackups                          # Lowercase — used in REST URL and kubectl
+    singular: databasebackup                         # Lowercase — used in kubectl get <singular>
+    shortNames:
+      - dbb                                          # Short alias: kubectl get dbb
+  scope: Namespaced                                  # CRs live inside namespaces (not cluster-scoped)
+  versions:
+    - name: v1                                       # API version — combined with group: backup.example.com/v1
+      served: true                                   # This version is available via the API
+      storage: true                                  # This version is used for storage in etcd
+
+      # -------------------------------------------------------------------
+      # additionalPrinterColumns — customize kubectl get output
+      # -------------------------------------------------------------------
+      additionalPrinterColumns:
+        - name: Database
+          type: string
+          description: Name of the database being backed up
+          jsonPath: .spec.databaseName
+        - name: Schedule
+          type: string
+          description: Cron schedule for the backup
+          jsonPath: .spec.schedule
+        - name: Retention
+          type: integer
+          description: Number of days to retain backups
+          jsonPath: .spec.retentionDays
+        - name: Status
+          type: string
+          description: Current phase of the backup
+          jsonPath: .status.phase
+        - name: Last Backup
+          type: string
+          description: Timestamp of the last completed backup
+          jsonPath: .status.lastBackupTime
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+
+      # -------------------------------------------------------------------
+      # Schema — validates CR structure at admission time
+      # -------------------------------------------------------------------
+      schema:
+        openAPIV3Schema:
+          type: object
+          description: >-
+            DatabaseBackup defines a scheduled backup configuration for a
+            database. The controller reconciles these resources by executing
+            (or simulating) backups and updating the status subresource.
+          properties:
+            spec:
+              type: object
+              description: Desired state — what the user configures
+              required:
+                - databaseName
+                - schedule
+                - retentionDays
+                - storageLocation
+              properties:
+                databaseName:
+                  type: string
+                  description: >-
+                    Name of the database to back up. Must match the database
+                    name in the target system (e.g., PostgreSQL, MySQL).
+                  minLength: 1
+                  maxLength: 253                     # DNS label length limit
+                schedule:
+                  type: string
+                  description: >-
+                    Cron expression defining the backup schedule.
+                    Examples: "0 2 * * *" (daily at 2 AM),
+                    "0 */6 * * *" (every 6 hours),
+                    "0 3 * * 0" (weekly on Sunday at 3 AM).
+                  minLength: 1
+                retentionDays:
+                  type: integer
+                  description: >-
+                    Number of days to retain backups before automatic deletion.
+                    Minimum 1 day, maximum 365 days (1 year).
+                  minimum: 1
+                  maximum: 365
+                storageLocation:
+                  type: string
+                  description: >-
+                    Target storage location for backup files. Can be an S3
+                    bucket path (s3://bucket/prefix), Azure Blob container
+                    (az://container/path), or local path (/backups/mydb).
+                  minLength: 1
+            status:
+              type: object
+              description: >-
+                Observed state — updated by the controller after reconciliation.
+                Users should not modify this section directly.
+              properties:
+                phase:
+                  type: string
+                  description: Current lifecycle phase of the backup
+                  enum:
+                    - Pending                        # Initial state — not yet processed
+                    - Running                        # Backup is in progress
+                    - Completed                      # Backup finished successfully
+                    - Failed                         # Backup or validation failed
+                lastBackupTime:
+                  type: string
+                  description: ISO 8601 timestamp when the last backup completed
+                  format: date-time
+                nextBackupTime:
+                  type: string
+                  description: ISO 8601 timestamp when the next backup is scheduled
+                  format: date-time
+                backupSizeBytes:
+                  type: integer
+                  description: Size of the last backup in bytes
+                  format: int64
+                message:
+                  type: string
+                  description: Human-readable message about the current status
+                lastUpdated:
+                  type: string
+                  description: ISO 8601 timestamp of the last status change
+                  format: date-time
+
+      # -------------------------------------------------------------------
+      # Subresources — enable the /status endpoint
+      # -------------------------------------------------------------------
+      # With this enabled, the controller uses a dedicated PATCH/PUT to
+      # /apis/backup.example.com/v1/.../databasebackups/{name}/status
+      # This prevents spec vs. status update conflicts.
+      # -------------------------------------------------------------------
+      subresources:
+        status: {}
+
+# =============================================================================
+# Imperative Commands
+# =============================================================================
+#
+# Apply this CRD (must be done before creating any DatabaseBackup resources):
+#   kubectl apply -f 01-databasebackup-crd.yaml
+#
+# Verify the CRD is registered:
+#   kubectl get crd databasebackups.backup.example.com
+#
+# Check available API resources (should list databasebackups):
+#   kubectl api-resources | grep databasebackup
+#
+# Inspect the CRD details:
+#   kubectl describe crd databasebackups.backup.example.com
+#
+# Delete the CRD (WARNING: also deletes ALL DatabaseBackup instances):
+#   kubectl delete -f 01-databasebackup-crd.yaml
