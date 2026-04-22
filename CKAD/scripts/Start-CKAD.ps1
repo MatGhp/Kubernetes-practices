@@ -40,23 +40,24 @@ param(
 
 $ErrorActionPreference = 'Stop'
 
-# Resolve repo-relative path to the bootstrap script, then translate to WSL form.
-$repoRoot   = Split-Path -Parent $PSScriptRoot          # ...\CKAD
-$upScriptWin = Join-Path $repoRoot 'scripts\ckad-up.sh' # ...\CKAD\scripts\ckad-up.sh
+# Resolve the rcfile next to this script, then translate to a WSL path.
+# The rcfile itself sources ckad-up.sh, so this is the only path we need.
+$rcScriptWin = Join-Path $PSScriptRoot 'ckad-bashrc.sh'
 
-if (-not (Test-Path $upScriptWin)) {
-    throw "ckad-up.sh not found at $upScriptWin"
+if (-not (Test-Path $rcScriptWin)) {
+    throw "ckad-bashrc.sh not found at $rcScriptWin"
 }
 
-# Convert Windows path to WSL path via wslpath.
-$upScriptWsl = (& wsl.exe -d $Distro -- wslpath -a ((Resolve-Path $upScriptWin).Path -replace '\\','/')).Trim()
-if (-not $upScriptWsl) {
+$rcScriptWsl = (& wsl.exe -d $Distro -- wslpath -a ((Resolve-Path $rcScriptWin).Path -replace '\\','/')).Trim()
+if (-not $rcScriptWsl) {
     throw "wslpath translation failed. Is the '$Distro' distro installed? Try: wsl -l -v"
 }
 
-# Build the bash command. We `source` so shell helpers persist in the interactive shell.
+# Build the bash command. We launch an interactive bash with our rcfile so the
+# CKAD helpers (alias k, $do, $now, completion) are defined in the interactive
+# shell that the user actually types into.
 $resetExport = if ($Reset.IsPresent) { 'export CKAD_RESET=1; ' } else { '' }
-$bashCmd = "cd ~ && $resetExport" + "source '$upScriptWsl' && exec bash"
+$bashCmd = "cd ~ && $resetExport" + "exec bash --rcfile '$rcScriptWsl' -i"
 
 # Prefer Windows Terminal (wt) if available; fall back to plain wsl.exe.
 $wt = Get-Command wt.exe -ErrorAction SilentlyContinue
@@ -67,7 +68,7 @@ if ($wt) {
         'new-tab',
         '--title', 'CKAD',
         '--profile', $Distro,
-        'bash', '-lc', $bashCmd
+        'wsl.exe', '-d', $Distro, '--cd', '~', '--', 'bash', '-lc', $bashCmd
     )
 } else {
     Write-Host "Windows Terminal not found. Launching plain WSL..." -ForegroundColor Yellow

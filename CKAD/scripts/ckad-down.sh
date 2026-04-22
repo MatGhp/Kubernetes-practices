@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Keep this file LF-only for WSL/bash compatibility.
 # ckad-down.sh — Tear down the CKAD practice environment.
 # Run inside WSL/Ubuntu.
 #
@@ -6,6 +7,8 @@
 # Use CKAD_DELETE=1 to fully delete the profile (clean slate for next session).
 
 set -euo pipefail
+
+export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
 
 CKAD_PROFILE="${CKAD_PROFILE:-ckad}"
 CKAD_DELETE="${CKAD_DELETE:-0}"

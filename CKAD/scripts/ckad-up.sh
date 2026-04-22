@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Keep this file LF-only for WSL/bash compatibility.
 # ckad-up.sh — Bring up the CKAD practice environment in one command.
 # Safe to run repeatedly: idempotent. Run inside WSL/Ubuntu.
 #
@@ -11,8 +12,8 @@
 #   6. Drops you into an interactive bash shell in ~ with everything ready.
 #
 # Usage:
-#   source scripts/ckad-up.sh       # preferred — keeps shell state
-#   bash   scripts/ckad-up.sh       # also works but spawns a child shell
+#   source scripts/ckad-up.sh       # preferred — keeps alias k, $do, $now, completion
+#   bash   scripts/ckad-up.sh       # brings up the cluster only (helpers are lost on exit)
 #
 # Flags (env vars you can set before calling):
 #   CKAD_DRIVER=docker              # minikube driver (default: docker)
@@ -21,6 +22,8 @@
 #   CKAD_RESET=1                    # delete the profile first (clean slate)
 
 set -euo pipefail
+
+export PATH="$HOME/.local/bin:$HOME/bin:$PATH"
 
 CKAD_DRIVER="${CKAD_DRIVER:-docker}"
 CKAD_PROFILE="${CKAD_PROFILE:-ckad}"
@@ -82,7 +85,12 @@ kubectl get ns
 # ---------------------------------------------------------------------------
 # 5. Shell helpers (alias + flags + completion)
 #    These only stick if the script is *sourced* (see usage note above).
+#    NOTE: `set -euo pipefail` from the top of this script leaks into the
+#    interactive shell when sourced. bash-completion routinely references
+#    unset vars and returns non-zero, which trips `-u` and `-e` and kills
+#    the tab on <TAB>. Disable all three before installing helpers.
 # ---------------------------------------------------------------------------
+set +euo pipefail
 alias k=kubectl
 export do="--dry-run=client -o yaml"
 export now="--grace-period=0 --force"
