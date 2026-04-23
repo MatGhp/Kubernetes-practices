@@ -49,6 +49,12 @@ All answers assume the current namespace is `practice`.
 ```bash
 kubectl create namespace practice
 ```
+
+Verify — expect a row with `STATUS=Active`:
+
+```bash
+kubectl get ns practice
+```
 </details>
 
 ---
@@ -62,6 +68,13 @@ kubectl create namespace practice
 ```bash
 kubectl create deployment web --image=nginx:1.27
 ```
+
+Verify — rollout prints `successfully rolled out`; `get deploy` shows `READY 1/1` and `IMAGES=nginx:1.27`:
+
+```bash
+kubectl rollout status deployment/web
+kubectl get deploy web -o wide
+```
 </details>
 
 ---
@@ -74,6 +87,12 @@ kubectl create deployment web --image=nginx:1.27
 
 ```bash
 kubectl scale deployment web --replicas=3
+```
+
+Verify — expect `READY 3/3` (may take a few seconds to reach that state):
+
+```bash
+kubectl get deploy web
 ```
 </details>
 
@@ -89,6 +108,12 @@ kubectl scale deployment web --replicas=3
 kubectl set image deployment/web nginx=nginx:1.27-alpine
 kubectl rollout status deployment/web
 ```
+
+Verify — the command prints exactly `nginx:1.27-alpine`:
+
+```bash
+kubectl get deploy web -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+```
 </details>
 
 ---
@@ -102,6 +127,13 @@ kubectl rollout status deployment/web
 ```bash
 kubectl expose deployment web --port=80 --target-port=80
 ```
+
+Verify — `svc` shows `TYPE=ClusterIP` and `PORT(S)=80/TCP`; `endpoints` lists one IP per ready pod (empty `<none>` means the selector matches no ready pods):
+
+```bash
+kubectl get svc web
+kubectl get endpoints web
+```
 </details>
 
 ---
@@ -114,6 +146,12 @@ kubectl expose deployment web --port=80 --target-port=80
 
 ```bash
 kubectl run tools --image=busybox --restart=Never -- /bin/sh -c "sleep infinity"
+```
+
+Verify — expect `STATUS=Running` and `READY 1/1`:
+
+```bash
+kubectl get pod tools
 ```
 </details>
 
@@ -173,6 +211,13 @@ kubectl create deployment api --image=nginx --replicas=2 $do > api.yaml
 vim api.yaml   # change spec.replicas from 2 to 4, :wq
 kubectl apply -f api.yaml
 ```
+
+Verify — rollout reports success and `get deploy` shows `READY 4/4` (proves the edit took effect, not the original `2`):
+
+```bash
+kubectl rollout status deployment/api
+kubectl get deploy api
+```
 </details>
 
 ---
@@ -189,6 +234,12 @@ kubectl apply -f api.yaml
 kubectl create configmap app-cfg \
   --from-literal=APP_ENV=prod \
   --from-literal=APP_TIER=web
+```
+
+Verify — output is a JSON map with both keys, e.g. `map[APP_ENV:prod APP_TIER:web]`:
+
+```bash
+kubectl get cm app-cfg -o jsonpath='{.data}{"\n"}'
 ```
 </details>
 
@@ -270,6 +321,12 @@ kubectl exec cm-vol -- cat /etc/app-cfg/APP_ENV
 
 ```bash
 kubectl create secret generic app-sec --from-literal=API_KEY=supersecret
+```
+
+Verify — the stored value is base64 (`.data.API_KEY` would print `c3VwZXJzZWNyZXQ=`); decoding it prints `supersecret`:
+
+```bash
+kubectl get secret app-sec -o jsonpath='{.data.API_KEY}' | base64 -d; echo
 ```
 </details>
 
@@ -407,6 +464,12 @@ kubectl create cronjob hello-cron \
   --image=busybox \
   --schedule="*/5 * * * *" \
   -- echo hello
+```
+
+Verify — expect `SCHEDULE=*/5 * * * *`, `SUSPEND=False`, and `LAST SCHEDULE` fills in after the first firing (up to 5 min):
+
+```bash
+kubectl get cronjob hello-cron
 ```
 </details>
 
