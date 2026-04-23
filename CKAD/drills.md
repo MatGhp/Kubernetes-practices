@@ -742,13 +742,11 @@ minikube delete -p ckad && minikube start -p ckad --driver=docker
 
 ## Coverage — what is and isn't in this lab
 
-These 25 drills cover ~80% of the CKAD curriculum. Intentionally **out of scope** here (practice separately from the main [README.md](README.md) §6 list or the Kubernetes docs):
+These 25 drills cover ~80% of the CKAD curriculum. The remaining gaps are covered in [`drills-part2.md`](drills-part2.md):
 
-- **SecurityContext** — `runAsUser`, `runAsNonRoot`, `fsGroup`, `readOnlyRootFilesystem`.
-- **ServiceAccount** — creating one and binding it to a pod via `serviceAccountName`.
-- **Ingress** — `networking.k8s.io/v1` Ingress resource + path/host rules.
-- **Observability** — `kubectl top pod/node` (needs metrics-server), `kubectl get events --sort-by=...`.
-- **Multi-container patterns** beyond sidecar — adapter and ambassador.
-- **`kubectl edit`** on a live object vs apply-from-file.
-
-Add one drill per gap when you rotate this lab.
+- **SecurityContext** — `runAsUser`, `runAsNonRoot`, `fsGroup`, `readOnlyRootFilesystem` (drills 26–28).
+- **ServiceAccount** — create + bind via `serviceAccountName`, plus RBAC with `auth can-i` (drills 29–30).
+- **Ingress** — `networking.k8s.io/v1` path- and host-based rules (drills 31–32).
+- **Observability** — `kubectl top` and events sorted by time (drills 33–34).
+- **Multi-container patterns** — ambassador and adapter (drills 35–36).
+- **`kubectl edit` vs apply-from-file** (drill 37).
