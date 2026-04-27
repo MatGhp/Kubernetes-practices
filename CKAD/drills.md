@@ -552,9 +552,9 @@ kubectl logs logger -c sidecar --tail=5
 
 ---
 
-### Drill 22 — Init container waits for a service
+### Drill 22 — Init container waits for a service (requires `web` service from Drill 5)
 **Budget:** 6 min
-**Task:** Pod `delayed` — initContainer blocks until service `web` resolves via DNS, then main container runs `nginx:1.27`.
+**Task:** Assuming the `web` service from Drill 5 already exists, create pod `delayed` so its initContainer blocks until service `web` resolves via DNS, then the main container runs `nginx:1.27`.
 
 <details><summary>Answer</summary>
 
