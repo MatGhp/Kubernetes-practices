@@ -37,8 +37,13 @@ Everything in this guide is shaped around those three.
 - [6. Core CKAD Drills](#6-core-ckad-drills)
 - [7. Debugging Playbook](#7-debugging-playbook)
 - [8. Common Pitfalls](#8-common-pitfalls)
-- [9. Exam-Day Runbook](#9-exam-day-runbook)
-- [10. Pre-Exam Survival Checklist](#10-pre-exam-survival-checklist)
+- [9. Local Practice vs Real Exam](#9-local-practice-vs-real-exam)
+  - [9.1 Ingress (drills 31–32)](#91-ingress-drills-3132)
+  - [9.2 NetworkPolicy (drill 23)](#92-networkpolicy-drill-23)
+  - [9.3 PV / PVC / StorageClass (drill 25)](#93-pv--pvc--storageclass-drill-25)
+  - [9.4 metrics-server / `kubectl top` (drill 33)](#94-metrics-server--kubectl-top-drill-33)
+- [10. Exam-Day Runbook](#10-exam-day-runbook)
+- [11. Pre-Exam Survival Checklist](#11-pre-exam-survival-checklist)
 
 ---
 
@@ -86,7 +91,7 @@ Run all CKAD practice inside WSL — not PowerShell. This makes:
 Set these up so every drill is faster. There are **two scenarios**:
 
 - **Practice machine (WSL/Ubuntu)** — install permanently in `~/.bashrc`. Do this once.
-- **Exam machine** — the shell is fresh and nothing is preloaded. You paste a one-time warm-up block at the start of the exam. See [§9.1](#91-one-time-warm-up-run-once-when-the-exam-terminal-opens).
+- **Exam machine** — the shell is fresh and nothing is preloaded. You paste a one-time warm-up block at the start of the exam. See [§10.1](#101-one-time-warm-up-run-once-when-the-exam-terminal-opens).
 
 Both scenarios use the same content.
 
@@ -452,9 +457,116 @@ Key diagnostic signals:
 
 ---
 
-## 9. Exam-Day Runbook
+## 9. Local Practice vs Real Exam
 
-### 9.1 One-time warm-up (run once when the exam terminal opens)
+A few drills depend on Minikube-specific setup (CNI, addons, default StorageClass). The exam cluster is **not Minikube** — the local caveat goes away, but a different set of rules applies. The drills link here instead of repeating this content.
+
+**General principle:** on the real exam the cluster is already provisioned. You don't `enable` addons, install controllers, pick a CNI, or create StorageClasses. You write the resource the task asks for, set the right namespace, and validate by behavior.
+
+### 9.1 Ingress (drills 31–32)
+
+> **Local env:** assumes the Minikube `ingress` addon is enabled. Resolve hosts via `$(minikube -p ckad ip)` or `/etc/hosts`.
+
+**On the real exam:**
+
+1. **An Ingress controller is already running** — don't deploy one. Confirm and move on:
+   ```bash
+   kubectl get ingressclass
+   kubectl get pods -A | grep -iE 'ingress|nginx|traefik'
+   ```
+2. **Set `ingressClassName` explicitly** when the task names a class (or one is the cluster default). Without it the controller may silently ignore your Ingress.
+3. **Scaffold imperatively, then edit** — saves typos in `pathType` and the nested `service.port` block:
+   ```bash
+   kubectl create ingress app -n <ns> \
+     --rule="/=web:80" --rule="/api=api:80" \
+     --class=nginx --dry-run=client -o yaml > ing.yaml
+   # host-based variant:
+   kubectl create ingress app --rule="web.local/*=web:80" --dry-run=client -o yaml
+   ```
+4. **`pathType` is mandatory** — admission rejects the object without it. Use `Prefix` unless told otherwise.
+5. **`backend.service.port` must match the Service** — use `port.number` or `port.name`, whichever the Service exposes (`kubectl get svc <name> -o yaml`).
+6. **No `minikube ip`, no `/etc/hosts` edits.** Validate from a throwaway pod or with curl headers:
+   ```bash
+   kubectl run tmp --rm -it --image=curlimages/curl --restart=Never -- \
+     curl -s -H "Host: web.local" http://<ingress-controller-svc>.<ns>.svc/
+   # or, if a NodePort/LoadBalancer is reachable:
+   curl -s --resolve web.local:80:<addr> http://web.local/
+   ```
+7. **`ADDRESS` may stay empty** in `kubectl get ingress` — it is **not** part of grading. The grader inspects the spec.
+8. **Watch the namespace.** Ingress and backend Services must live in the **same namespace**.
+9. **TLS only if asked**, and only with a Secret the task provides — never generate certificates.
+10. **Score on spec, then move on.** If `kubectl get ingress <name> -o yaml` shows the right class, rules, paths, `pathType`, and ports, you're done.
+
+30-second fast-path:
+
+```bash
+kubectl get ingressclass                              # learn the class name
+kubectl create ingress <name> --class=<class> \
+  --rule="<host>/<path>=<svc>:<port>" \
+  --dry-run=client -o yaml > ing.yaml
+vim ing.yaml                                          # tweak pathType / add rules / TLS
+kubectl apply -f ing.yaml
+kubectl describe ingress <name> | grep -E 'Class|Host|Path|Backend'
+```
+
+### 9.2 NetworkPolicy (drill 23)
+
+> **Local env:** Minikube needs a CNI that enforces NetworkPolicy — start with `minikube start -p ckad --cni=calico` to actually test enforcement.
+
+**On the real exam:**
+
+1. **The CNI already enforces policies** — don't try to install or change one.
+2. **Read the namespace** — apply with `-n <ns>` and confirm with `kubectl get netpol -n <ns>`.
+3. **Set `policyTypes` explicitly** (`Ingress`, `Egress`, or both). Omitting it means "infer from rules" — a common silent-fail when the question says "deny all egress".
+4. **Default-deny is empty rules, not missing rules.** To deny all ingress for a selector use `policyTypes: [Ingress]` with **no** `ingress:` key (or `ingress: []`). Same for egress.
+5. **Selector scoping matters.** `from.podSelector` matches pods in the **same namespace**; cross-namespace requires `namespaceSelector` (often combined with `podSelector`). Namespace labels matter — `kubectl label ns <ns> name=<ns>` if needed.
+6. **DNS often needs an explicit egress rule** — UDP/TCP 53 to `kube-system` — when the task restricts egress and the pod resolves Service names.
+7. **Validate by traffic, not by `describe`.** The grader checks behavior:
+   ```bash
+   kubectl run probe --rm -it --image=busybox --restart=Never --labels=role=client \
+     -- wget -qO- --timeout=2 http://web.<ns>.svc.cluster.local || echo BLOCKED
+   ```
+8. **Don't restart pods.** Policies apply immediately to existing pods — recreating workloads wastes time.
+
+### 9.3 PV / PVC / StorageClass (drill 25)
+
+> **Local env:** Minikube ships with a default `standard` StorageClass (hostpath), so the PVC binds automatically without creating a PV.
+
+**On the real exam** — behavior depends on the task. Two patterns are common; **read the question** to know which:
+
+1. **"Create a PVC that binds."** A default StorageClass exists. Don't set `storageClassName` and the PVC will bind. Confirm:
+   ```bash
+   kubectl get sc                                       # find the (default) class
+   kubectl get pvc <name> -o wide                       # STATUS should be Bound
+   ```
+2. **"Create a PV and a matching PVC."** No default StorageClass, OR the task asks you to back the claim with a specific PV (often `hostPath`). To force the binding to your PV, both sides must agree:
+   - Use **`storageClassName: ""`** on PVC and PV to opt out of dynamic provisioning, **or** set the same explicit class name on both.
+   - Match `accessModes` exactly and ensure `PV.capacity.storage >= PVC.requests.storage`.
+   - Use a `selector` on the PVC if the task names labels for the PV.
+3. **`ReadWriteOnce` vs `ReadWriteMany`** — only request RWX if the task says so; most exam clusters' default class only provides RWO and the PVC will hang in `Pending`.
+4. **`Pending` PVC = read the events.** `kubectl describe pvc <name>` shows the exact mismatch (no class, no matching PV, wrong access mode, capacity too small).
+5. **Reclaim policy** — only set `persistentVolumeReclaimPolicy: Retain` on the PV when the task explicitly requires data to survive PVC deletion.
+6. **Verify across pods** with `kubectl exec` (write from one, read from another) — don't trust `kubectl get pvc` alone for round-trip tasks.
+
+### 9.4 metrics-server / `kubectl top` (drill 33)
+
+> **Local env:** the Minikube `metrics-server` addon must be enabled and warmed up before `kubectl top` works.
+
+**On the real exam:**
+
+1. **metrics-server is already installed and running.** You don't enable anything.
+2. If `kubectl top` returns `Metrics API not available`, check the deployment is healthy:
+   ```bash
+   kubectl -n kube-system get deploy metrics-server
+   ```
+3. **Wait ~30 s** — metrics need a scrape interval before the first values appear, especially if pods just started.
+4. **Don't troubleshoot it further** — it's not part of the question. Move on, return at the end if needed.
+
+---
+
+## 10. Exam-Day Runbook
+
+### 10.1 One-time warm-up (run once when the exam terminal opens)
 
 The exam shell is fresh — aliases and completion are **not** preloaded, and nothing you set in one task's shell carries over automatically. Paste the [§2.1 block](#21-the-block) at the very start:
 
@@ -472,7 +584,7 @@ Tips for speed on the exam machine:
 - If the exam terminal tab is replaced (new shell), paste the block again — it is cheap.
 - Open the allowed docs tab (`kubernetes.io/docs`) **before** starting the clock-sensitive work.
 
-### 9.2 Per-task runbook
+### 10.2 Per-task runbook
 
 Do these at the start of **every** task:
 
@@ -504,7 +616,7 @@ Time discipline matters more than any single question.
 
 ---
 
-## 10. Pre-Exam Survival Checklist
+## 11. Pre-Exam Survival Checklist
 
 You should be able to do all of these without thinking.
 

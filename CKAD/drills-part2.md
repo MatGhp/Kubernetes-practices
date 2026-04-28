@@ -255,58 +255,7 @@ kubectl auth can-i delete pods --as=system:serviceaccount:practice:deployer -n p
 
 ## Section H — Ingress (`networking.k8s.io/v1`)
 
-> **Local env (these drills):** assumes the Minikube `ingress` addon is enabled (see the setup block). Resolve hosts via `$(minikube -p ckad ip)` or `/etc/hosts`.
->
-> **Real exam:** the cluster you are graded on is **not Minikube**. The notes below describe what changes and how to handle drills 31 & 32 under exam conditions.
-
-#### Exam reality — Ingress (applies to drills 31 & 32)
-
-What differs from this local setup, and what to do about it:
-
-1. **An Ingress controller is already running** — don't deploy one, don't enable an "addon". Confirm and move on:
-   ```bash
-   kubectl get ingressclass
-   kubectl get pods -A | grep -iE 'ingress|nginx|traefik'
-   ```
-2. **Set `ingressClassName` explicitly** when the task names a class (or one is the cluster default). Without it, the controller may silently ignore your Ingress:
-   ```yaml
-   spec:
-     ingressClassName: nginx   # copy the name from `kubectl get ingressclass`
-   ```
-3. **Scaffold imperatively, then edit.** Saves you from typos in `pathType` and the nested `service.port.number` block:
-   ```bash
-   kubectl create ingress app -n <ns> \
-     --rule="/=web:80" --rule="/api=api:80" \
-     --class=nginx --dry-run=client -o yaml > ing.yaml
-   # host-based variant:
-   kubectl create ingress app --rule="web.local/*=web:80" --dry-run=client -o yaml
-   ```
-4. **`pathType` is mandatory** — admission will reject the object without it. Use `Prefix` unless told otherwise.
-5. **`backend.service.port` must match the Service** — use `port.number` or `port.name`, whichever the existing Service exposes (`kubectl get svc <name> -o yaml`).
-6. **No `minikube ip` and no `/etc/hosts` edits.** You usually can't modify the exam machine, and you don't need to. Validate from a throwaway pod or with curl headers:
-   ```bash
-   # In-cluster smoke test (works regardless of external DNS):
-   kubectl run tmp --rm -it --image=curlimages/curl --restart=Never -- \
-     curl -s -H "Host: web.local" http://<ingress-controller-svc>.<ns>.svc/
-   # Or, if a NodePort/LoadBalancer is exposed and reachable:
-   curl -s --resolve web.local:80:<addr> http://web.local/
-   ```
-7. **`ADDRESS` may stay empty** in `kubectl get ingress` — it is **not** part of grading. The grader inspects the spec.
-8. **Watch the namespace.** Ingress and backend Services must live in the **same namespace** — set `-n <ns>` on every command or `kubectl config set-context --current --namespace=<ns>`.
-9. **TLS only if asked**, and only with a Secret the task provides — never generate certificates.
-10. **Score on spec, then move on.** If `kubectl get ingress <name> -o yaml` shows the right `ingressClassName`, rules, paths, `pathType`, and ports, you're done.
-
-30-second exam fast-path:
-
-```bash
-kubectl get ingressclass                              # learn the class name
-kubectl create ingress <name> --class=<class> \
-  --rule="<host>/<path>=<svc>:<port>" \
-  --dry-run=client -o yaml > ing.yaml
-vim ing.yaml                                          # tweak pathType / add rules / TLS
-kubectl apply -f ing.yaml
-kubectl describe ingress <name> | grep -E 'Class|Host|Path|Backend'
-```
+> **Local env vs real exam:** these drills assume the Minikube `ingress` addon is enabled and resolve hosts via `$(minikube -p ckad ip)` or `/etc/hosts`. The exam cluster already has a controller running and you cannot edit `/etc/hosts`. See [README §9.1 Ingress](README.md#91-ingress-drills-3132) for exam-day actions and a 30-second fast-path.
 
 ---
 
@@ -432,10 +381,7 @@ kubectl -n kube-system get deploy metrics-server
 kubectl -n kube-system rollout status deploy/metrics-server
 ```
 
-> **Real exam:** metrics-server is already installed and running. You don't `enable` anything. If `kubectl top` returns `Metrics API not available`:
-> 1. Check the deployment is healthy: `kubectl -n kube-system get deploy metrics-server`.
-> 2. Wait ~30s — metrics need a scrape interval before the first values appear, especially if pods just started.
-> 3. Don't troubleshoot it further — it's not part of the question. Move on, return at the end if needed.
+> **Local env vs real exam:** local needs the addon to warm up; on the exam metrics-server is already installed. See [README §9.4 metrics-server / `kubectl top`](README.md#94-metrics-server--kubectl-top-drill-33) for exam-day actions.
 </details>
 
 ---
