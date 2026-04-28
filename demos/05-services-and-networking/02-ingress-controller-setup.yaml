@@ -60,6 +60,23 @@
 # =============================================================================
 
 # -----------------------------------------------------------------------------
+# 0. Namespace — dedicated namespace for the Ingress Controller
+# -----------------------------------------------------------------------------
+#
+# Isolating the controller in its own namespace is a best practice. The label
+# `name: ingress-nginx` is also useful if other NetworkPolicies need to allow
+# traffic FROM the ingress controller via a namespaceSelector.
+#
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: ingress-nginx
+  labels:
+    name: ingress-nginx
+    app: nginx-ingress
+
+---
+# -----------------------------------------------------------------------------
 # 1. ServiceAccount — identity for the Ingress Controller
 # -----------------------------------------------------------------------------
 apiVersion: v1
@@ -215,7 +232,12 @@ spec:
         - --election-id=ingress-controller-leader
         - --controller-class=k8s.io/ingress-nginx
         - --ingress-class=nginx
-        - --watch-namespace=$(POD_NAMESPACE)
+        # NOTE: do NOT pass --watch-namespace here — we want the controller to
+        # see Ingress resources in ALL namespaces (e.g., the demos in
+        # 03-ingress-resource.yaml deployed to the `default` namespace).
+        # --publish-service updates Ingress .status.loadBalancer with this
+        # Service's address so `kubectl get ingress` shows ADDRESS column.
+        - --publish-service=$(POD_NAMESPACE)/nginx-ingress-service
         env:
         - name: POD_NAME
           valueFrom:
@@ -289,10 +311,7 @@ spec:
 # kubectl Commands — Ingress Controller Setup
 # =============================================================================
 #
-# --- Create the namespace first ---
-#   kubectl create namespace ingress-nginx
-#
-# --- Deploy all resources ---
+# --- Deploy all resources (namespace is included in this file) ---
 #   kubectl apply -f 02-ingress-controller-setup.yaml
 #
 # --- Verify the controller is running ---
