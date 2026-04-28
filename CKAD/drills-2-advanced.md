@@ -38,6 +38,8 @@ kubectl wait -n ingress-nginx --for=condition=Ready pod \
 
 ## Section F — SecurityContext
 
+> **`privileged: true` (out of scope for the exam, but a frequent MCQ topic).** Setting `securityContext.privileged: true` on a container disables almost every kernel isolation (capability set, AppArmor/SELinux, seccomp, devices) — the container effectively runs as a root process on the node. The CKAD exam will not ask you to enable it; if anything you'll be asked to keep it `false`. Real-world hardening: prefer `capabilities.add: [NET_BIND_SERVICE]` (drill 27 territory) over `privileged: true`, and always pair with `allowPrivilegeEscalation: false`.
+
 ### Drill 26 — Run as non-root with a fixed UID
 **Budget:** 5 min
 **Task:** Pod `sec-uid` (image `busybox`, sleeps forever) that runs as UID `1000` and **must** fail to start if the image tries to run as root.
@@ -358,6 +360,73 @@ curl -s --resolve web.local:80:$IP http://web.local/ | head -n 1
 curl -s --resolve api.local:80:$IP http://api.local/
 ```
 </details>
+
+---
+
+### Drill 32b — TLS-terminated Ingress
+**Budget:** 7 min
+**Task:** Re-expose deployment `web` (from drill 31) at `https://web.local`, terminating TLS at the Ingress. Steps:
+
+1. Generate a self-signed cert/key for CN `web.local`.
+2. Load it into a `kubernetes.io/tls` Secret named `web-tls` in `practice`.
+3. Replace the Ingress with a single-host TLS rule referencing that Secret.
+4. Verify `https://web.local` returns the nginx welcome page (with `-k` since the cert is self-signed).
+
+<details><summary>Answer</summary>
+
+```bash
+# 1. Self-signed cert for CN=web.local (1-year validity, no passphrase)
+openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+  -keyout web.key -out web.crt \
+  -subj "/CN=web.local" \
+  -addext "subjectAltName=DNS:web.local"
+
+# 2. tls-typed Secret. The shorthand below sets data["tls.crt"] and data["tls.key"]
+#    and stamps `type: kubernetes.io/tls` automatically.
+kubectl create secret tls web-tls --cert=web.crt --key=web.key
+```
+
+```yaml
+# ingress-tls.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app
+spec:
+  tls:
+    - hosts: [web.local]
+      secretName: web-tls          # must be the kubernetes.io/tls Secret above
+  rules:
+    - host: web.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service: { name: web, port: { number: 80 } }
+```
+
+```bash
+kubectl apply -f ingress-tls.yaml
+```
+
+Verify — Secret type, Ingress TLS block, and an HTTPS request all line up:
+
+```bash
+kubectl get secret web-tls -o jsonpath='{.type}{"\n"}'   # → kubernetes.io/tls
+kubectl describe ingress app | grep -E 'TLS|Host|web-tls'
+
+IP=$(minikube -p ckad ip)
+curl -ks --resolve web.local:443:$IP https://web.local/ | head -n 1
+# Inspect the served cert's CN/SAN
+echo | openssl s_client -connect $IP:443 -servername web.local 2>/dev/null \
+  | openssl x509 -noout -subject -ext subjectAltName
+```
+
+> **Why `--resolve` instead of `/etc/hosts`?** The exam terminal blocks editing `/etc/hosts`. `curl --resolve <host>:<port>:<ip>` is the portable trick that works there too. The Secret type **must** be `kubernetes.io/tls`; the keys inside must be exactly `tls.crt` and `tls.key` — `kubectl create secret tls` gets both right for you.
+</details>
+
+**Cleanup:** `kubectl delete ingress app; kubectl delete secret web-tls; rm -f web.crt web.key`
 
 ---
 

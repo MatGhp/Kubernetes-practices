@@ -38,7 +38,7 @@ Everything in this guide is shaped around those three.
 - [7. Debugging Playbook](#7-debugging-playbook)
 - [8. Common Pitfalls](#8-common-pitfalls)
 - [9. Local Practice vs Real Exam](#9-local-practice-vs-real-exam)
-  - [9.1 Ingress (drills 31–32)](#91-ingress-drills-3132)
+  - [9.1 Ingress (drills 31–32b)](#91-ingress-drills-3132b)
   - [9.2 NetworkPolicy (drill 23)](#92-networkpolicy-drill-23)
   - [9.3 PV / PVC / StorageClass (drill 25)](#93-pv--pvc--storageclass-drill-25)
   - [9.4 metrics-server / `kubectl top` (drill 33)](#94-metrics-server--kubectl-top-drill-33)
@@ -397,7 +397,7 @@ Map of every published [CKAD curriculum](https://github.com/cncf/curriculum) com
 | | StorageClass / dynamic provisioning | 4 (D46) |
 | | Discover & use CRDs | 4 (D47) |
 | **Services & Networking (20%)** | Services & access | 1 (D5), 5 (T11–13), 6 (D54–55) |
-| | Ingress | 2 (D31–32), 5 (T11) |
+| | Ingress (incl. TLS termination) | 2 (D31–32, D32b), 5 (T11) |
 | | NetworkPolicies | 1 (D23), 3, 5 (T10) |
 | **Observability & Maintenance (15%)** | Probes & health | 1 (D16), 5 (T3) |
 | | Logs, events, metrics | 2 (D33–34), 6 (D60) |
@@ -503,7 +503,7 @@ A few drills depend on Minikube-specific setup (CNI, addons, default StorageClas
 
 **General principle:** on the real exam the cluster is already provisioned. You don't `enable` addons, install controllers, pick a CNI, or create StorageClasses. You write the resource the task asks for, set the right namespace, and validate by behavior.
 
-### 9.1 Ingress (drills 31–32)
+### 9.1 Ingress (drills 31–32b)
 
 > **Local env:** assumes the Minikube `ingress` addon is enabled. Resolve hosts via `$(minikube -p ckad ip)` or `/etc/hosts`.
 
