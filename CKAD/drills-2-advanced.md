@@ -266,10 +266,34 @@ kubectl auth can-i delete pods --as=system:serviceaccount:practice:deployer -n p
 > kubectl create deployment web --image=nginx
 > kubectl expose deployment web --port=80 --target-port=80
 >
-> # api — used by drill 31 (path) and 32 (host)
-> kubectl create deployment api --image=hashicorp/http-echo \
->   -- -text="hello from api" -listen=:80
-> kubectl expose deployment api --port=80 --target-port=80
+> # api — used by drill 31 (path) and 32 (host).
+> # NOTE: hashicorp/http-echo runs as non-root (cannot bind :80) and has an
+> # ENTRYPOINT, so flags must go via YAML `args:` — not `kubectl create
+> # deployment -- ...`, which writes `command:` and replaces the entrypoint,
+> # producing CrashLoopBackOff with `exec: "-text=...": not found`.
+> kubectl apply -f - <<'EOF'
+> apiVersion: apps/v1
+> kind: Deployment
+> metadata: { name: api, labels: { app: api } }
+> spec:
+>   replicas: 1
+>   selector: { matchLabels: { app: api } }
+>   template:
+>     metadata: { labels: { app: api } }
+>     spec:
+>       containers:
+>         - name: http-echo
+>           image: hashicorp/http-echo
+>           args: ["-text=hello from api", "-listen=:5678"]
+>           ports: [{ containerPort: 5678 }]
+> ---
+> apiVersion: v1
+> kind: Service
+> metadata: { name: api }
+> spec:
+>   selector: { app: api }
+>   ports: [{ port: 80, targetPort: 5678 }]
+> EOF
 >
 > # Wait until both are ready before applying any Ingress
 > kubectl wait --for=condition=available deploy/web deploy/api --timeout=60s
@@ -285,12 +309,32 @@ kubectl auth can-i delete pods --as=system:serviceaccount:practice:deployer -n p
 
 <details><summary>Answer</summary>
 
-Ensure `web` and `api` exist (skip if you already ran the Section H prerequisites block above):
+Ensure `web` and `api` exist (skip if you already ran the Section H prerequisites block above). See that block for why `args:` + port `5678` are required instead of `kubectl create deployment -- ...`:
 
 ```bash
-kubectl create deployment api --image=hashicorp/http-echo \
-  -- -text="hello from api" -listen=:80
-kubectl expose deployment api --port=80 --target-port=80
+kubectl apply -f - <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: api, labels: { app: api } }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: api } }
+  template:
+    metadata: { labels: { app: api } }
+    spec:
+      containers:
+        - name: http-echo
+          image: hashicorp/http-echo
+          args: ["-text=hello from api", "-listen=:5678"]
+          ports: [{ containerPort: 5678 }]
+---
+apiVersion: v1
+kind: Service
+metadata: { name: api }
+spec:
+  selector: { app: api }
+  ports: [{ port: 80, targetPort: 5678 }]
+EOF
 ```
 
 ```yaml
