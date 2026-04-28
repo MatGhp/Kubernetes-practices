@@ -367,6 +367,46 @@ What `ckad-up.sh` does:
 
 Run these repeatedly until they feel automatic.
 
+> Six drill sheets are available (study them in order):
+> 1. [drills-1-core.md](drills-1-core.md) — 25 scenario-based drills (build a thing).
+> 2. [drills-2-advanced.md](drills-2-advanced.md) — 12 advanced drills (SecurityContext, ServiceAccount, Ingress, Observability, multi-container, `kubectl edit`).
+> 3. [drills-3-imperative.md](drills-3-imperative.md) — 32 verb-based drills that drill **every imperative `kubectl` command shape** the exam expects (speed multipliers).
+> 4. [drills-4-modern.md](drills-4-modern.md) — 12 current-curriculum gap fillers (blue-green & canary, Helm, Kustomize, scheduling, `LimitRange`, `StorageClass`, CRD, PDB, `kubectl debug`).
+> 5. [drills-5-mock-exam.md](drills-5-mock-exam.md) — 15-task, 2-hour timed simulation with self-scoring rubric. Take it last.
+> 6. [drills-6-community.md](drills-6-community.md) — 12 gap-fillers inspired by the MIT-licensed `dgkanatsios/CKAD-exercises` (`kubectl explain`, downwardAPI, `subPath`, ExternalName, `rollout pause`, `kubectl cp`, etc.).
+
+### Curriculum coverage matrix
+
+Map of every published [CKAD curriculum](https://github.com/cncf/curriculum) competency to the drill files where it's exercised. Use this to find under-practiced areas before the exam.
+
+| Domain (weight) | Competency | Files |
+|-----------------|------------|-------|
+| **App Design & Build (20%)** | Define, build, modify container images | 6 (Drill 50–51) |
+| | Multi-container Pod patterns | 1 (D21), 2 (D35–36), 5 (T1), 6 (D52) |
+| | Jobs and CronJobs | 1 (D18–19), 3 (imperative job/cronjob) |
+| | Persistent and ephemeral volumes | 1 (D25), 4 (D46), 6 (D52–53) |
+| **App Deployment (20%)** | Deployments and rolling updates | 1 (D2–4, 9), 3, 6 (D56–57) |
+| | Deployment strategies (blue-green, canary) | 4 (D38–39), 5 (T4) |
+| | Helm | 4 (D40), 5 (T5) |
+| | Kustomize | 4 (D41), 5 (T6) |
+| **Env, Config & Security (25%)** | ConfigMaps, Secrets | 1 (D11–15), 5 (T7) |
+| | SecurityContext | 2 (D26–28), 5 (T8) |
+| | ServiceAccount, Role/RoleBinding | 2 (D29–30), 5 (T9) |
+| | Resource requirements & quotas | 1 (D17), 4 (D45) |
+| | Pod scheduling (selectors, affinity) | 4 (D42–44) |
+| | StorageClass / dynamic provisioning | 4 (D46) |
+| | Discover & use CRDs | 4 (D47) |
+| **Services & Networking (20%)** | Services & access | 1 (D5), 5 (T11–13), 6 (D54–55) |
+| | Ingress | 2 (D31–32), 5 (T11) |
+| | NetworkPolicies | 1 (D23), 3, 5 (T10) |
+| **Observability & Maintenance (15%)** | Probes & health | 1 (D16), 5 (T3) |
+| | Logs, events, metrics | 2 (D33–34), 6 (D60) |
+| | Debug Pods, ephemeral containers | 1 (D20), 4 (D49), 5 (T14–15) |
+| | `kubectl wait`, `cp`, port-forward | 5 (T13), 6 (D59, 61) |
+| | PodDisruptionBudget | 4 (D48) |
+
+If a row has only one file, that area is **lightly practiced** — make it your first weak-spot drill before booking the real exam.
+
 ### Core workloads
 
 1. Create a namespace `practice`.

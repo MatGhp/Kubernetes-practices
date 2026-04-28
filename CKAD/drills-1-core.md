@@ -742,7 +742,7 @@ minikube delete -p ckad && minikube start -p ckad --driver=docker
 
 ## Coverage — what is and isn't in this lab
 
-These 25 drills cover ~80% of the CKAD curriculum. The remaining gaps are covered in [`drills-part2.md`](drills-part2.md):
+These 25 drills cover ~80% of the CKAD curriculum. The remaining gaps are covered in [`drills-2-advanced.md`](drills-2-advanced.md):
 
 - **SecurityContext** — `runAsUser`, `runAsNonRoot`, `fsGroup`, `readOnlyRootFilesystem` (drills 26–28).
 - **ServiceAccount** — create + bind via `serviceAccountName`, plus RBAC with `auth can-i` (drills 29–30).

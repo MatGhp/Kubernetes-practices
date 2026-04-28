@@ -1,6 +1,6 @@
 # CKAD Mock Lab — Part 2 (Gap Fillers)
 
-Follow-up to [`drills.md`](drills.md). These 12 drills cover the topics intentionally left out of part 1:
+Follow-up to [`drills-1-core.md`](drills-1-core.md). These 12 drills cover the topics intentionally left out of part 1:
 
 - **SecurityContext** — `runAsUser`, `runAsNonRoot`, `fsGroup`, `readOnlyRootFilesystem`
 - **ServiceAccount** — create + bind via `serviceAccountName`

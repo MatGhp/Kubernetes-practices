@@ -411,4 +411,4 @@ If you completed that without Googling, you have enough Linux for CKAD. Now go d
 ## Related
 
 - [CKAD/README.md](README.md) — main CKAD playbook (environment, speed patterns, exam runbook).
-- [CKAD/drills.md](drills.md) — 25 timed CKAD drills with hidden answers.
+- [CKAD/drills-1-core.md](drills-1-core.md) — 25 timed CKAD drills with hidden answers.

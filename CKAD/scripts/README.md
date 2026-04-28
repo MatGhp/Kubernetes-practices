@@ -163,7 +163,7 @@ cd C:\me\git\Kubernetes-practices\CKAD\scripts
 ```bash
 # 2. In the new WSL tab — drills
 cd ~
-# … pick 5 drills from ../drills.md, timer on …
+# … pick 5 drills from ../drills-1-core.md, timer on …
 
 # 3. End of session — same tab
 ckad-down          # stop (keep state for tomorrow)
@@ -202,5 +202,5 @@ Copilot will verify Docker Desktop is running before UP and will always target t
 ## See also
 
 - [../README.md §5.4 One-command startup](../README.md#54-one-command-startup-windows--wsl) — brief mention in the main playbook.
-- [../drills.md](../drills.md) — the 25 timed drills this env is for.
+- [../drills-1-core.md](../drills-1-core.md) — the 25 timed drills this env is for.
 - [../linux-for-windows-users.md](../linux-for-windows-users.md) — WSL / bash primer for Windows users.
