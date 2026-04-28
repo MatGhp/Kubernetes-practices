@@ -257,7 +257,23 @@ kubectl auth can-i delete pods --as=system:serviceaccount:practice:deployer -n p
 
 ## Section H — Ingress (`networking.k8s.io/v1`)
 
-> **Local env vs real exam:** these drills assume the Minikube `ingress` addon is enabled and resolve hosts via `$(minikube -p ckad ip)` or `/etc/hosts`. The exam cluster already has a controller running and you cannot edit `/etc/hosts`. See [README §9.1 Ingress](README.md#91-ingress-drills-3132) for exam-day actions and a 30-second fast-path.
+> **Local env vs real exam:** these drills assume the Minikube `ingress` addon is enabled and resolve hosts via `$(minikube -p ckad ip)` or `/etc/hosts`. The exam cluster already has a controller running and you cannot edit `/etc/hosts`. See [README §9.1 Ingress](README.md#91-ingress-drills-3132b) for exam-day actions and a 30-second fast-path.
+
+> **Prerequisites for Section H (drills 31, 32, 32b).** All three reuse the same `web` and `api` Services. If you are starting from a fresh cluster (no part-1 state), create them once up front. They are idempotent — re-running on top of an existing setup is safe but will print `AlreadyExists` errors you can ignore.
+>
+> ```bash
+> # web — from drills-1-core.md D2 + D5
+> kubectl create deployment web --image=nginx
+> kubectl expose deployment web --port=80 --target-port=80
+>
+> # api — used by drill 31 (path) and 32 (host)
+> kubectl create deployment api --image=hashicorp/http-echo \
+>   -- -text="hello from api" -listen=:80
+> kubectl expose deployment api --port=80 --target-port=80
+>
+> # Wait until both are ready before applying any Ingress
+> kubectl wait --for=condition=available deploy/web deploy/api --timeout=60s
+> ```
 
 ---
 
@@ -268,6 +284,8 @@ kubectl auth can-i delete pods --as=system:serviceaccount:practice:deployer -n p
 - `GET /api`  → service `api` port 80 (strip the prefix is not required)
 
 <details><summary>Answer</summary>
+
+Ensure `web` and `api` exist (skip if you already ran the Section H prerequisites block above):
 
 ```bash
 kubectl create deployment api --image=hashicorp/http-echo \
