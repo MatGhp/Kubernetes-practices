@@ -619,7 +619,20 @@ kubectl apply -f netpol.yaml
 kubectl describe netpol allow-web-from-client
 ```
 
-> Minikube needs a CNI that enforces NetworkPolicy. Start with `minikube start -p ckad --cni=calico` if enforcement is required.
+> **Local env:** Minikube needs a CNI that enforces NetworkPolicy — start with `minikube start -p ckad --cni=calico` if you actually want to test enforcement.
+>
+> **Real exam:** you do **not** need to enable or pick a CNI — the exam cluster already runs one that enforces NetworkPolicy (Calico/Cilium-class). What matters on exam day:
+> 1. **Read the namespace** — apply the policy with `-n <ns>` and confirm it's in the right one (`kubectl get netpol -n <ns>`).
+> 2. **Set `policyTypes` explicitly** (`Ingress`, `Egress`, or both). Omitting it means "infer from rules", which is a common silent-fail trap when the question says "deny all egress".
+> 3. **Default-deny is empty rules, not missing rules.** To deny all ingress for a selector use `policyTypes: [Ingress]` with **no** `ingress:` key (or `ingress: []`). Same for egress.
+> 4. **Selector scoping matters.** `from.podSelector` matches pods in the **same namespace**; cross-namespace requires `namespaceSelector` (often combined with `podSelector`).
+> 5. **DNS often needs an explicit egress rule** — UDP/TCP 53 to `kube-system` — when the task asks for restricted egress and the pod uses Service names.
+> 6. **Validate by traffic, not by `describe`.** The grader checks behavior:
+>    ```bash
+>    kubectl run probe --rm -it --image=busybox --restart=Never --labels=role=client \
+>      -- wget -qO- --timeout=2 http://web.<ns>.svc.cluster.local || echo BLOCKED
+>    ```
+> 7. **Don't restart pods.** Policies apply immediately to existing pods — recreating workloads wastes time.
 </details>
 
 ---
@@ -715,7 +728,21 @@ kubectl apply -f reader.yaml
 kubectl logs reader   # expect: hello
 ```
 
-> Minikube ships with a default `standard` StorageClass (hostpath), so the PVC binds without creating a PV manually.
+> **Local env:** Minikube ships with a default `standard` StorageClass (hostpath), so the PVC binds automatically without creating a PV.
+>
+> **Real exam:** behavior depends on the task. Two patterns are common — **read the question** to know which:
+> 1. **"Create a PVC that binds."** A default StorageClass exists. Don't set `storageClassName` (leave it unset) and the PVC will bind. Confirm:
+>    ```bash
+>    kubectl get sc                                       # find the (default) class
+>    kubectl get pvc <name> -o wide                       # STATUS should be Bound
+>    ```
+> 2. **"Create a PV and a matching PVC."** No default StorageClass, OR the task asks you to back the claim with a specific PV (often `hostPath`). To force the binding to your PV, both sides must agree:
+>    - Use **`storageClassName: ""`** (empty string) on the PVC and PV to opt out of dynamic provisioning, **or** set the same explicit class name on both.
+>    - Match `accessModes` and ensure `PV.capacity.storage >= PVC.requests.storage`.
+>    - Use a `selector` on the PVC if the task names labels for the PV.
+> 3. **`ReadWriteOnce` vs `ReadWriteMany`** — only request RWX if the task says so; most exam clusters' default class only provides RWO and the PVC will hang in `Pending`.
+> 4. **`Pending` PVC = read the events.** `kubectl describe pvc <name>` shows the exact mismatch (no class, no matching PV, wrong access mode, capacity too small).
+> 5. **Reclaim policy** — only set `persistentVolumeReclaimPolicy: Retain` on the PV when the task explicitly requires data to survive PVC deletion.
 </details>
 
 ---
