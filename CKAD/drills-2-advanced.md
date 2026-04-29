@@ -679,6 +679,26 @@ kubectl exec cache-ambassador -c proxy -- ss -tlnp | grep 6379
 
 > **Why `subPath`?** Without it, the `volumeMount` would replace the entire `/etc/nginx/` directory with the ConfigMap, removing all other nginx files. `subPath: nginx.conf` mounts only that one key as a single file at the given path.
 
+> **Exam recall — three values, one name:** The ConfigMap key, `subPath`, and the filename in `mountPath` are all the same string: `nginx.conf`. You only need to remember the filename once; the rest is mechanical:
+> ```
+> key       = nginx.conf
+> subPath   = nginx.conf          # always equals the key for single-file mounts
+> mountPath = /etc/nginx/nginx.conf   # /etc/nginx/ + key
+> ```
+> **Why the whole file, not `conf.d/`?** nginx's default `nginx.conf` wraps everything in `http {}`, and `conf.d/` files are included *inside* that block. `stream {}` is a top-level directive — it cannot nest inside `http {}`. Replacing the whole file is the only option. Mnemonic: *"stream needs the top — replace the top."*
+>
+> **Content skeleton (10-second recall):**
+> ```
+> events {}
+> stream {
+>   server {
+>     listen PORT;
+>     proxy_pass HOST:PORT;
+>   }
+> }
+> ```
+> Compare with HTTP: `http → server → location` (3 levels). TCP: `events + stream → server` (2 levels, outer block names the protocol).
+
 </details>
 
 ---

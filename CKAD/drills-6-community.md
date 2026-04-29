@@ -1,10 +1,10 @@
-# CKAD Drills — Community Gap-Fillers (Drills 50–61)
+# CKAD Drills — Community Gap-Fillers (Drills 50–64)
 
-These 12 drills target curriculum corners that the previous five files don't drill hard. Topics and example phrasings were inspired by the open-source [`dgkanatsios/CKAD-exercises`](https://github.com/dgkanatsios/CKAD-exercises) (MIT-licensed) — the **scenarios below are original**, written from scratch for Kubernetes 1.34+ (current supported branches: 1.34/1.35/1.36), but credit goes to that repo for highlighting the gaps.
+These 15 drills target curriculum corners that the previous five files don't drill hard. Topics and example phrasings were inspired by the open-source [`dgkanatsios/CKAD-exercises`](https://github.com/dgkanatsios/CKAD-exercises) (MIT-licensed) — the **scenarios below are original**, written from scratch for Kubernetes 1.34+ (current supported branches: 1.34/1.35/1.36), but credit goes to that repo for highlighting the gaps.
 
 > **Attribution:** Topic list seeded from `dgkanatsios/CKAD-exercises`, licensed under the [MIT License](https://github.com/dgkanatsios/CKAD-exercises/blob/main/LICENSE). © Dimitris Kanatsios and contributors. We adapted the curriculum coverage map only — no question text or solution code is copied.
 
-Same ground-rules as part 1–4: timer on, hide the answer, run the verify block, log your time. Estimated total: **42 min**.
+Same ground-rules as part 1–4: timer on, hide the answer, run the verify block, log your time. Estimated total: **58 min**.
 
 ```bash
 kubectl create namespace practice 2>/dev/null
@@ -405,6 +405,210 @@ kubectl wait --for=delete pod/task14 --timeout=30s
 
 ---
 
+## Section G — Container Images & API Versioning
+
+### Drill 62 — `docker build` + minikube local image deploy
+**Curriculum:** Application Design & Build
+**Budget:** 5 min
+**Task:** Build a custom nginx image locally and deploy it to the cluster without a registry:
+1. Write a `Dockerfile` using `FROM nginx:1.27` that copies a local `index.html` (content: `Hello CKAD`) to `/usr/share/nginx/html/index.html`.
+2. Build the image as `my-app:v1` **inside minikube's Docker daemon**.
+3. Deploy a Pod `my-app` (namespace `practice`) using that image with `imagePullPolicy: Never`.
+4. Verify `curl localhost` from inside the Pod returns `Hello CKAD`.
+
+<details><summary>Answer</summary>
+
+```bash
+# Switch your shell's Docker client to minikube's daemon
+eval $(minikube docker-env -p ckad)
+
+echo 'Hello CKAD' > index.html
+
+cat > Dockerfile <<'EOF'
+FROM nginx:1.27
+COPY index.html /usr/share/nginx/html/index.html
+EXPOSE 80
+EOF
+
+docker build -t my-app:v1 .
+docker images my-app   # confirm it appears
+```
+
+```yaml
+# my-app.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: my-app
+  namespace: practice
+spec:
+  containers:
+    - name: app
+      image: my-app:v1
+      imagePullPolicy: Never
+      ports:
+        - containerPort: 80
+```
+
+```bash
+kubectl apply -f my-app.yaml
+kubectl wait --for=condition=Ready pod/my-app --timeout=30s
+kubectl exec my-app -- curl -s localhost   # Hello CKAD
+```
+
+**Why `imagePullPolicy: Never`?** The image exists only inside minikube's Docker daemon — there is no registry to pull from. `Never` tells the kubelet to use the locally cached image and fail immediately if absent, rather than attempt a remote pull.
+</details>
+
+**Cleanup:** `kubectl delete pod my-app; docker rmi my-app:v1; eval $(minikube docker-env -u -p ckad)`
+
+---
+
+### Drill 63 — Multi-stage Dockerfile (minimise final image)
+**Curriculum:** Application Design & Build
+**Budget:** 8 min
+**Task:** Write a multi-stage `Dockerfile`:
+- **Stage 1** (`builder`): `FROM golang:1.22-alpine`, compile a Go program (`fmt.Println("hello CKAD")`) to `/app/server`.
+- **Stage 2**: `FROM alpine:3.20`, copy only `/app/server` from the builder stage, set it as the default command.
+
+Build as `go-app:v1` inside minikube's daemon. Run it as a Pod `go-hello` and verify `kubectl logs go-hello` shows `hello CKAD`.
+
+<details><summary>Answer</summary>
+
+```bash
+eval $(minikube docker-env -p ckad)
+
+mkdir go-app && cd go-app
+
+cat > main.go <<'EOF'
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("hello CKAD")
+}
+EOF
+
+cat > Dockerfile <<'EOF'
+# Stage 1 — compile
+FROM golang:1.22-alpine AS builder
+WORKDIR /src
+COPY main.go .
+RUN go build -o /app/server main.go
+
+# Stage 2 — minimal runtime
+FROM alpine:3.20
+COPY --from=builder /app/server /server
+CMD ["/server"]
+EOF
+
+docker build -t go-app:v1 .
+```
+
+```bash
+kubectl run go-hello \
+  --image=go-app:v1 \
+  --restart=Never \
+  --overrides='{"spec":{"containers":[{"name":"go-hello","image":"go-app:v1","imagePullPolicy":"Never"}]}}'
+kubectl wait --for=jsonpath='{.status.phase}'=Succeeded pod/go-hello --timeout=30s
+kubectl logs go-hello   # hello CKAD
+```
+
+**Key concepts:**
+- `FROM ... AS <name>` names a build stage.
+- `COPY --from=<name>` copies artefacts between stages.
+- Only the **final stage** ends up in the image — the Go toolchain (~300 MB) is discarded; the `alpine` runtime image is ~10 MB.
+</details>
+
+**Cleanup:** `kubectl delete pod go-hello; docker rmi go-app:v1; cd ..; rm -rf go-app; eval $(minikube docker-env -u -p ckad)`
+
+---
+
+### Drill 64 — Identify and fix a deprecated API version
+**Curriculum:** Application Observability & Maintenance
+**Budget:** 4 min
+**Task:** The manifest below uses a removed API version. Without opening a browser:
+1. Apply it and observe the error.
+2. Use only `kubectl` to find the correct `apiVersion` for `CronJob`.
+3. Apply a corrected version and verify the CronJob exists.
+
+```yaml
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: cleanup
+  namespace: practice
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: task
+              image: busybox:1.36
+              command: ["sh", "-c", "echo cleaning"]
+          restartPolicy: OnFailure
+```
+
+<details><summary>Answer</summary>
+
+```bash
+# Step 1 — observe the error
+kubectl apply -n practice -f - <<'EOF'
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata: { name: cleanup }
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers: [{ name: task, image: busybox:1.36, command: ["sh","-c","echo cleaning"] }]
+          restartPolicy: OnFailure
+EOF
+# Error: no matches for kind "CronJob" in version "batch/v1beta1"
+# batch/v1beta1 was removed in Kubernetes 1.25.
+
+# Step 2 — find the correct version without a browser
+kubectl api-resources --api-group=batch
+# NAME       SHORTNAMES   APIVERSION   NAMESPACED   KIND
+# cronjobs   cj           batch/v1     true         CronJob
+
+# Step 3 — apply corrected manifest
+kubectl apply -n practice -f - <<'EOF'
+apiVersion: batch/v1
+kind: CronJob
+metadata: { name: cleanup }
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers: [{ name: task, image: busybox:1.36, command: ["sh","-c","echo cleaning"] }]
+          restartPolicy: OnFailure
+EOF
+```
+
+```bash
+kubectl get cronjob cleanup -n practice
+```
+
+**Exam tip:** `kubectl api-resources --api-group=<group>` lists every resource with its current `apiVersion`. Common removals:
+
+| Old version | Replacement | Removed in |
+|---|---|---|
+| `batch/v1beta1` CronJob | `batch/v1` | 1.25 |
+| `networking.k8s.io/v1beta1` Ingress | `networking.k8s.io/v1` | 1.22 |
+| `policy/v1beta1` PodDisruptionBudget | `policy/v1` | 1.25 |
+</details>
+
+**Cleanup:** `kubectl delete cronjob cleanup -n practice`
+
+---
+
 ## Cleanup (full reset)
 
 ```bash
@@ -429,7 +633,10 @@ kubectl delete deploy,svc,pod,cm,secret --all -n practice
 | 59 | Observability | `kubectl cp` |
 | 60 | Observability | `-l selector`, `--prefix`, `--max-log-requests` log flags |
 | 61 | Observability | `kubectl wait` condition vocabulary |
+| 62 | Design & Build | `docker build` inside minikube daemon; `imagePullPolicy: Never` |
+| 63 | Design & Build | multi-stage Dockerfile; `FROM ... AS`; `COPY --from=` |
+| 64 | Observability | `batch/v1beta1` → `batch/v1` removal; `kubectl api-resources` discovery |
 
 ## Scoring
 
-Same as the other drill files: 2 pts solved in budget without peeking, 1 pt solved within 1.5× or after one peek, 0 pts otherwise. Target **18 / 24** across this set.
+Same as the other drill files: 2 pts solved in budget without peeking, 1 pt solved within 1.5× or after one peek, 0 pts otherwise. Target **22 / 30** across this set.

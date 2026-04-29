@@ -1,4 +1,4 @@
-# CKAD Mock Exam — 15 Tasks, 2 Hours
+# CKAD Mock Exam — 18 Tasks, ~2.5 Hours
 
 A timed simulation of the **current** CKAD exam format (April 2026). Original tasks — no leaked content. Designed to mirror the **shape** of the live exam: terminal-only, mixed difficulty, weighted percentages roughly matching the [published curriculum](https://github.com/cncf/curriculum), and worded to be unambiguous so you can self-grade.
 
@@ -11,26 +11,31 @@ A timed simulation of the **current** CKAD exam format (April 2026). Original ta
    ```bash
    bash ./CKAD/scripts/ckad-up.sh   # or pwsh -File .\CKAD\scripts\Start-CKAD.ps1
    kubectl get nodes                 # must be Ready
-   kubectl create ns exam
-   kubectl config set-context --current --namespace=exam
+   for ns in ns-build ns-deploy ns-config ns-network ns-observe; do
+     kubectl create ns $ns 2>/dev/null
+   done
    alias k=kubectl
    export do="--dry-run=client -o yaml"
+   # Switch namespace at the start of each section:
+   #   kubectl config set-context --current --namespace=<ns>
    ```
-2. **Start a 120-minute timer** (the real exam is 2 hours).
+2. **Start a 150-minute timer** (the real exam is 2 hours; this extended paper has 3 additional tasks).
 3. Do tasks in order. Don't peek at answers. If a task takes more than its budget, **skip it** and come back.
 4. At the end, expand the answers, run each `Verify` block, and score yourself.
-5. **Pass mark: 66%** = score ≥ 66 of the 100 weighted points.
+5. **Pass mark: 66%** = score ≥ 79 of the 120 weighted points.
 
 ## Constraints (mirror the real exam)
 
-- All tasks run in namespace **`exam`** unless stated otherwise.
+- Each section runs in its own namespace (see section header). Switch with `kubectl config set-context --current --namespace=<ns>` at the start of each section.
 - You may use any official Kubernetes documentation site (`kubernetes.io`, `helm.sh`, `kustomize.io`).
 - **No** searching Stack Overflow, blogs, GitHub, AI assistants, or your own notes file. (Honour system here.)
 - You may use `kubectl` aliases and the `$do` env var. The `k`, `kc`, `kn`, `kg` aliases from [README §2.2](README.md#22-kubectl-context--namespace-helpers) are fair game.
 
 ---
 
-## Section 1 — Application Design and Build (20 pts)
+## Section 1 — Application Design and Build (27 pts)
+
+> **Namespace:** `ns-build` — `kubectl config set-context --current --namespace=ns-build`
 
 ### Task 1 — Multi-container Pod with shared `emptyDir` (6 pts, 5 min)
 
@@ -76,7 +81,7 @@ kubectl logs task1 -c reader --tail=3
 
 ### Task 2 — Init container that gates startup (6 pts, 5 min)
 
-Create a Pod `task2` with one main container `app` (`nginx:1.27`) and one init container `wait-for-svc` (`busybox:1.36`) that runs `sh -c "until nslookup gate.exam.svc.cluster.local; do sleep 2; done"`. Then create the Service `gate` (ClusterIP, port 80, no backing pods needed) and observe `task2` transition `Init` → `Running`.
+Create a Pod `task2` with one main container `app` (`nginx:1.27`) and one init container `wait-for-svc` (`busybox:1.36`) that runs `sh -c "until nslookup gate.ns-build.svc.cluster.local; do sleep 2; done"`. Then create the Service `gate` (ClusterIP, port 80, no backing pods needed) and observe `task2` transition `Init` → `Running`.
 
 <details><summary>Answer</summary>
 
@@ -96,7 +101,7 @@ spec:
   initContainers:
     - name: wait-for-svc
       image: busybox:1.36
-      command: ["sh","-c","until nslookup gate.exam.svc.cluster.local; do sleep 2; done"]
+      command: ["sh","-c","until nslookup gate.ns-build.svc.cluster.local; do sleep 2; done"]
   containers:
     - name: app
       image: nginx:1.27
@@ -149,6 +154,8 @@ kubectl get svc api
 
 ## Section 2 — Application Deployment (20 pts)
 
+> **Namespace:** `ns-deploy` — `kubectl config set-context --current --namespace=ns-deploy`
+
 ### Task 4 — Canary at 10% (6 pts, 5 min)
 
 A Service `shop` selects `app=shop` (no version label). Provide a `shop-stable` Deployment (9 replicas, `nginx:1.27`, labels `app=shop,track=stable`) and a `shop-canary` Deployment (1 replica, `nginx:1.28`, labels `app=shop,track=canary`).
@@ -177,13 +184,13 @@ helm repo update
 helm install front bitnami/nginx \
   --set service.type=ClusterIP \
   --set replicaCount=2 \
-  -n exam
+  -n ns-deploy
 ```
 
 **Verify:**
 
 ```bash
-helm list -n exam
+helm list -n ns-deploy
 kubectl get deploy,svc -l app.kubernetes.io/instance=front
 ```
 </details>
@@ -207,6 +214,8 @@ kubectl get deploy web -o jsonpath='{.spec.replicas} {.metadata.labels.env}{"\n"
 ---
 
 ## Section 3 — Environment, Configuration & Security (25 pts)
+
+> **Namespace:** `ns-config` — `kubectl config set-context --current --namespace=ns-config`
 
 ### Task 7 — ConfigMap + Secret consumption (6 pts, 4 min)
 
@@ -297,7 +306,7 @@ Create ServiceAccount `viewer`, Role `pod-viewer` allowing `get,list,watch` on `
 kubectl create sa viewer
 kubectl create role pod-viewer --verb=get,list,watch --resource=pods
 kubectl create rolebinding viewer-binds-pod-viewer \
-  --role=pod-viewer --serviceaccount=exam:viewer
+  --role=pod-viewer --serviceaccount=ns-config:viewer
 ```
 
 ```yaml
@@ -314,8 +323,8 @@ spec:
 **Verify:**
 
 ```bash
-kubectl exec task9 -- kubectl get pods -n exam
-kubectl exec task9 -- kubectl get deploy -n exam 2>&1 | grep -i forbidden
+kubectl exec task9 -- kubectl get pods -n ns-config
+kubectl exec task9 -- kubectl get deploy -n ns-config 2>&1 | grep -i forbidden
 ```
 </details>
 
@@ -323,7 +332,7 @@ kubectl exec task9 -- kubectl get deploy -n exam 2>&1 | grep -i forbidden
 
 ### Task 10 — NetworkPolicy: default-deny + allow from one label (6 pts, 5 min)
 
-Add two NetworkPolicies in namespace `exam`:
+Add two NetworkPolicies in namespace `ns-config`:
 
 1. `default-deny` denying all ingress.
 2. `allow-frontend` allowing ingress to pods with `app=backend` from pods with `app=frontend` on TCP 80.
@@ -355,13 +364,15 @@ spec:
 **Verify:**
 
 ```bash
-kubectl get netpol -n exam
+kubectl get netpol -n ns-config
 ```
 </details>
 
 ---
 
 ## Section 4 — Services and Networking (20 pts)
+
+> **Namespace:** `ns-network` — `kubectl config set-context --current --namespace=ns-network`
 
 ### Task 11 — Path-based Ingress (8 pts, 6 min)
 
@@ -415,7 +426,7 @@ spec:
 
 ```bash
 kubectl run dns --rm -it --restart=Never --image=busybox:1.36 -- \
-  nslookup db.exam.svc.cluster.local
+  nslookup db.ns-network.svc.cluster.local
 # Expect TWO addresses listed.
 ```
 </details>
@@ -424,12 +435,12 @@ kubectl run dns --rm -it --restart=Never --image=busybox:1.36 -- \
 
 ### Task 13 — `port-forward` to a private Service (6 pts, 3 min)
 
-Forward local port 9090 to Service `api` (port 80) in namespace `exam`, then `curl` `http://localhost:9090` to confirm a 200 response. Run the forward in the background and clean it up.
+Forward local port 9090 to Service `api` (port 80) in namespace `ns-network`, then `curl` `http://localhost:9090` to confirm a 200 response. Run the forward in the background and clean it up.
 
 <details><summary>Answer</summary>
 
 ```bash
-kubectl port-forward svc/api 9090:80 -n exam &
+kubectl port-forward svc/api 9090:80 -n ns-network &
 PF=$!
 sleep 1
 curl -sI http://localhost:9090 | head -1   # HTTP/1.1 200 OK
@@ -439,7 +450,9 @@ kill $PF
 
 ---
 
-## Section 5 — Observability & Maintenance (15 pts)
+## Section 5 — Observability & Maintenance (28 pts)
+
+> **Namespace:** `ns-observe` — `kubectl config set-context --current --namespace=ns-observe`
 
 ### Task 14 — Diagnose a CrashLooping Pod (8 pts, 7 min)
 
@@ -514,18 +527,243 @@ cat /tmp/probe.txt
 
 ---
 
+### Task 16 — Build and deploy a local container image (7 pts, 6 min)
+
+> **Curriculum:** Application Design & Build — container images  
+> **Namespace:** `ns-build` (switch back if needed)
+
+Use minikube's Docker daemon to build and deploy a custom image **without a registry**:
+1. Create a `Dockerfile` (base: `nginx:1.27`) that copies a local `index.html` containing `Hello CKAD` to `/usr/share/nginx/html/index.html`.
+2. Build the image as `my-app:v1` inside minikube's Docker daemon (`eval $(minikube docker-env -p ckad)`).
+3. Run a Pod `task16` (namespace `ns-build`) using that image with `imagePullPolicy: Never`.
+4. Verify `curl localhost` from inside the Pod prints `Hello CKAD`.
+
+<details><summary>Answer</summary>
+
+```bash
+eval $(minikube docker-env -p ckad)
+
+echo 'Hello CKAD' > index.html
+
+cat > Dockerfile <<'EOF'
+FROM nginx:1.27
+COPY index.html /usr/share/nginx/html/index.html
+EXPOSE 80
+EOF
+
+docker build -t my-app:v1 .
+```
+
+```yaml
+# task16.yaml
+apiVersion: v1
+kind: Pod
+metadata:
+  name: task16
+  namespace: ns-build
+spec:
+  containers:
+    - name: app
+      image: my-app:v1
+      imagePullPolicy: Never
+      ports:
+        - containerPort: 80
+```
+
+```bash
+kubectl apply -f task16.yaml
+kubectl wait --for=condition=Ready pod/task16 -n ns-build --timeout=30s
+kubectl exec -n ns-build task16 -- curl -s localhost   # Hello CKAD
+```
+
+**Why `imagePullPolicy: Never`?** The image lives only inside minikube's Docker daemon — there is no registry. `Never` tells the kubelet to use the locally cached image instead of attempting a remote pull (which would fail with `ErrImagePull`).
+</details>
+
+**Cleanup:** `kubectl delete pod task16 -n ns-build; docker rmi my-app:v1; eval $(minikube docker-env -u -p ckad)`
+
+---
+
+### Task 17 — Identify and fix a deprecated API version (5 pts, 4 min)
+
+> **Curriculum:** Application Observability & Maintenance — API deprecations  
+> **Namespace:** `ns-observe`
+
+Apply the manifest below, note the error, find the correct `apiVersion` using only `kubectl`, and re-apply a corrected version.
+
+```yaml
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata:
+  name: cleanup
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers:
+            - name: task
+              image: busybox:1.36
+              command: ["sh", "-c", "echo cleaning"]
+          restartPolicy: OnFailure
+```
+
+<details><summary>Answer</summary>
+
+```bash
+# Step 1 — apply and observe the error
+kubectl apply -n ns-observe -f - <<'EOF'
+apiVersion: batch/v1beta1
+kind: CronJob
+metadata: { name: cleanup }
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers: [{ name: task, image: busybox:1.36, command: ["sh","-c","echo cleaning"] }]
+          restartPolicy: OnFailure
+EOF
+# Error: no matches for kind "CronJob" in version "batch/v1beta1"
+# batch/v1beta1 was removed in Kubernetes 1.25.
+
+# Step 2 — find the correct version without a browser
+kubectl api-resources --api-group=batch
+# NAME       SHORTNAMES   APIVERSION   NAMESPACED   KIND
+# cronjobs   cj           batch/v1     true         CronJob
+
+# Step 3 — apply corrected manifest
+kubectl apply -n ns-observe -f - <<'EOF'
+apiVersion: batch/v1
+kind: CronJob
+metadata: { name: cleanup }
+spec:
+  schedule: "*/5 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          containers: [{ name: task, image: busybox:1.36, command: ["sh","-c","echo cleaning"] }]
+          restartPolicy: OnFailure
+EOF
+```
+
+**Verify:**
+
+```bash
+kubectl get cronjob cleanup -n ns-observe
+```
+
+**Common API removals to memorise:**
+
+| Old version | Replacement | Removed in |
+|---|---|---|
+| `batch/v1beta1` CronJob | `batch/v1` | 1.25 |
+| `networking.k8s.io/v1beta1` Ingress | `networking.k8s.io/v1` | 1.22 |
+| `policy/v1beta1` PodDisruptionBudget | `policy/v1` | 1.25 |
+</details>
+
+**Cleanup:** `kubectl delete cronjob cleanup -n ns-observe`
+
+---
+
+### Task 18 — Debug and fix a broken Deployment (8 pts, 7 min)
+
+> **Curriculum:** Application Observability & Maintenance — debugging workloads  
+> **Namespace:** `ns-observe`
+
+Apply this Deployment. It has **two bugs** — find both and fix them so all 2 replicas reach `Running`.
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: task18
+spec:
+  replicas: 2
+  selector:
+    matchLabels: { app: task18 }
+  template:
+    metadata:
+      labels: { app: task18 }
+    spec:
+      containers:
+        - name: app
+          image: nginx:doesnotexist
+          resources:
+            requests: { cpu: "500m", memory: "128Mi" }
+            limits:   { cpu: "100m", memory: "64Mi" }
+```
+
+<details><summary>Answer</summary>
+
+```bash
+kubectl apply -n ns-observe -f - <<'EOF'
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: task18 }
+spec:
+  replicas: 2
+  selector: { matchLabels: { app: task18 } }
+  template:
+    metadata: { labels: { app: task18 } }
+    spec:
+      containers:
+        - name: app
+          image: nginx:doesnotexist
+          resources:
+            requests: { cpu: "500m", memory: "128Mi" }
+            limits:   { cpu: "100m", memory: "64Mi" }
+EOF
+
+# Diagnose
+kubectl get pod -n ns-observe -l app=task18
+kubectl describe pod -n ns-observe -l app=task18 | grep -A5 "State\|Reason\|Events"
+```
+
+**Bug 1 — bad image tag:** `nginx:doesnotexist` → pods enter `ErrImagePull` / `ImagePullBackOff`. Fix:
+
+```bash
+kubectl set image deployment/task18 app=nginx:1.27 -n ns-observe
+```
+
+**Bug 2 — cpu limit < request:** `limits.cpu: 100m` is less than `requests.cpu: 500m`. Kubernetes rejects pods with this constraint. Fix with `kubectl edit`:
+
+```bash
+kubectl edit deployment task18 -n ns-observe
+# change limits.cpu from "100m" to "1"
+```
+
+Then watch the rollout complete:
+
+```bash
+kubectl rollout status deployment/task18 -n ns-observe
+```
+
+**Verify:**
+
+```bash
+kubectl get deploy task18 -n ns-observe   # READY: 2/2
+```
+</details>
+
+**Cleanup:** `kubectl delete deploy task18 -n ns-observe`
+
+---
+
 ## Self-scoring rubric
 
-After your 120 minutes are up:
+After your 150 minutes are up:
 
 | Section | Tasks | Max pts |
 |---------|-------|---------|
-| Application Design & Build | 1, 2, 3 | 20 |
+| Application Design & Build | 1, 2, 3, 16 | 27 |
 | Application Deployment | 4, 5, 6 | 20 |
 | Env, Config & Security | 7, 8, 9, 10 | 25 |
 | Services & Networking | 11, 12, 13 | 20 |
-| Observability & Maintenance | 14, 15 | 15 |
-| **Total** | | **100** |
+| Observability & Maintenance | 14, 15, 17, 18 | 28 |
+| **Total** | | **120** |
 
 For each task, award:
 
@@ -533,13 +771,13 @@ For each task, award:
 - **Half points** if you peeked at the answer once or your verify required minor manual fix-ups.
 - **Zero** if you skipped or the verify failed.
 
-**Pass mark: 66 / 100.** If you scored less, identify the weakest section, drill the corresponding source file (1–4 or 6), and re-attempt this paper after a 24-hour gap.
+**Pass mark: 79 / 120.** If you scored less, identify the weakest section, drill the corresponding source file (1–4 or 6), and re-attempt this paper after a 24-hour gap.
 
 ## Cleanup
 
 ```bash
-kubectl delete ns exam
-helm uninstall front -n exam 2>/dev/null
+kubectl delete ns ns-build ns-deploy ns-config ns-network ns-observe
+helm uninstall front -n ns-deploy 2>/dev/null
 ```
 
 ---
