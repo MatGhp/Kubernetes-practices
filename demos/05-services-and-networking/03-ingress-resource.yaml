@@ -349,8 +349,33 @@ spec:
 #   tls.crt — the certificate (PEM)
 #   tls.key — the private key (PEM)
 #
-# Create the Secret:
+# Step 1 — Generate a self-signed cert + private key with openssl:
+#
+#   openssl req -x509 -newkey rsa:2048 -nodes -days 365 \
+#     -keyout tls.key -out tls.crt \
+#     -subj "/CN=store.example.com" \
+#     -addext "subjectAltName=DNS:store.example.com"
+#
+#   Flag breakdown:
+#     req -x509          Generate a self-signed certificate (skips the CSR/CA step).
+#                        Without -x509 you'd get a CSR (signing request), not a cert.
+#     -newkey rsa:2048   Create a new RSA private key (2048-bit) alongside the cert.
+#     -nodes             No DES — do NOT encrypt the private key with a passphrase.
+#                        Required so the Ingress Controller can read it unattended.
+#     -days 365          Certificate validity period (1 year).
+#     -keyout tls.key    Write the private key to this file.
+#     -out    tls.crt    Write the certificate to this file.
+#     -subj "/CN=..."    Set the Common Name inline (skips the interactive prompt).
+#     -addext "SAN=..."  Add a Subject Alternative Name — modern TLS clients require
+#                        SAN; CN alone is no longer trusted by browsers/curl.
+#
+#   Result: two PEM files — tls.key (private key) and tls.crt (certificate).
+#
+# Step 2 — Load the files into a kubernetes.io/tls Secret:
 #   kubectl create secret tls tls-secret --cert=tls.crt --key=tls.key
+#
+#   This sets type=kubernetes.io/tls and stores the data under the exact keys
+#   "tls.crt" and "tls.key" — the names the Ingress Controller expects.
 #
 apiVersion: networking.k8s.io/v1
 kind: Ingress
