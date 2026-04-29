@@ -598,8 +598,8 @@ kubectl logs ambassador-demo -c ambassador --tail=3
 
 ### Drill 35b — Ambassador pattern (TCP proxy)
 **Budget:** 9 min
-**Task:** Namespace `default` already contains a Service named `redis` on port `6379`.
-Create a Pod named `cache-ambassador` with two containers:
+**Task:** Namespace `practice` already contains a Service named `redis` on port `6379`.
+Create a Pod named `cache-ambassador` in `practice` with two containers:
 - `app` — image `busybox`, runs: `while true; do nc -z 127.0.0.1 6379 && echo "$(date) redis reachable"; sleep 5; done`
 - `proxy` — image `nginx:1.27`, proxies `localhost:6379` → `redis:6379`
 
@@ -610,9 +610,10 @@ The `app` container must only reference `localhost` — not the `redis` Service 
 <details><summary>Answer</summary>
 
 ```bash
-# Pre-req: create the redis Service + Deployment so the proxy has something to forward to
-kubectl create deployment redis --image=redis:7 --port=6379
-kubectl expose deployment redis --port=6379
+# Pre-req: create the redis Deployment + Service in the practice namespace
+kubectl create deployment redis --image=redis:7 --port=6379 -n practice
+kubectl expose deployment redis --port=6379 -n practice
+kubectl wait --for=condition=available deploy/redis -n practice --timeout=60s
 ```
 
 ```yaml
@@ -621,13 +622,14 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: tcp-proxy-conf
+  namespace: practice
 data:
   nginx.conf: |
     events {}
     stream {
       server {
         listen 6379;
-        proxy_pass redis:6379;   # resolved inside the cluster via DNS
+        proxy_pass redis:6379;   # resolved via cluster DNS within the same namespace
       }
     }
 ---
@@ -635,6 +637,7 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: cache-ambassador
+  namespace: practice
 spec:
   restartPolicy: Never
   volumes:
