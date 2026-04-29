@@ -596,6 +596,90 @@ kubectl logs ambassador-demo -c ambassador --tail=3
 
 ---
 
+### Drill 35b — Ambassador pattern (TCP proxy)
+**Budget:** 9 min
+**Task:** Namespace `default` already contains a Service named `redis` on port `6379`.
+Create a Pod named `cache-ambassador` with two containers:
+- `app` — image `busybox`, runs: `while true; do nc -z 127.0.0.1 6379 && echo "$(date) redis reachable"; sleep 5; done`
+- `proxy` — image `nginx:1.27`, proxies `localhost:6379` → `redis:6379`
+
+The `app` container must only reference `localhost` — not the `redis` Service directly.
+
+> **Trap:** port 6379 is raw TCP, not HTTP. nginx's `http {}` block cannot proxy TCP — you need the `stream {}` block, and the config must replace `/etc/nginx/nginx.conf` entirely (not drop a file in `/etc/nginx/conf.d/`).
+
+<details><summary>Answer</summary>
+
+```bash
+# Pre-req: create the redis Service + Deployment so the proxy has something to forward to
+kubectl create deployment redis --image=redis:7 --port=6379
+kubectl expose deployment redis --port=6379
+```
+
+```yaml
+# cache-ambassador.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tcp-proxy-conf
+data:
+  nginx.conf: |
+    events {}
+    stream {
+      server {
+        listen 6379;
+        proxy_pass redis:6379;   # resolved inside the cluster via DNS
+      }
+    }
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: cache-ambassador
+spec:
+  restartPolicy: Never
+  volumes:
+    - name: cfg
+      configMap:
+        name: tcp-proxy-conf
+  containers:
+    - name: app
+      image: busybox
+      command:
+        - sh
+        - -c
+        - |
+          while true; do
+            nc -z 127.0.0.1 6379 && echo "$(date) redis reachable via localhost"
+            sleep 5
+          done
+    - name: proxy
+      image: nginx:1.27
+      volumeMounts:
+        - name: cfg
+          mountPath: /etc/nginx/nginx.conf   # replaces the whole file — required for stream {}
+          subPath: nginx.conf                # subPath so only this key is mounted as a file
+```
+
+```bash
+kubectl apply -f cache-ambassador.yaml
+```
+
+Verify:
+
+```bash
+kubectl logs cache-ambassador -c app --tail=5
+# → "redis reachable via localhost" every 5 s
+
+# Confirm the proxy is listening on 6379 inside the pod
+kubectl exec cache-ambassador -c proxy -- ss -tlnp | grep 6379
+```
+
+> **Why `subPath`?** Without it, the `volumeMount` would replace the entire `/etc/nginx/` directory with the ConfigMap, removing all other nginx files. `subPath: nginx.conf` mounts only that one key as a single file at the given path.
+
+</details>
+
+---
+
 ### Drill 36 — Adapter pattern
 **Budget:** 8 min
 **Task:** Pod `adapter-demo` where the **app** writes plain lines to `/var/log/app.log`, and an **adapter** container transforms each line into a structured JSON line and writes it to `/var/log/app.json`. Share logs via `emptyDir`.
