@@ -409,6 +409,7 @@ Map of every published [CKAD curriculum](https://github.com/cncf/curriculum) com
 | | Deployment strategies (blue-green, canary) | 4 (D38–39), 5 (T4) |
 | | Helm | 4 (D40), 5 (T5) |
 | | Kustomize | 4 (D41), 5 (T6) |
+| | Horizontal Pod Autoscaler (HPA) | 4 (D49b) — demo: [`demos/04-pod-design/08-hpa-definition.yaml`](../demos/04-pod-design/08-hpa-definition.yaml) |
 | **Env, Config & Security (25%)** | ConfigMaps, Secrets | 1 (D11–15), 5 (T7) |
 | | SecurityContext | 2 (D26–28), 5 (T8) |
 | | ServiceAccount, Role/RoleBinding | 2 (D29–30), 5 (T9) |

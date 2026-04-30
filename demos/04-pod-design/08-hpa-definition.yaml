@@ -1,0 +1,225 @@
+# =============================================================================
+# Kubernetes HorizontalPodAutoscaler (HPA) — Educational Reference
+# =============================================================================
+#
+# A HorizontalPodAutoscaler automatically adjusts the number of replicas of a
+# scalable workload (Deployment, StatefulSet, ReplicaSet, or any resource that
+# exposes the `scale` subresource) based on observed metrics — most commonly
+# CPU or memory utilisation, but also custom and external metrics.
+#
+# How it works:
+#   1. You create an HPA that points at a workload (`scaleTargetRef`).
+#   2. Every ~15s the controller queries the metrics API for current usage.
+#   3. It computes the desired replica count using the ratio formula:
+#
+#        desiredReplicas = ceil( currentReplicas * (currentMetric / targetMetric) )
+#
+#      Example: 4 Pods at 80% CPU, target 50%  →  ceil(4 * 80/50) = 7 Pods.
+#   4. The result is clamped to [minReplicas, maxReplicas] and applied via
+#      the `scale` subresource — the Deployment's ReplicaSet then reconciles.
+#
+#   HPA control loop:
+#
+#                ┌──────────────────────────┐
+#                │   metrics-server         │  scrapes kubelet every ~15s
+#                └────────────┬─────────────┘
+#                             │ metrics.k8s.io
+#                             ▼
+#       ┌─────────────────────────────────────┐
+#       │   HPA controller (kube-controller-  │  reads usage, computes ratio,
+#       │   manager, --horizontal-pod-        │  honours stabilization windows
+#       │   autoscaler-sync-period=15s)       │
+#       └────────────┬────────────────────────┘
+#                    │ updates .spec.replicas via /scale
+#                    ▼
+#               Deployment  ─►  ReplicaSet  ─►  Pods (scaled in/out)
+#
+# Key fields:
+#   ┌────────────────────┬───────────────────────────────────────────────────┐
+#   │ Field              │ Description                                       │
+#   ├────────────────────┼───────────────────────────────────────────────────┤
+#   │ scaleTargetRef     │ Workload to scale (apiVersion + kind + name)      │
+#   │ minReplicas        │ Lower bound (default: 1; can be 0 with feature gate)│
+#   │ maxReplicas        │ Upper bound (required, hard cap)                  │
+#   │ metrics[].type     │ Resource | Pods | Object | External | Container  │
+#   │ target.type        │ Utilization (% of requests) | AverageValue | Value│
+#   │ behavior.scaleUp   │ Tunes how fast we add Pods (policies + window)    │
+#   │ behavior.scaleDown │ Tunes how fast we remove Pods (default 5min wait) │
+#   └────────────────────┴───────────────────────────────────────────────────┘
+#
+# API versions:
+#   ┌────────────────────┬──────────────────────────────────────────────────┐
+#   │ autoscaling/v1     │ CPU utilisation only — `kubectl autoscale` emits │
+#   │                    │ this; OK for the CKAD imperative shortcut.       │
+#   │ autoscaling/v2     │ (Recommended) CPU + memory + custom + external,  │
+#   │                    │ plus `behavior` for scale-up/down tuning.        │
+#   └────────────────────┴──────────────────────────────────────────────────┘
+#
+# Imperative shortcut (CKAD-friendly):
+#   kubectl autoscale deployment api --min=2 --max=5 --cpu=70%
+#
+#   Note: `--cpu-percent=70` still works but is deprecated since kubectl 1.34.
+#   Use `--cpu=70%` for utilisation or `--cpu=500m` for an absolute target.
+#
+# Requirements:
+#   - The target Pod template MUST set CPU/memory `requests` for any Resource
+#     metric you reference. HPA computes utilisation as `usage / requests`,
+#     so without `requests` the HPA shows `<unknown>` and never scales.
+#   - metrics-server (or a custom metrics adapter) must be installed and
+#     Ready. On minikube:
+#         minikube -p ckad addons enable metrics-server
+#     See ../../CKAD/README.md §9.4 for the full troubleshooting checklist.
+#
+# Common gotchas:
+#   - `<unknown>` in TARGETS for the first ~30s after creating the HPA is
+#     normal — metrics-server needs at least one scrape interval.
+#   - `<unknown>` that NEVER goes away usually means: missing `requests`,
+#     metrics-server not Ready, or no Pods matching the selector.
+#   - Default scale-down stabilization is 5 minutes — don't expect Pods to
+#     disappear immediately after load drops.
+#
+# See also:
+#   - 03-roulling-updates-rollback-deployment.yaml for the underlying
+#     Deployment/ReplicaSet machinery the HPA drives.
+#   - ../../CKAD/drills-3-imperative.md   Drill 9  (imperative HPA)
+#   - ../../CKAD/drills-4-modern.md       Drill 49b (declarative HPA)
+#
+# =============================================================================
+
+
+# -----------------------------------------------------------------------------
+# 1. Target Deployment — `api`
+# -----------------------------------------------------------------------------
+# A plain web Deployment. The CPU `requests` value is the most important
+# field on this whole page: the HPA divides observed CPU usage by it to
+# compute utilisation. Without `requests`, the HPA target shows `<unknown>`
+# and no scaling ever happens.
+#
+#   utilisation % = (sum of pod CPU usage) / (sum of pod CPU requests) * 100
+# -----------------------------------------------------------------------------
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  labels:
+    app: api
+spec:
+  replicas: 2                      # Initial replica count (HPA will adjust)
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27         # Specific tag — never use :latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "100m"           # ← HPA computes utilisation against THIS
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+
+---
+
+# -----------------------------------------------------------------------------
+# 2. Simple HPA — CPU utilisation only (CKAD baseline)
+# -----------------------------------------------------------------------------
+# Equivalent to:
+#   kubectl autoscale deployment api --min=2 --max=5 --cpu=70%
+#
+# Reads as: "Keep average CPU usage across all `api` Pods at ~70% of their
+# requested CPU. Scale between 2 and 5 replicas to make that true."
+#
+#   At 100m requests, 70% target ⇒ scale up when avg pod CPU > 70m sustained.
+# -----------------------------------------------------------------------------
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api
+  labels:
+    app: api
+spec:
+  scaleTargetRef:                   # What to scale
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization         # % of requests (NOT % of limits)
+          averageUtilization: 70
+
+---
+
+# -----------------------------------------------------------------------------
+# 3. Multi-metric HPA — CPU + memory, with scale behavior tuning
+# -----------------------------------------------------------------------------
+# When multiple metrics are listed, the HPA computes a desired replica count
+# for EACH metric and then takes the MAXIMUM. The Deployment scales to the
+# largest required value (i.e., whichever metric is hottest wins).
+#
+# `behavior` lets you tame thrashing on bursty workloads:
+#   - scaleUp:   react fast (short stabilization, aggressive policies)
+#   - scaleDown: react slowly (long stabilization, conservative policies)
+#
+#   Without `behavior` the defaults are:
+#     scaleUp.stabilizationWindowSeconds   = 0    (immediate)
+#     scaleDown.stabilizationWindowSeconds = 300  (5 minutes)
+# -----------------------------------------------------------------------------
+
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-multi
+  labels:
+    app: api
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+    - type: Resource                # Metric 1 — CPU utilisation
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+    - type: Resource                # Metric 2 — memory utilisation
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30        # Wait 30s of sustained pressure
+      policies:
+        - type: Percent
+          value: 100                        # Allow doubling Pod count...
+          periodSeconds: 60                 # ...at most once per minute
+        - type: Pods
+          value: 4                          # OR add up to 4 Pods at a time
+          periodSeconds: 60
+      selectPolicy: Max                     # Use whichever policy adds more
+    scaleDown:
+      stabilizationWindowSeconds: 300       # 5min cooldown before removing Pods
+      policies:
+        - type: Percent
+          value: 50                         # Remove at most 50% per minute
+          periodSeconds: 60

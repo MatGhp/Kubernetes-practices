@@ -205,7 +205,7 @@ kubectl get svc web-np
 <details><summary>Answer</summary>
 
 ```bash
-kubectl autoscale deployment api --min=2 --max=5 --cpu-percent=70
+kubectl autoscale deployment api --min=2 --max=5 --cpu=70%
 ```
 
 Verify:
@@ -214,6 +214,8 @@ Verify:
 kubectl get hpa api
 ```
 
+> `--cpu=70%` replaces the deprecated `--cpu-percent=70` flag (deprecation warning added in kubectl 1.34). Use `--cpu=500m` instead for an absolute milliCPU target.
+>
 > `kubectl top` and the HPA need `metrics-server`. See [README §9.4](README.md#94-metrics-server--kubectl-top-drill-33).
 </details>
 

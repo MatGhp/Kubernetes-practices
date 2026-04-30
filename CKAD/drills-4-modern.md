@@ -1,6 +1,6 @@
 # CKAD Mock Lab — Modern Drills (Curriculum Gap Fillers)
 
-Follow-up to [`drills-1-core.md`](drills-1-core.md), [`drills-2-advanced.md`](drills-2-advanced.md), and [`drills-3-imperative.md`](drills-3-imperative.md). These 12 drills target topics on the **current** CKAD curriculum that none of the other three files exercise:
+Follow-up to [`drills-1-core.md`](drills-1-core.md), [`drills-2-advanced.md`](drills-2-advanced.md), and [`drills-3-imperative.md`](drills-3-imperative.md). These 13 drills target topics on the **current** CKAD curriculum that none of the other three files exercise:
 
 - **Deployment strategies** — blue-green, canary
 - **Packaging** — Helm install/upgrade/rollback, Kustomize overlays
@@ -10,6 +10,7 @@ Follow-up to [`drills-1-core.md`](drills-1-core.md), [`drills-2-advanced.md`](dr
 - **Custom Resources** — author a CRD and create an instance
 - **Resilience** — `PodDisruptionBudget`
 - **Modern debug** — `kubectl debug` ephemeral container
+- **Autoscaling** — `HorizontalPodAutoscaler` (`kubectl autoscale`)
 
 All scenarios are written from scratch against Kubernetes **1.34+** APIs (current supported branches: 1.34, 1.35, 1.36). Same drill format as part 2: set a timer, solve without peeking, then expand the answer. Every answer ends with a **Verify** block plus a per-drill **Cleanup** so you can reset the namespace between attempts.
 
@@ -36,6 +37,9 @@ helm version
 
 # kubectl debug drill — ephemeral containers GA since 1.25 (on by default)
 kubectl debug --help >/dev/null && echo "ok"
+
+# HPA drill — metrics-server is required for HPA to compute CPU utilisation
+minikube -p ckad addons enable metrics-server
 ```
 
 ---
@@ -653,10 +657,78 @@ kubectl get pod target-debug
 
 ---
 
+## Section H — Autoscaling
+
+### Drill 49b — Autoscale a Deployment with an HPA
+**Curriculum:** Application Deployment
+**Budget:** 2 min
+**Task:** A Deployment `api` already exists (image `nginx:1.27`, 2 replicas, with CPU `requests: 100m` set on the container — the HPA needs this). Create a HorizontalPodAutoscaler that keeps the Pod count between **2** and **5** and targets **70% CPU utilisation**. Reference: [`demos/04-pod-design/08-hpa-definition.yaml`](../demos/04-pod-design/08-hpa-definition.yaml).
+
+<details><summary>Answer</summary>
+
+Fastest path — imperative `kubectl autoscale`:
+
+```bash
+# Setup (only if `api` doesn't already exist)
+kubectl create deployment api --image=nginx:1.27 --replicas=2
+kubectl set resources deployment api --requests=cpu=100m,memory=64Mi
+
+# The actual answer
+kubectl autoscale deployment api --min=2 --max=5 --cpu=70%
+```
+
+> `--cpu=70%` replaces the deprecated `--cpu-percent=70` flag (deprecation message added in kubectl 1.34). Use `--cpu=500m` instead if the task asks for an absolute milliCPU target rather than a utilisation percentage.
+
+Equivalent declarative form (`autoscaling/v2`) — use this when the task asks you to write YAML, or when you need non-CPU metrics:
+
+```yaml
+# api-hpa.yaml
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata: { name: api }
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70
+```
+
+```bash
+kubectl apply -f api-hpa.yaml
+```
+
+Verify — `TARGETS` shows `<current>%/70%`, `MINPODS=2`, `MAXPODS=5`. The `<unknown>` you may see for the first ~30s is normal: metrics-server needs a scrape interval before the first values land.
+
+```bash
+kubectl get hpa api
+kubectl describe hpa api | sed -n '/Conditions/,/Events/p'
+kubectl top pod -l app=api
+```
+
+> **Gotchas:**
+> - HPA computes utilisation as `usage / requests`. **No CPU `requests` on the Pod → HPA stays `<unknown>` forever.** That's the #1 exam pitfall.
+> - HPA needs metrics-server. On minikube: `minikube -p ckad addons enable metrics-server`. On the real exam it is already running — see [README §9.4](README.md#94-metrics-server--kubectl-top-drill-33).
+> - `kubectl autoscale` always emits `autoscaling/v1`. The declarative form above uses `autoscaling/v2` so you can add memory or custom metrics later.
+
+</details>
+
+**Cleanup:** `kubectl delete hpa api; kubectl delete deploy api`
+
+---
+
 ## Cleanup (full reset)
 
 ```bash
-kubectl delete deploy,svc,pod,pvc,limitrange,pdb --all -n practice
+kubectl delete deploy,svc,pod,pvc,limitrange,pdb,hpa --all -n practice
 kubectl delete crd widgets.example.com 2>/dev/null
 helm uninstall web1 2>/dev/null
 # Remove the SSD label if you set it in Drill 42
@@ -679,6 +751,7 @@ Each drill maps to an explicit current-curriculum bullet that wasn't already exe
 | 47 | Env/Config/Security 25% | "Discover and use resources that extend Kubernetes (CRD, Operators)" |
 | 48 | Application Deployment 20% | Application robustness — PDB |
 | 49 | Observability 15% | "Utilize container logs / debug in Kubernetes" |
+| 49b | Application Deployment 20% | "Use the Horizontal Pod Autoscaler to dynamically scale a Deployment" |
 
 Skipped on purpose: standalone `ReplicaSet` (use Deployment), legacy SA-token Secrets (already covered correctly in [demos/01-configuration/12-2-service-account-secret-definition.yaml](../demos/01-configuration/12-2-service-account-secret-definition.yaml)), `PodSecurityPolicy` (removed in 1.25), deprecated probe fields.
 
@@ -686,4 +759,4 @@ Skipped on purpose: standalone `ReplicaSet` (use Deployment), legacy SA-token Se
 
 ## Scoring
 
-Same as the other drill files: 2 pts solved in budget without peeking, 1 pt solved within 1.5× or after one peek, 0 pts otherwise. Target **18+ / 24** across this set.
+Same as the other drill files: 2 pts solved in budget without peeking, 1 pt solved within 1.5× or after one peek, 0 pts otherwise. Target **20+ / 26** across this set.
