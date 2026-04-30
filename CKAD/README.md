@@ -101,6 +101,12 @@ Both scenarios use the same content.
 # Shorter alias
 alias k=kubectl
 
+# Verb shortcuts (compose with k:  k <verb>  ==  kubectl <verb>)
+alias kg='kubectl get'
+alias kd='kubectl describe'
+alias ka='kubectl apply -f'
+alias kv='kubectl apply --dry-run=server -f'   # server-side validate a manifest
+
 # Common flags
 export do="--dry-run=client -o yaml"   # generate YAML
 export now="--grace-period=0 --force"  # force delete
@@ -115,6 +121,16 @@ Usage:
 ```bash
 k run nginx --image=nginx $do > nginx.yaml
 k delete pod nginx $now
+```
+
+Typical generate → edit → validate → apply loop:
+
+```bash
+k create deployment api --image=nginx:1.27 $do > deployment.yaml
+vim deployment.yaml
+kv deployment.yaml          # server-side dry-run — catches schema + admission errors
+ka deployment.yaml          # apply for real
+kg deploy,pod               # confirm
 ```
 
 ### 2.2 Permanent setup on WSL / Ubuntu (practice machine)
@@ -132,6 +148,10 @@ cat >> ~/.bashrc <<'EOF'
 
 # ---- CKAD kubectl setup ----
 alias k=kubectl
+alias kg='kubectl get'
+alias kd='kubectl describe'
+alias ka='kubectl apply -f'
+alias kv='kubectl apply --dry-run=server -f'
 export do="--dry-run=client -o yaml"
 export now="--grace-period=0 --force"
 source <(kubectl completion bash)
@@ -612,6 +632,10 @@ The exam shell is fresh — aliases and completion are **not** preloaded, and no
 
 ```bash
 alias k=kubectl
+alias kg='kubectl get'
+alias kd='kubectl describe'
+alias ka='kubectl apply -f'
+alias kv='kubectl apply --dry-run=server -f'
 export do="--dry-run=client -o yaml"
 export now="--grace-period=0 --force"
 source <(kubectl completion bash)

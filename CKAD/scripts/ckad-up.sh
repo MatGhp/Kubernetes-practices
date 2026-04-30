@@ -92,12 +92,16 @@ kubectl get ns
 # ---------------------------------------------------------------------------
 set +euo pipefail
 alias k=kubectl
+alias kg='kubectl get'
+alias kd='kubectl describe'
+alias ka='kubectl apply -f'
+alias kv='kubectl apply --dry-run=server -f'
 export do="--dry-run=client -o yaml"
 export now="--grace-period=0 --force"
 # shellcheck disable=SC1090
 source <(kubectl completion bash)
 complete -F __start_kubectl k 2>/dev/null || true
-ok "shell helpers loaded (alias k, \$do, \$now, completion)"
+ok "shell helpers loaded (aliases k/kg/kd/ka/kv, \$do, \$now, completion)"
 
 # ---------------------------------------------------------------------------
 # 6. Summary
