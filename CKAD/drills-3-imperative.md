@@ -34,7 +34,7 @@ All answers assume the current namespace is `practice`.
 4. Only expand the answer after you finish **or** time runs out.
 5. Log each miss (`drill`, `mistake`, `faster command`).
 
-The point is **muscle memory**: when the exam asks for a Job that runs `perl -Mbignum...`, your fingers should already be typing `kubectl create job` before you re-read the question.
+The point is **muscle memory**: when the exam gives you a command to run inside a Job, your fingers should already be typing `kubectl create job` before you re-read the question.
 
 ---
 
@@ -392,19 +392,24 @@ kubectl get secret web-tls -o jsonpath='{.type}'
 
 ### Drill 17 — Create a Job
 **Budget:** 2 min
-**Task:** Job `pi` that prints 50 digits of pi using image `perl`.
+**Task:** Create a Job named `countdown` (image `busybox`) that runs `sh -c 'for i in 9 8 7 6 5 4 3 2 1 0; do echo $i; done'` with `backoffLimit: 4`.
 
 <details><summary>Answer</summary>
 
 ```bash
-kubectl create job pi --image=perl -- perl -Mbignum=bpi -wle 'print bpi(50)'
+kubectl create job countdown --image=busybox -o yaml --dry-run=client -- \
+  sh -c 'for i in 9 8 7 6 5 4 3 2 1 0; do echo $i; done' \
+  | sed 's/backoffLimit: 6/backoffLimit: 4/' \
+  | kubectl apply -f -
 ```
+
+> `kubectl create job` has no `--backoff-limit` flag — generate YAML with `--dry-run=client -o yaml`, patch `backoffLimit`, then pipe to `kubectl apply`.
 
 Verify:
 
 ```bash
-kubectl wait --for=condition=Complete job/pi --timeout=60s
-kubectl logs job/pi
+kubectl wait --for=condition=Complete job/countdown --timeout=60s
+kubectl logs job/countdown
 ```
 </details>
 
@@ -775,7 +780,7 @@ kubectl delete pod nginx busybox web --ignore-not-found
 kubectl delete svc api-svc web-np --ignore-not-found
 kubectl delete cm app-cfg app-env app-cfg-file --ignore-not-found
 kubectl delete secret db regcred web-tls --ignore-not-found
-kubectl delete job pi --ignore-not-found
+kubectl delete job countdown --ignore-not-found
 kubectl delete cronjob hello --ignore-not-found
 kubectl delete sa build-sa --ignore-not-found
 kubectl delete role pod-reader --ignore-not-found
