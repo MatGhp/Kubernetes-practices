@@ -208,6 +208,38 @@ helm history web1 | tail -3
 
 ---
 
+### Drill 40b — Helm: search, show values, install with a values file
+**Curriculum:** Application Deployment
+**Budget:** 3 min
+**Task:** Inspect the Bitnami nginx chart before installing: search the repo for nginx charts, dump the chart's default values to `my-values.yaml`, edit `replicaCount` to `3` and `service.type` to `ClusterIP`, then install a new release `web2` using that file. Confirm with `helm list`.
+
+<details><summary>Answer</summary>
+
+```bash
+helm search repo nginx             # shows bitnami/nginx, version, app version
+
+helm show values bitnami/nginx > my-values.yaml
+
+# Edit the two fields — use sed to keep it scriptable:
+sed -i 's/^replicaCount: .*/replicaCount: 3/' my-values.yaml
+sed -i 's/type: LoadBalancer/type: ClusterIP/' my-values.yaml
+
+helm install web2 bitnami/nginx -f my-values.yaml
+```
+
+Verify — `helm list` shows the release; the Deployment has 3 replicas:
+
+```bash
+helm list
+kubectl get deploy -l app.kubernetes.io/instance=web2 \
+  -o jsonpath='{.items[0].spec.replicas}{"\n"}'
+```
+</details>
+
+**Cleanup:** `helm uninstall web2; rm -f my-values.yaml`
+
+---
+
 ### Drill 41 — Kustomize overlay
 **Curriculum:** Application Deployment
 **Budget:** 3 min
@@ -277,6 +309,51 @@ kubectl get pod -l app=api,env=dev
 </details>
 
 **Cleanup:** `kubectl delete -k kustomize-drill/overlays/dev`
+
+---
+
+### Drill 41b — Kustomize: `images:` transformer + dry-preview with `kubectl kustomize`
+**Curriculum:** Application Deployment
+**Budget:** 2 min
+**Task:** Extend the `overlays/dev` kustomization from Drill 41 with an `images:` transformer that bumps the nginx tag from `1.27` → `1.28`. Before applying, use `kubectl kustomize` to preview the final rendered YAML — confirm the tag changed — then apply.
+
+<details><summary>Answer</summary>
+
+Add the `images:` block to `overlays/dev/kustomization.yaml`:
+
+```yaml
+# overlays/dev/kustomization.yaml (updated)
+resources:
+  - ../../base
+commonLabels:
+  env: dev
+patches:
+  - path: replicas-patch.yaml
+images:
+  - name: nginx
+    newTag: "1.28"
+```
+
+```bash
+# Preview only — renders to stdout, nothing is applied:
+kubectl kustomize kustomize-drill/overlays/dev
+
+# Spot-check the image tag in the preview:
+kubectl kustomize kustomize-drill/overlays/dev | grep "image:"
+
+# Apply once you're happy:
+kubectl apply -k kustomize-drill/overlays/dev
+```
+
+Verify — the Deployment's image tag is now `nginx:1.28`:
+
+```bash
+kubectl get deploy api \
+  -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
+```
+</details>
+
+**Cleanup:** `kubectl delete -k kustomize-drill/overlays/dev && rm -rf kustomize-drill/`
 
 ---
 
@@ -659,7 +736,7 @@ kubectl get pod target-debug
 
 ## Section H — Autoscaling
 
-### Drill 49b — Autoscale a Deployment with an HPA
+### Drill 50 — Autoscale a Deployment with an HPA
 **Curriculum:** Application Deployment
 **Budget:** 2 min
 **Task:** A Deployment `api` already exists (image `nginx:1.27`, 2 replicas, with CPU `requests: 100m` set on the container — the HPA needs this). Create a HorizontalPodAutoscaler that keeps the Pod count between **2** and **5** and targets **70% CPU utilisation**. Reference: [`demos/04-pod-design/08-hpa-definition.yaml`](../demos/04-pod-design/08-hpa-definition.yaml).
@@ -677,7 +754,7 @@ kubectl set resources deployment api --requests=cpu=100m,memory=64Mi
 kubectl autoscale deployment api --min=2 --max=5 --cpu=70%
 ```
 
-> `--cpu=70%` replaces the deprecated `--cpu-percent=70` flag (deprecation message added in kubectl 1.34). Use `--cpu=500m` instead if the task asks for an absolute milliCPU target rather than a utilisation percentage.
+> `--cpu` accepts a percentage (`70%`) for average utilisation or an absolute quantity (`500m`) for average milliCPU value. The older `--cpu-percent` flag (integer only) is still accepted but `--cpu` is the current canonical form.
 
 Equivalent declarative form (`autoscaling/v2`) — use this when the task asks you to write YAML, or when you need non-CPU metrics:
 
@@ -731,6 +808,9 @@ kubectl top pod -l app=api
 kubectl delete deploy,svc,pod,pvc,limitrange,pdb,hpa --all -n practice
 kubectl delete crd widgets.example.com 2>/dev/null
 helm uninstall web1 2>/dev/null
+helm uninstall web2 2>/dev/null
+rm -f my-values.yaml
+rm -rf kustomize-drill/
 # Remove the SSD label if you set it in Drill 42
 kubectl label node --all disktype- 2>/dev/null
 ```
@@ -744,14 +824,14 @@ Each drill maps to an explicit current-curriculum bullet that wasn't already exe
 | Drill | Domain | Curriculum bullet |
 |---|---|---|
 | 38, 39 | Application Deployment 20% | "Use Kubernetes primitives to implement common deployment strategies (e.g. blue/green or canary)" |
-| 40, 41 | Application Deployment 20% | "Use Helm and Kustomize to install an existing package" |
+| 40, 40b, 41, 41b | Application Deployment 20% | "Use Helm and Kustomize to install an existing package" |
 | 42–44 | Env/Config/Security 25% | Pod scheduling — node labels, affinity/anti-affinity |
 | 45 | Env/Config/Security 25% | Resource requirements, limits, and quotas |
 | 46 | Env/Config/Security 25% | Persistent and ephemeral volumes |
 | 47 | Env/Config/Security 25% | "Discover and use resources that extend Kubernetes (CRD, Operators)" |
 | 48 | Application Deployment 20% | Application robustness — PDB |
 | 49 | Observability 15% | "Utilize container logs / debug in Kubernetes" |
-| 49b | Application Deployment 20% | "Use the Horizontal Pod Autoscaler to dynamically scale a Deployment" |
+| 50 | Application Deployment 20% | "Use the Horizontal Pod Autoscaler to dynamically scale a Deployment" |
 
 Skipped on purpose: standalone `ReplicaSet` (use Deployment), legacy SA-token Secrets (already covered correctly in [demos/01-configuration/12-2-service-account-secret-definition.yaml](../demos/01-configuration/12-2-service-account-secret-definition.yaml)), `PodSecurityPolicy` (removed in 1.25), deprecated probe fields.
 
@@ -759,4 +839,4 @@ Skipped on purpose: standalone `ReplicaSet` (use Deployment), legacy SA-token Se
 
 ## Scoring
 
-Same as the other drill files: 2 pts solved in budget without peeking, 1 pt solved within 1.5× or after one peek, 0 pts otherwise. Target **20+ / 26** across this set.
+Same as the other drill files: 2 pts solved in budget without peeking, 1 pt solved within 1.5× or after one peek, 0 pts otherwise. Target **22+ / 30** across this set.
