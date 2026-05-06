@@ -108,8 +108,10 @@ kubectl patch svc web -p '{"spec":{"selector":{"app":"web","version":"green"}}}'
 Verify — endpoints should now point at green pods, and the served version banner from `nginx:1.28` should match:
 
 ```bash
-kubectl get endpoints web -o wide
-kubectl run curl --rm -it --image=curlimages/curl --restart=Never -- \
+# v1 Endpoints is deprecated in 1.33+; use EndpointSlice
+kubectl get endpointslice -l kubernetes.io/service-name=web
+# -i (no -t): keep stdout pipeable for grep
+kubectl run curl --rm -i --image=curlimages/curl --restart=Never -- \
   -sI http://web | grep -i server
 ```
 </details>
@@ -166,10 +168,15 @@ kubectl apply -f shop-canary.yaml
 Verify — endpoint count should be 10, and ~1/10 hits should land on canary:
 
 ```bash
-kubectl get endpoints shop -o jsonpath='{.subsets[*].addresses[*].ip}{"\n"}' | wc -w
-for i in $(seq 1 30); do
-  kubectl exec deploy/shop-stable -- curl -s -o /dev/null -w '%{http_code} %{remote_ip}\n' http://shop
-done | sort | uniq -c
+# v1 Endpoints is deprecated in 1.33+; use EndpointSlice instead
+kubectl get endpointslice -l kubernetes.io/service-name=shop \
+  -o jsonpath='{.items[*].endpoints[*].addresses[*]}' | wc -w
+
+# nginx images have no curl — spin up a throwaway curl pod to sample traffic
+kubectl run canary-test --rm -it --image=curlimages/curl --restart=Never -- \
+  sh -c 'for i in $(seq 1 30); do
+    curl -s -o /dev/null -w "%{http_code} %{remote_ip}\n" http://shop
+  done' | sort | uniq -c
 ```
 </details>
 
@@ -205,6 +212,8 @@ helm history web1 | tail -3
 </details>
 
 **Cleanup:** `helm uninstall web1`
+
+> **Heads-up:** Bitnami's free public image catalog at `docker.io/bitnami/*` was sunset in late 2025. Newer chart versions of `bitnami/nginx` may pull images that now require auth, leading to `ImagePullBackOff`. The drill still teaches the right Helm commands; if pods don't start locally, pin to a known-good chart version (e.g. `helm install web1 bitnami/nginx --version 18.x.x ...`) or substitute another public chart.
 
 ---
 
@@ -281,8 +290,10 @@ resources: [deployment.yaml]
 # overlays/dev/kustomization.yaml
 resources:
   - ../../base
-commonLabels:
-  env: dev
+# `commonLabels` is deprecated in Kustomize v5 (kubectl 1.27+); use `labels:` instead.
+labels:
+  - pairs: { env: dev }
+    includeSelectors: true
 patches:
   - path: replicas-patch.yaml
 ```
@@ -325,8 +336,9 @@ Add the `images:` block to `overlays/dev/kustomization.yaml`:
 # overlays/dev/kustomization.yaml (updated)
 resources:
   - ../../base
-commonLabels:
-  env: dev
+labels:
+  - pairs: { env: dev }
+    includeSelectors: true
 patches:
   - path: replicas-patch.yaml
 images:
@@ -523,15 +535,15 @@ kubectl get pod no-res -o jsonpath='{.spec.containers[0].resources}{"\n"}'
 ### Drill 46 — StorageClass + dynamic PVC with WaitForFirstConsumer
 **Curriculum:** Environment, Configuration & Security
 **Budget:** 3 min
-**Task:** Using the cluster's default `StorageClass`, create a PVC `data` (1 Gi, RWO). Note that with `volumeBindingMode: WaitForFirstConsumer` (the minikube default behaviour for the `standard` class) the PVC stays `Pending` until a Pod actually mounts it. Create a Pod that mounts it and observe binding.
+**Task:** Using the cluster's default `StorageClass`, create a PVC `data` (1 Gi, RWO), then a Pod that mounts it. Confirm the PVC ends up `Bound`. On real-world clusters with `volumeBindingMode: WaitForFirstConsumer` the PVC stays `Pending` until a consumer Pod is scheduled — minikube's `standard` class uses `Immediate` binding so it binds straight away, but the Pod-side flow is identical.
 
 <details><summary>Answer</summary>
 
 ```bash
-# Confirm a default StorageClass exists
+# Confirm a default StorageClass exists and check its binding mode
 kubectl get storageclass
 SC=$(kubectl get storageclass -o jsonpath='{.items[?(@.metadata.annotations.storageclass\.kubernetes\.io/is-default-class=="true")].metadata.name}')
-echo "default SC: $SC"
+kubectl get sc "$SC" -o jsonpath='{.volumeBindingMode}{"\n"}'   # Immediate or WaitForFirstConsumer
 ```
 
 ```yaml
@@ -562,10 +574,11 @@ spec:
 kubectl apply -f data.yaml
 ```
 
-Verify — PVC transitions `Pending` → `Bound` only once `writer` is scheduled:
+Verify — the PVC reaches `Bound` and the file written by the Pod survives in the volume. With `Immediate` binding the PVC binds at apply time; with `WaitForFirstConsumer` it binds only after `writer` is scheduled.
 
 ```bash
-kubectl get pvc data -w   # Ctrl-C once Bound
+kubectl get pvc data
+kubectl wait --for=condition=Ready pod/writer --timeout=60s
 kubectl exec writer -- cat /data/hello
 ```
 </details>
@@ -717,8 +730,9 @@ kubectl debug -it target --image=busybox --target=target -- sh
 `--copy-to` variant — non-destructive: makes a sibling pod with an added debug image and overridden command, leaving the original untouched. Useful when the target's `command` itself is broken (CrashLoopBackOff scenarios):
 
 ```bash
-kubectl debug target --copy-to=target-debug --image=busybox \
-  --share-processes -- sh -c "sleep 3600"
+# --container=debugger names the added container so we can target it with -c
+kubectl debug target --copy-to=target-debug --container=debugger \
+  --image=busybox --share-processes -- sh -c "sleep 3600"
 kubectl exec -it target-debug -c debugger -- sh
 ```
 
