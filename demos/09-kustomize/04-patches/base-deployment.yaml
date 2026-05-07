@@ -1,0 +1,41 @@
+# =============================================================================
+# Base Deployment — Patches Reference
+# =============================================================================
+#
+# This base deployment is intentionally minimal.
+# The kustomization.yaml in this directory applies multiple patches on top of
+# it to demonstrate Strategic Merge Patch and JSON Patch techniques.
+#
+# Compare the output of `kustomize build .` against this file to see exactly
+# what each patch in kustomization.yaml contributes.
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp
+  labels:
+    app: myapp
+    remove-me: "will-be-removed-by-json-patch"  # JSON patch 'remove' demo
+spec:
+  replicas: 1                  # SMP patch 1 will change this to 5
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+      - name: myapp
+        image: nginx:1.27.0    # SMP patch 2 / images transformer will update this
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi

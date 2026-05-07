@@ -1,0 +1,207 @@
+# =============================================================================
+# Kustomize — Patches Reference (04-patches)
+# =============================================================================
+#
+# Kustomize supports two patch formats for modifying resources:
+#
+#   1. Strategic Merge Patch (SMP)  — Kubernetes-native, most commonly used
+#   2. JSON Patch (RFC 6902)        — more precise, required for lists
+#
+# =============================================================================
+# 1. Strategic Merge Patch (SMP)
+# =============================================================================
+#
+#   - Format: a partial YAML fragment that looks like the target resource
+#   - Merge strategy: intelligently merges lists and maps based on Kubernetes
+#     schema knowledge (e.g., containers list is merged by name, not index)
+#   - Pros: readable, mirrors the resource structure, no positional index risk
+#   - Cons: only works with Kubernetes resources (schema-aware merge)
+#
+#   Example — override replicas without touching anything else:
+#
+#     patch: |-
+#       apiVersion: apps/v1
+#       kind: Deployment
+#       metadata:
+#         name: myapp
+#       spec:
+#         replicas: 5         ← only this field is changed; rest is inherited
+#
+# =============================================================================
+# 2. JSON Patch (RFC 6902)
+# =============================================================================
+#
+#   - Format: a list of operations: add, remove, replace, move, copy, test
+#   - Path: a JSON Pointer (e.g., /spec/replicas, /spec/containers/0/image)
+#   - Pros: surgical precision; works on any resource (no schema needed)
+#   - Cons: uses array indices (fragile if order changes); less readable
+#
+#   Operations:
+#   ┌─────────┬───────────────────────────────────────────────────┐
+#   │ op      │ description                                       │
+#   ├─────────┼───────────────────────────────────────────────────┤
+#   │ replace │ replaces the value at path                        │
+#   │ add     │ adds a key at path (or appends to array with -)   │
+#   │ remove  │ deletes the key at path                           │
+#   │ move    │ moves value from 'from' path to 'path'            │
+#   │ copy    │ copies value from 'from' path to 'path'           │
+#   │ test    │ asserts the value at path equals value (or fails) │
+#   └─────────┴───────────────────────────────────────────────────┘
+#
+#   JSON Pointer cheat-sheet:
+#   /spec/replicas                           → spec.replicas
+#   /spec/template/spec/containers/0/image  → first container's image
+#   /spec/template/spec/containers/-        → append to containers list
+#   /metadata/labels/app                    → label key 'app'
+#
+# =============================================================================
+# When to use each
+# =============================================================================
+#
+#   Use Strategic Merge Patch when:
+#     - Modifying scalar values (replicas, image, env values)
+#     - Adding/updating containers (matched by name, not index)
+#     - Modifying resources, probes, or env vars in a container
+#
+#   Use JSON Patch when:
+#     - Removing a specific item from a list by index
+#     - Targeting a resource that has no Kubernetes schema (CRDs)
+#     - You need the 'test' assertion operation
+#
+# =============================================================================
+# Inline patches vs patch files
+# =============================================================================
+#
+#   Inline (in kustomization.yaml):     Patch file (separate .yaml):
+#   ┌─────────────────────────────┐     ┌─────────────────────────────┐
+#   │ patches:                    │     │ patches:                    │
+#   │   - patch: |-               │     │   - path: my-patch.yaml     │
+#   │       apiVersion: apps/v1   │     │     target:                 │
+#   │       kind: Deployment      │     │       kind: Deployment      │
+#   │       metadata:             │     │       name: myapp           │
+#   │         name: myapp         │     └─────────────────────────────┘
+#   │       spec:                 │
+#   │         replicas: 5         │     my-patch.yaml:
+#   │     target:                 │     ┌─────────────────────────────┐
+#   │       kind: Deployment      │     │ apiVersion: apps/v1         │
+#   │       name: myapp           │     │ kind: Deployment            │
+#   └─────────────────────────────┘     │ metadata:                   │
+#                                       │   name: myapp               │
+#   Prefer inline for small patches.   │ spec:                       │
+#   Use files for complex patches.     │   replicas: 5               │
+#                                       └─────────────────────────────┘
+#
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - base-deployment.yaml
+
+# =============================================================================
+# Strategic Merge Patches — applied inline
+# =============================================================================
+patches:
+  # --- SMP 1: Scale replicas ------------------------------------------------
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: myapp
+      spec:
+        replicas: 5
+    target:
+      kind: Deployment
+      name: myapp
+
+  # --- SMP 2: Update a container image tag ---------------------------------
+  # You can also use the `images:` transformer for this (preferred),
+  # but a patch demonstrates the merge approach explicitly.
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: myapp
+      spec:
+        template:
+          spec:
+            containers:
+            - name: myapp                # Container matched by NAME, not index
+              image: nginx:1.28.0        # Override the image tag
+    target:
+      kind: Deployment
+      name: myapp
+
+  # --- SMP 3: Add an environment variable -----------------------------------
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: myapp
+      spec:
+        template:
+          spec:
+            containers:
+            - name: myapp
+              env:
+              - name: LOG_LEVEL
+                value: info
+    target:
+      kind: Deployment
+      name: myapp
+
+  # --- JSON Patch 1: Replace replicas using RFC 6902 -----------------------
+  # Functionally identical to SMP 1 above — shown for comparison.
+  # - patch: |-
+  #     - op: replace
+  #       path: /spec/replicas
+  #       value: 5
+  #   target:
+  #     kind: Deployment
+  #     name: myapp
+
+  # --- JSON Patch 2: Remove a label ----------------------------------------
+  # JSON Patch is needed to REMOVE a key — SMP alone cannot delete a field.
+  - patch: |-
+      - op: remove
+        path: /metadata/labels/remove-me
+    target:
+      kind: Deployment
+      name: myapp
+
+  # --- JSON Patch 3: Add a new annotation -----------------------------------
+  - patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          patched-by: kustomize
+          patch-type: json-rfc6902
+    target:
+      kind: Deployment
+      name: myapp
+
+# =============================================================================
+# Images transformer (alternative to image patch)
+# =============================================================================
+# Preferred approach for changing image tags — works across all containers
+# without writing a patch. Matches by image name, updates tag everywhere.
+images:
+  - name: nginx
+    newName: nginx              # Optional: rename the image repository
+    newTag: "1.28.0"            # Override the tag
+
+# =============================================================================
+# Commands
+# =============================================================================
+#
+# Preview the final merged YAML with all patches applied:
+#   cd demos/09-kustomize/04-patches
+#   kustomize build .
+#
+# Verify a specific field was patched (e.g., replicas):
+#   kustomize build . | grep 'replicas:'
+#
+# Apply:
+#   kubectl apply -k .
+# =============================================================================
