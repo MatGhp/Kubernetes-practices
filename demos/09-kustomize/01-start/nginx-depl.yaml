@@ -1,19 +1,47 @@
+# =============================================================================
+# Kustomize — Base Deployment (01-start)
+# =============================================================================
+#
+# This is the BASE Deployment manifest managed by Kustomize.
+# It defines the "desired state" for nginx without any environment-specific
+# configuration. Kustomize reads this file and overlays transformations
+# (labels, namePrefix, patches, image overrides) declared in kustomization.yaml.
+#
+# Important: this file should remain environment-agnostic.
+# Environment-specific differences (replicas, image tag, resource limits)
+# belong in overlays (see 03-overlays/) or patches (see 04-patches/).
+#
+# Best practice: avoid `image: nginx:latest` in production.
+#   - :latest is mutable — the same tag can point to different images over time.
+#   - Use a specific digest or semantic version (e.g., nginx:1.27.0) so
+#     deployments are reproducible and rollbacks are reliable.
+#   - Kustomize `images:` transformer in kustomization.yaml can pin tags
+#     without editing this base file directly.
+# =============================================================================
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: nginx-deployment
+  name: nginx-deployment       # Kustomize may prepend namePrefix to this
 spec:
-  replicas: 3
+  replicas: 3                  # Override per environment via patches or overlays
   selector:
     matchLabels:
-      app: nginx
+      app: nginx               # Must match template.metadata.labels below
   template:
     metadata:
       labels:
-        app: nginx
+        app: nginx             # Kustomize labels transformer injects extra labels here
     spec:
       containers:
       - name: nginx
-        image: nginx:latest
+        image: nginx:1.27.0    # Pin to a specific version — avoid :latest in base
         ports:
         - containerPort: 80
+        resources:             # Always set requests/limits to help the scheduler
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi

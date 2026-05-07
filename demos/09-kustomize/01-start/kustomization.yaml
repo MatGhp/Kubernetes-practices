@@ -1,50 +1,115 @@
+# =============================================================================
+# Kustomize — Educational Reference (01-start: Basic Kustomization)
+# =============================================================================
+#
+# What is Kustomize?
+#   Kustomize is a configuration management tool built into kubectl (v1.14+).
+#   It lets you customise raw Kubernetes YAML manifests without templates or
+#   a new language — you just write pure YAML and declare *transformations*
+#   (patches, labels, namePrefix, etc.) in a file called kustomization.yaml.
+#
+# Why Kustomize instead of copy-pasting YAML?
+#   ┌────────────────────┬──────────────────────────────────────────────────┐
+#   │ Problem            │ Kustomize solution                               │
+#   ├────────────────────┼──────────────────────────────────────────────────┤
+#   │ Duplicate YAML     │ Single base, multiple overlays                   │
+#   │ Per-env tweaks     │ Patches applied on top of the base               │
+#   │ Missing context    │ namePrefix/nameSuffix clarifies ownership         │
+#   │ Label drift        │ commonLabels / labels added to all resources      │
+#   │ Image tag sprawl   │ images transformer — change tags in one place     │
+#   └────────────────────┴──────────────────────────────────────────────────┘
+#
+# Kustomize vs Helm:
+#   ┌────────────────┬──────────────────────────────┬────────────────────────┐
+#   │                │ Kustomize                    │ Helm                   │
+#   ├────────────────┼──────────────────────────────┼────────────────────────┤
+#   │ Approach       │ Declarative patches / overlays│ Go templates + values  │
+#   │ Learning curve │ Low (pure YAML)              │ Medium (template syntax)│
+#   │ Templating     │ No (YAML only)               │ Yes (full Go templates) │
+#   │ Built into k8s │ Yes (kubectl -k)             │ No (separate CLI)      │
+#   │ Packaging      │ No (git URLs / directories)  │ Yes (versioned charts)  │
+#   │ Best for       │ Env-specific patches          │ Reusable packages       │
+#   └────────────────┴──────────────────────────────┴────────────────────────┘
+#
+# How kustomize build works:
+#
+#   kustomization.yaml              kustomize build .
+#   ┌─────────────────┐                    │
+#   │ resources:      │   reads base YAMLs │   applies transformers
+#   │  - nginx-depl   │──────────────────► │ ──────────────────────► merged YAML
+#   │  - nginx-service│                    │   (labels, namePrefix,
+#   │ labels: ...     │                    │    patches, images, …)
+#   └─────────────────┘                    │
+#
+# kustomization.yaml key fields:
+#
+#   resources:        List of YAML files (or directories) to include
+#   labels:           Labels (and optionally selectors) added to all resources
+#   commonLabels:     Shorthand — adds labels AND updates selectors/templates
+#   namePrefix:       Prepend a string to the name of every resource
+#   nameSuffix:       Append a string to the name of every resource
+#   namespace:        Set/override the namespace of all resources
+#   images:           Change container image names/tags without editing files
+#   configMapGenerator: Create ConfigMaps from files or literals
+#   secretGenerator:  Create Secrets from files or literals
+#   patches:          Strategic-merge or JSON-6902 patches to modify resources
+#   components:       Reusable units that bundle resources + patches
+#   bases:            (legacy) sub-directories; prefer resources: instead
+#
+# See also:
+#   - 02-multi-folder-structure/ : organize multiple services with sub-kustomizations
+#   - 03-overlays/               : base + per-environment overlays (dev/staging/prod)
+#   - 04-patches/                : strategic merge and JSON 6902 patch examples
+#
+# =============================================================================
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# kubernetes resources to be managed by kustomize
+# --- Resources ---------------------------------------------------------------
+# List every Kubernetes manifest that Kustomize should manage.
+# Paths are relative to this kustomization.yaml file.
 resources:
   - nginx-depl.yaml
   - nginx-service.yaml
 
-# Customizations that need to be made
+# --- Labels ------------------------------------------------------------------
+# Add labels to ALL resources declared in 'resources'.
+# includeSelectors: true  → also injects the label into Deployment selectors
+#                           and Pod template labels so Pods are still matched.
+# includeTemplates: true  → (default when includeSelectors is true) also injects
+#                           into Pod template metadata.
 labels:
   - includeSelectors: true
     pairs:
       company: IT-Consulting, Mojtaba-Ghanaat-Pisheh
 
-
-
-# sample commands
-# Navigate to the demos directory
-# cd c:\me\git\Kubernetes-practices\demos\
-# Run kustomize build on the 09-kustomize folder
-# kustomize build 09-kustomize/
-# Navigate to the kustomize directory
-# cd c:\me\git\Kubernetes-practices\demos\09-kustomize\
-# Run kustomize build on current directory
-# kustomize build .
-
-# to apply the build
-
-# kustomize build . | kubectl  apply -f -
-# service/nginx-loadbalancer-service created 
-# deployment.apps/nginx-deployment created service/nginx-loadbalancer-service created
-
-
-# or
-
-# kubectl apply -k .
-# service/nginx-loadbalancer-service created
-# deployment.apps/nginx-deployment created
-
-# delete resources
-
-# kustomize build . | kubectl delete -f -
-# service "nginx-loadbalancer-service" deleted
-# deployment.apps "nginx-deployment" deleted
-
-# or
-
-# kubectl delete -k .
-# service "nginx-loadbalancer-service" deleted
-# deployment.apps "nginx-deployment" deleted
+# =============================================================================
+# Commands
+# =============================================================================
+#
+# Preview the final merged YAML without applying (dry-run / inspect):
+#   kustomize build .
+#   kubectl kustomize .                       # equivalent (built-in)
+#
+# Apply all resources defined in this kustomization:
+#   kustomize build . | kubectl apply -f -
+#   kubectl apply -k .                        # shorthand — same result
+#
+# Delete all resources defined in this kustomization:
+#   kustomize build . | kubectl delete -f -
+#   kubectl delete -k .                       # shorthand — same result
+#
+# Run from a parent directory (pass the path):
+#   cd c:\me\git\Kubernetes-practices\demos
+#   kustomize build 09-kustomize\01-start
+#   kubectl apply -k 09-kustomize\01-start
+#
+# Expected output (apply):
+#   service/nginx-service created
+#   deployment.apps/nginx-deployment created
+#
+# Verify labels were injected:
+#   kubectl get deployment nginx-deployment -o yaml | grep company
+#   kubectl get service nginx-service -o yaml | grep company
+# =============================================================================

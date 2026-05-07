@@ -1,12 +1,32 @@
+# =============================================================================
+# Kustomize — Base Service (01-start)
+# =============================================================================
+#
+# This is the BASE Service manifest managed by Kustomize.
+# The selector (app: nginx) matches the labels on the Deployment's Pod template.
+#
+# Service types:
+#   ClusterIP    (default) — only reachable inside the cluster
+#   NodePort     — exposes on each node's IP at a static port (30000-32767)
+#   LoadBalancer — provisions an external load balancer (cloud providers)
+#   ExternalName — maps to an external DNS name (no proxying)
+#
+# When Kustomize applies the labels transformer with includeSelectors: true,
+# it also updates this Service's selector so it still routes traffic correctly
+# to the Pods after the extra labels are injected.
+# =============================================================================
+
 apiVersion: v1
 kind: Service
 metadata:
-  name: nginx-service
+  name: nginx-service          # Kustomize may prepend namePrefix to this
 spec:
+  type: ClusterIP              # Use LoadBalancer for cloud, NodePort for local testing
   selector:
-    app: nginx
+    app: nginx                 # Must match Pod template labels in nginx-depl.yaml
   ports:
-  - protocol: TCP
-    port: 80
-    targetPort: 80
+  - name: http
+    protocol: TCP
+    port: 80                   # Port exposed by the Service (cluster-internal)
+    targetPort: 80             # Port the container listens on
 
