@@ -1,0 +1,45 @@
+# =============================================================================
+# Kustomize — Staging Overlay (overlays/staging/)
+# =============================================================================
+#
+# The staging overlay mirrors production as closely as possible for pre-release
+# validation, but with fewer replicas to reduce cost.
+#
+# Staging differences from base:
+#   - namespace: staging
+#   - replicas: 2             (HA but cheaper than prod)
+#   - image tag: rc (release candidate / pre-release)
+#   - nameSuffix: -staging
+#
+# Apply staging overlay:
+#   kubectl apply -k overlays/staging/
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+namespace: staging
+
+nameSuffix: -staging
+
+commonLabels:
+  environment: staging
+
+images:
+  - name: nginx
+    newTag: "1.27.0"           # Staging tracks the release candidate
+
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: myapp
+      spec:
+        replicas: 2            # Staging: 2 replicas for basic HA testing
+    target:
+      kind: Deployment
+      name: myapp

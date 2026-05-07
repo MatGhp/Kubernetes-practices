@@ -1,0 +1,23 @@
+# =============================================================================
+# Base Service — Overlay Pattern
+# =============================================================================
+#
+# ClusterIP in the base is the safest default.
+# The prod overlay could patch this to LoadBalancer if external access is needed.
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: myapp-service
+  labels:
+    app: myapp
+spec:
+  type: ClusterIP
+  selector:
+    app: myapp
+  ports:
+  - name: http
+    protocol: TCP
+    port: 80
+    targetPort: 80

@@ -1,0 +1,49 @@
+# =============================================================================
+# Base Deployment — Overlay Pattern
+# =============================================================================
+#
+# This is the canonical, environment-agnostic deployment definition.
+# Values here represent sensible defaults that overlays can override.
+#
+# What overlays typically change:
+#   - replicas        (fewer in dev, more in prod)
+#   - image tag       (dev uses :latest or a branch tag; prod uses a release tag)
+#   - resource limits (relaxed in dev, strict in prod)
+#   - namespace       (dev / staging / prod)
+#   - environment variables (debug flags, feature toggles)
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: myapp                  # Overlays can add nameSuffix or namePrefix
+  labels:
+    app: myapp
+spec:
+  replicas: 3                  # Base default; overlays patch this per environment
+  selector:
+    matchLabels:
+      app: myapp
+  template:
+    metadata:
+      labels:
+        app: myapp
+    spec:
+      containers:
+      - name: myapp
+        image: nginx:1.27.0    # Overlays use `images:` transformer to change the tag
+        ports:
+        - containerPort: 80
+        resources:             # Base resources; prod overlay increases limits
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 250m
+            memory: 256Mi
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 10

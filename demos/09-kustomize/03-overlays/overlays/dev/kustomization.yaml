@@ -1,0 +1,55 @@
+# =============================================================================
+# Kustomize — Development Overlay (overlays/dev/)
+# =============================================================================
+#
+# The dev overlay extends the base with development-specific settings:
+#   - namespace: dev          (isolated from staging and prod)
+#   - replicas: 1             (save resources in dev)
+#   - image tag: edge         (track the latest build from main branch)
+#   - nameSuffix: -dev        (prevents name collisions if deployed to same cluster)
+#
+# Apply dev overlay only:
+#   kubectl apply -k overlays/dev/
+#
+# Preview without applying:
+#   kustomize build overlays/dev/
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Reference the base — the overlay INHERITS all base resources and transformers
+resources:
+  - ../../base
+
+# Override namespace for all resources in this overlay
+namespace: dev
+
+# Append '-dev' to every resource name to avoid collisions in shared clusters
+nameSuffix: -dev
+
+# Override common labels for this environment
+commonLabels:
+  environment: dev
+
+# --- Images transformer ------------------------------------------------------
+# Change the image tag without editing the base deployment.yaml.
+# This is the recommended way to pin different image versions per environment.
+images:
+  - name: nginx                # matches the image name in base/deployment.yaml
+    newTag: "1.27.0"           # dev tracks a specific build; use 'edge' for bleeding-edge
+
+# --- Patches -----------------------------------------------------------------
+# Strategic merge patch to override replicas.
+# Only the 'replicas' field is changed; everything else is inherited from base.
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: myapp            # Must match the name in base/deployment.yaml
+      spec:
+        replicas: 1            # Dev: 1 replica to save cluster resources
+    target:
+      kind: Deployment
+      name: myapp

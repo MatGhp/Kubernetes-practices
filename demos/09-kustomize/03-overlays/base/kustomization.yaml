@@ -1,0 +1,56 @@
+# =============================================================================
+# Kustomize — Overlays Pattern (03-overlays: Base)
+# =============================================================================
+#
+# The overlay pattern is the most important Kustomize concept.
+# It separates WHAT you deploy (the base) from HOW it varies per environment.
+#
+# Structure:
+#
+#   03-overlays/
+#   ├── base/                        ← shared, environment-agnostic manifests
+#   │   ├── kustomization.yaml       ← THIS FILE
+#   │   ├── deployment.yaml
+#   │   └── service.yaml
+#   └── overlays/
+#       ├── dev/                     ← development environment
+#       │   ├── kustomization.yaml   ← references ../base, applies dev patches
+#       │   └── patch-replicas.yaml  ← dev: 1 replica
+#       ├── staging/                 ← staging / QA environment
+#       │   ├── kustomization.yaml
+#       │   └── patch-replicas.yaml  ← staging: 2 replicas
+#       └── prod/                    ← production environment
+#           ├── kustomization.yaml
+#           ├── patch-replicas.yaml  ← prod: 5 replicas
+#           └── patch-resources.yaml ← prod: higher CPU/memory limits
+#
+# How overlays work:
+#
+#   base/                   overlay/dev/             Final output
+#   ┌─────────────────┐     ┌─────────────────┐     ┌─────────────────────┐
+#   │ replicas: 3     │  +  │ replicas: 1     │  =  │ replicas: 1  (dev)  │
+#   │ image: 1.27.0   │     │ namespace: dev  │     │ image: 1.27.0       │
+#   │ port: 80        │     └─────────────────┘     │ namespace: dev      │
+#   └─────────────────┘                             └─────────────────────┘
+#
+#   base/                   overlay/prod/            Final output
+#   ┌─────────────────┐     ┌─────────────────────┐  ┌───────────────────────┐
+#   │ replicas: 3     │  +  │ replicas: 5         │= │ replicas: 5  (prod)  │
+#   │ image: 1.27.0   │     │ cpu limit: 1000m    │  │ image: 1.27.0         │
+#   │ port: 80        │     │ namespace: prod     │  │ cpu limit: 1000m      │
+#   └─────────────────┘     └─────────────────────┘  └───────────────────────┘
+#
+# Overlay vs duplication:
+#   WITHOUT overlays: you maintain 3 copies of deployment.yaml (drift risk)
+#   WITH overlays:    one base file, each overlay is just a small diff (patch)
+#
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# The base declares the shared resources.
+# Overlays reference this directory and layer their patches on top.
+resources:
+  - deployment.yaml
+  - service.yaml

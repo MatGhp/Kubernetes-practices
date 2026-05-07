@@ -1,0 +1,72 @@
+# =============================================================================
+# Kustomize — Production Overlay (overlays/prod/)
+# =============================================================================
+#
+# The prod overlay applies the most stringent settings:
+#   - namespace: prod
+#   - replicas: 5             (high availability)
+#   - image tag: pinned to an exact release version
+#   - higher CPU/memory limits
+#   - Service type: LoadBalancer (external access)
+#
+# Apply prod overlay:
+#   kubectl apply -k overlays/prod/
+#
+# Production best practices enforced here:
+#   - Pinned image tag (never :latest in prod — ensures reproducibility)
+#   - Strict resource limits (prevents noisy-neighbour CPU/memory hogging)
+#   - Liveness + readiness probes (already in base)
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+namespace: prod
+
+commonLabels:
+  environment: prod
+
+images:
+  - name: nginx
+    newTag: "1.27.0"           # Prod: always pin to an exact, tested release tag
+
+# Two patches applied to the prod Deployment:
+#   1. Scale to 5 replicas
+#   2. Increase CPU/memory limits for production load
+patches:
+  - patch: |-
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: myapp
+      spec:
+        replicas: 5
+        template:
+          spec:
+            containers:
+            - name: myapp
+              resources:
+                requests:
+                  cpu: 200m
+                  memory: 256Mi
+                limits:
+                  cpu: 1000m    # 1 full CPU core in prod
+                  memory: 512Mi
+    target:
+      kind: Deployment
+      name: myapp
+
+  # Patch the Service to LoadBalancer so prod gets an external IP
+  - patch: |-
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: myapp-service
+      spec:
+        type: LoadBalancer
+    target:
+      kind: Service
+      name: myapp-service
