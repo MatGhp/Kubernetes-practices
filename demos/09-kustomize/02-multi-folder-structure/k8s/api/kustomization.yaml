@@ -1,8 +1,20 @@
+# =============================================================================
+# Kustomize — API Component (api/)
+# =============================================================================
+#
+# This sub-kustomization manages the REST API resources.
+# It can be deployed independently or composed by the root kustomization.
+#
+# Filter API resources after deploy:
+#   kubectl get all -l component=api
+# =============================================================================
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# API component kustomization
-resources: []
+resources:
+  - api-depl.yaml
+  - api-service.yaml
 
 commonLabels:
   component: api

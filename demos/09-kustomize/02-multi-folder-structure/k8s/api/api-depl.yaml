@@ -1,0 +1,54 @@
+# =============================================================================
+# REST API Deployment — API Component
+# =============================================================================
+#
+# This Deployment represents a generic REST API service.
+# It connects to the database via the db-service DNS name.
+#
+# After the root kustomization applies namePrefix: myapp-,
+# the DB service is reachable at: myapp-db-service:5432
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api                    # Root kustomization will prefix this: myapp-api
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+      - name: api
+        image: nginx:1.27.0    # Replace with your actual API image
+        ports:
+        - containerPort: 8080
+        env:
+        - name: DB_HOST
+          value: myapp-db-service   # Matches the prefixed Service name
+        - name: DB_PORT
+          value: "5432"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 256Mi
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 15
+          periodSeconds: 20

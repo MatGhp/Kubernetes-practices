@@ -1,8 +1,20 @@
+# =============================================================================
+# Kustomize — Cache Component (cache/)
+# =============================================================================
+#
+# This sub-kustomization manages the Redis cache resources.
+# It can be deployed independently or composed by the root kustomization.
+#
+# Filter cache resources after deploy:
+#   kubectl get all -l component=cache
+# =============================================================================
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Cache component kustomization
-resources: []
+resources:
+  - cache-depl.yaml
+  - cache-service.yaml
 
 commonLabels:
   component: cache

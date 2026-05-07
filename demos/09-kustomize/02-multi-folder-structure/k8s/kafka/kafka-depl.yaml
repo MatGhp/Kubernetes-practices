@@ -1,0 +1,54 @@
+# =============================================================================
+# Kafka Deployment — Messaging Component
+# =============================================================================
+#
+# Apache Kafka is a distributed event streaming platform.
+# In production, Kafka requires ZooKeeper (or KRaft mode in Kafka 3.x+)
+# and persistent storage. This demo uses a simplified single-broker setup.
+#
+# For production Kafka on Kubernetes, consider:
+#   - Strimzi operator (https://strimzi.io/) for full Kafka lifecycle management
+#   - Confluent Operator
+#   - Using StatefulSet + PersistentVolumeClaims for data durability
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka                  # Root kustomization will prefix this: myapp-kafka
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+      - name: kafka
+        image: bitnami/kafka:3.6   # Bitnami image includes KRaft mode (no ZooKeeper)
+        ports:
+        - containerPort: 9092      # Client connections
+        - containerPort: 9093      # Controller (KRaft mode)
+        env:
+        - name: KAFKA_CFG_NODE_ID
+          value: "0"
+        - name: KAFKA_CFG_PROCESS_ROLES
+          value: broker,controller
+        - name: KAFKA_CFG_LISTENERS
+          value: PLAINTEXT://:9092,CONTROLLER://:9093
+        - name: KAFKA_CFG_ADVERTISED_LISTENERS
+          value: PLAINTEXT://myapp-kafka-service:9092
+        - name: KAFKA_CFG_CONTROLLER_QUORUM_VOTERS
+          value: 0@myapp-kafka-service:9093
+        - name: KAFKA_CFG_CONTROLLER_LISTENER_NAMES
+          value: CONTROLLER
+        resources:
+          requests:
+            cpu: 200m
+            memory: 512Mi
+          limits:
+            cpu: 1000m
+            memory: 1Gi

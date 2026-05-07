@@ -1,11 +1,24 @@
+# =============================================================================
+# PostgreSQL Service — Database Component
+# =============================================================================
+#
+# ClusterIP (default) exposes the database only inside the cluster.
+# Other Pods (e.g., the API) connect using the DNS name:
+#   <service-name>.<namespace>.svc.cluster.local:5432
+# After namePrefix is applied by the root kustomization, this becomes:
+#   myapp-db-service.<namespace>.svc.cluster.local
+# =============================================================================
+
 apiVersion: v1
 kind: Service
 metadata:
-  name: db-service
+  name: db-service             # Root kustomization will prefix this: myapp-db-service
 spec:
+  type: ClusterIP              # Internal only — databases should never be exposed externally
   selector:
-    app: db
+    app: db                    # Routes traffic to Pods with label app=db
   ports:
-  - protocol: TCP
+  - name: postgres
+    protocol: TCP
     port: 5432
     targetPort: 5432

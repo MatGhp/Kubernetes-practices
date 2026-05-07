@@ -1,10 +1,24 @@
+# =============================================================================
+# Kustomize — Database Component (db/)
+# =============================================================================
+#
+# This sub-kustomization manages the PostgreSQL database resources.
+# It can be deployed independently (kubectl apply -k db/) or composed by
+# the parent kustomization.yaml in the root k8s/ directory.
+#
+# Component label 'component: database' is applied to all resources here,
+# allowing you to filter just DB resources:
+#   kubectl get all -l component=database
+# =============================================================================
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Database component kustomization
 resources:
   - db-depl.yaml
   - db-service.yaml
 
+# Labels applied only to resources in this sub-kustomization.
+# The parent kustomization will add its own labels on top.
 commonLabels:
   component: database

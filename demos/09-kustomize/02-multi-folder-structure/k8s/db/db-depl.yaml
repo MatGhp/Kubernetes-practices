@@ -1,9 +1,25 @@
+# =============================================================================
+# PostgreSQL Deployment — Database Component
+# =============================================================================
+#
+# IMPORTANT: This is a simplified demo deployment.
+# In production, use a StatefulSet (not a Deployment) for databases because:
+#   - StatefulSets provide stable, unique Pod names (postgres-0, postgres-1)
+#   - Pods get stable network identities via a Headless Service
+#   - PersistentVolumeClaims are retained when a Pod is rescheduled
+#
+# Also in production:
+#   - Never store passwords in plain-text env vars — use a Secret and
+#     reference it via secretKeyRef (see 01-configuration/09-2-pod-secret.yaml)
+#   - Mount a PersistentVolume to /var/lib/postgresql/data to survive pod restarts
+# =============================================================================
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: db
+  name: db                     # Root kustomization will prefix this: myapp-db
 spec:
-  replicas: 1
+  replicas: 1                  # Databases are typically single-instance in demos
   selector:
     matchLabels:
       app: db
@@ -14,13 +30,25 @@ spec:
     spec:
       containers:
       - name: postgres
-        image: postgres:13
+        image: postgres:15      # Use a specific tag, not :latest
         env:
         - name: POSTGRES_DB
           value: myapp
         - name: POSTGRES_USER
           value: user
         - name: POSTGRES_PASSWORD
-          value: password
+          value: password        # Demo only — use a Secret in production
         ports:
         - containerPort: 5432
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        readinessProbe:          # Only route traffic once Postgres is ready
+          exec:
+            command: ["pg_isready", "-U", "user", "-d", "myapp"]
+          initialDelaySeconds: 10
+          periodSeconds: 5

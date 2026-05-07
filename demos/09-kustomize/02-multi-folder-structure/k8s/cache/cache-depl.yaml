@@ -1,0 +1,41 @@
+# =============================================================================
+# Redis Deployment — Cache Component
+# =============================================================================
+#
+# Redis is used as an in-memory cache / session store.
+# Like the database, a StatefulSet is more appropriate for Redis in production
+# because Redis primary-replica setups need stable network identities.
+# This demo uses a Deployment for simplicity.
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cache                  # Root kustomization will prefix this: myapp-cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cache
+  template:
+    metadata:
+      labels:
+        app: cache
+    spec:
+      containers:
+      - name: redis
+        image: redis:7.2        # Pin to a specific version
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            cpu: 50m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+        readinessProbe:
+          exec:
+            command: ["redis-cli", "ping"]
+          initialDelaySeconds: 5
+          periodSeconds: 5

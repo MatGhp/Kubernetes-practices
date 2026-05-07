@@ -1,21 +1,100 @@
+# =============================================================================
+# Kustomize — Multi-Folder Structure (02-multi-folder-structure)
+# =============================================================================
+#
+# This example demonstrates organising a microservices application into
+# separate sub-directories, each with its own kustomization.yaml.
+# The root kustomization.yaml ties them together as a single deployable unit.
+#
+# Why split into sub-directories?
+#   - Each team/service owns its manifests independently
+#   - Sub-kustomizations can be deployed individually during development
+#   - The root kustomization composes everything for a full-stack deployment
+#   - Shared transformations (namePrefix, commonLabels) are applied once here
+#
+# Application being deployed:
+#
+#   ┌──────────────────────────────────────────────────────────────────┐
+#   │                     myapp (root kustomization)                   │
+#   │                                                                  │
+#   │   ┌──────────┐   ┌──────────┐   ┌──────────┐   ┌──────────┐   │
+#   │   │   api/   │   │   db/    │   │  cache/  │   │  kafka/  │   │
+#   │   │(REST API)│   │(Postgres)│   │  (Redis) │   │(Messaging│   │
+#   │   └──────────┘   └──────────┘   └──────────┘   └──────────┘   │
+#   └──────────────────────────────────────────────────────────────────┘
+#
+# Directory structure:
+#
+#   k8s/
+#   ├── kustomization.yaml      ← THIS FILE: root, composes all components
+#   ├── api/
+#   │   ├── kustomization.yaml  ← api component (deployment + service)
+#   │   ├── api-depl.yaml
+#   │   └── api-service.yaml
+#   ├── db/
+#   │   ├── kustomization.yaml  ← db component (deployment + service)
+#   │   ├── db-depl.yaml
+#   │   └── db-service.yaml
+#   ├── cache/
+#   │   ├── kustomization.yaml  ← cache component (deployment + service)
+#   │   ├── cache-depl.yaml
+#   │   └── cache-service.yaml
+#   └── kafka/
+#       ├── kustomization.yaml  ← kafka component (deployment + service)
+#       ├── kafka-depl.yaml
+#       └── kafka-service.yaml
+#
+# How transformers compose across sub-kustomizations:
+#   1. Each sub-kustomization applies its own component labels.
+#   2. The root kustomization then applies namePrefix and commonLabels on top
+#      of the already-merged resources from all sub-kustomizations.
+#   3. The final output contains BOTH the component label AND the root labels.
+#
+# =============================================================================
+
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-# Main kustomization that references all components
+# --- Resources ---------------------------------------------------------------
+# Each sub-directory is a separate kustomization. Kustomize will recursively
+# process the kustomization.yaml inside each directory and merge the results.
 resources:
   - api/
   - db/
   - cache/
   - kafka/
 
+# --- Name prefix -------------------------------------------------------------
+# Prepend 'myapp-' to the name of every resource from all sub-kustomizations.
+# db-depl → myapp-db-depl, api-service → myapp-api-service, etc.
 namePrefix: myapp-
+
+# --- Common labels -----------------------------------------------------------
+# Add these labels to ALL resources (and their Pod selectors/templates).
+# Useful for cost allocation, monitoring grouping, and kubectl filtering:
+#   kubectl get all -l app=myapp
 commonLabels:
   app: myapp
   version: v1.0.0
 
-
-# kustomize build . | kubectl apply -f -
-
-# or 
-
-# kubectl apply -k . 
+# =============================================================================
+# Commands
+# =============================================================================
+#
+# Preview all resources from all sub-kustomizations combined:
+#   cd demos/09-kustomize/02-multi-folder-structure/k8s
+#   kustomize build .
+#
+# Apply the full stack:
+#   kubectl apply -k .
+#
+# Apply a single component (e.g., only the database):
+#   kubectl apply -k db/
+#
+# Delete the full stack:
+#   kubectl delete -k .
+#
+# Filter by label after deploy:
+#   kubectl get all -l app=myapp
+#   kubectl get all -l component=database
+# =============================================================================
