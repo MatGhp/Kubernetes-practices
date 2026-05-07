@@ -1,0 +1,295 @@
+# =============================================================================
+# Kustomize — Built-in Transformers Reference (05-transformers)
+# =============================================================================
+#
+# A transformer is a built-in Kustomize function that modifies resources
+# AFTER they are loaded from `resources:` and BEFORE the final YAML is output.
+# You declare them directly in kustomization.yaml — no scripting required.
+#
+# Processing pipeline:
+#
+#   resources:                   transformers                    output
+#   ┌──────────────────┐        ┌──────────────────────────┐   ┌───────────┐
+#   │ base-deployment  │──────► │ 1. namespace              │──►│ merged,   │
+#   │ base-service     │        │ 2. namePrefix/nameSuffix  │   │ patched,  │
+#   │ (raw YAML)       │        │ 3. labels / annotations   │   │ final     │
+#   └──────────────────┘        │ 4. images                 │   │ YAML      │
+#                               │ 5. replicas               │   └───────────┘
+#                               │ 6. patches (SMP / JSON)   │
+#                               └──────────────────────────┘
+#
+# Transformers vs Patches:
+#   ┌────────────────────┬─────────────────────────────┬──────────────────────┐
+#   │                    │ Transformer                 │ Patch (SMP/JSON)     │
+#   ├────────────────────┼─────────────────────────────┼──────────────────────┤
+#   │ What it does       │ Applies a well-known change │ Arbitrary YAML edit  │
+#   │                    │ to ALL resources at once     │ targeted at one Kind │
+#   │ Syntax             │ Top-level key in             │ `patches:` list      │
+#   │                    │ kustomization.yaml           │                      │
+#   │ Scope              │ All resources (unless        │ Filtered by target   │
+#   │                    │ resource-type limited)       │ (kind/name/namespace)│
+#   │ Use when           │ Consistent cross-cutting     │ Surgical, per-       │
+#   │                    │ changes (env, ownership)     │ resource overrides   │
+#   └────────────────────┴─────────────────────────────┴──────────────────────┘
+#
+# =============================================================================
+# Transformer catalogue
+# =============================================================================
+#
+# ┌──────────────────────┬──────────────────────────────────────────────────┐
+# │ Transformer field    │ What it does                                     │
+# ├──────────────────────┼──────────────────────────────────────────────────┤
+# │ namespace            │ Sets metadata.namespace on every resource        │
+# │ namePrefix           │ Prepends a string to metadata.name               │
+# │ nameSuffix           │ Appends a string to metadata.name                │
+# │ labels               │ Adds labels + optionally updates selectors       │
+# │ commonLabels         │ Shorthand: labels + selectors + template labels  │
+# │ annotations          │ Adds annotations to every resource               │
+# │ images               │ Overrides image name / tag / digest              │
+# │ replicas             │ Changes spec.replicas by Deployment name         │
+# │ configMapGenerator   │ Creates ConfigMap from literals / files / envs   │
+# │ secretGenerator      │ Creates Secret from literals / files / envs      │
+# └──────────────────────┴──────────────────────────────────────────────────┘
+#
+# =============================================================================
+# 1. namespace
+# =============================================================================
+#
+#   Sets metadata.namespace on ALL resources in one line.
+#   Also updates roleBinding subjects and other namespace-aware references.
+#
+#   namespace: demo-transformers
+#
+#   ► Use in overlays to pin resources to a specific namespace per environment.
+#   ► Does NOT create the Namespace object — apply `kubectl create ns` first.
+#
+# =============================================================================
+# 2. namePrefix / nameSuffix
+# =============================================================================
+#
+#   Prepend / append a string to metadata.name of every resource.
+#   Kustomize is smart: it also updates cross-references such as
+#   Service selectors, roleBinding references, and volumeClaimTemplates.
+#
+#   namePrefix: demo-         → "webapp" becomes "demo-webapp"
+#   nameSuffix: -v2           → "webapp" becomes "webapp-v2"
+#   combined:                 → "webapp" becomes "demo-webapp-v2"
+#
+#   ► Use in overlays so dev/staging/prod resources don't collide in one cluster.
+#   ► Use in the root kustomization of a multi-service stack for ownership clarity.
+#
+# =============================================================================
+# 3. labels  (preferred over legacy commonLabels)
+# =============================================================================
+#
+#   Adds labels to all resources.
+#   includeSelectors: true  → also injects into Deployment.spec.selector and
+#                             Pod template labels so Pods are still matched.
+#   includeTemplates: true  → only applies to the Pod template (subset of above).
+#
+#   labels:
+#     - pairs:
+#         app.kubernetes.io/part-of: my-system
+#         environment: demo
+#       includeSelectors: false    # safe default: DO NOT update selectors here
+#
+#   CAUTION: setting includeSelectors: true on an EXISTING Deployment changes
+#   its immutable selector and will require delete + re-apply.  Set it to true
+#   only on first-time apply or in fresh clusters.
+#
+# =============================================================================
+# 4. annotations
+# =============================================================================
+#
+#   Same behaviour as labels but for annotations.
+#   Annotations are not used by selectors, so no includeSelectors concern.
+#
+#   commonAnnotations:
+#     managed-by: kustomize
+#     team: platform
+#
+# =============================================================================
+# 5. images
+# =============================================================================
+#
+#   Override the image name, tag, or digest of containers/initContainers
+#   across ALL resources — without editing the base YAML files.
+#
+#   images:
+#     - name: nginx             # matches any container whose image starts with "nginx"
+#       newTag: 1.27.1          # only changes the tag; name stays "nginx"
+#     - name: nginx
+#       newName: my-registry/nginx   # changes the registry/name too
+#       newTag: 1.27.1
+#     - name: nginx
+#       digest: sha256:abc123…  # pin to an immutable digest (most secure)
+#
+#   ► Prefer `images:` over patching the image field in base YAML.
+#   ► Use in CI/CD to inject the freshly-built image tag without touching source.
+#
+# =============================================================================
+# 6. replicas
+# =============================================================================
+#
+#   Override spec.replicas by resource name — no patch file required.
+#
+#   replicas:
+#     - name: webapp            # matches Deployment/StatefulSet named "webapp"
+#       count: 3
+#
+#   ► Use in overlays: base has count: 1 (cheap); prod overlay sets count: 5.
+#   ► Works with Deployments, StatefulSets, and ReplicaSets.
+#   ► IMPORTANT: if you also use `commonLabels:`, the selector change may
+#     conflict with an in-place replica update on an existing Deployment.
+#
+# =============================================================================
+# 7. configMapGenerator
+# =============================================================================
+#
+#   Generates a ConfigMap and automatically appends a content-hash suffix to
+#   its name (e.g., webapp-config-7f8d4b2).  Any Deployment that references
+#   the ConfigMap is also updated by Kustomize, triggering a rolling restart
+#   whenever the config changes — without manual `kubectl rollout restart`.
+#
+#   configMapGenerator:
+#     - name: webapp-config
+#       literals:
+#         - LOG_LEVEL=info
+#         - APP_ENV=demo
+#       # files:
+#       #   - config/app.properties     # file content as a single key
+#       # envs:
+#       #   - config/.env               # KEY=VALUE pairs become separate keys
+#
+#   ► Combine with `generatorOptions.disableNameSuffixHash: true` if you need a
+#     stable name (e.g., the ConfigMap is referenced by an external system).
+#
+# =============================================================================
+# 8. secretGenerator
+# =============================================================================
+#
+#   Same as configMapGenerator but creates a Secret (base64-encoded).
+#   NEVER commit real secret values to Git — use a secrets manager or
+#   sealed-secrets / external-secrets instead.  This example uses placeholders.
+#
+#   secretGenerator:
+#     - name: webapp-secret
+#       literals:
+#         - DB_PASSWORD=REPLACE_ME    # ← replace with vault injection in CI/CD
+#       type: Opaque
+#
+# =============================================================================
+# Commands
+# =============================================================================
+#
+#   Preview rendered output (dry-run):
+#     kubectl kustomize demos/09-kustomize/05-transformers
+#
+#   Apply to cluster (requires the namespace to exist first):
+#     kubectl create namespace demo-transformers --dry-run=client -o yaml | kubectl apply -f -
+#     kubectl apply -k demos/09-kustomize/05-transformers
+#
+#   Verify transformer effects on a specific field:
+#     kubectl kustomize demos/09-kustomize/05-transformers | grep -E "name:|namespace:|image:|replicas:"
+#
+#   Delete all resources:
+#     kubectl delete -k demos/09-kustomize/05-transformers
+#
+# See also:
+#   - 01-start/          : first Kustomize example, labels transformer intro
+#   - 03-overlays/       : namespace + namePrefix + images in overlay context
+#   - 04-patches/        : SMP / JSON patches for targeted per-resource edits
+#
+# =============================================================================
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# --- Resources ---------------------------------------------------------------
+resources:
+  - base-deployment.yaml
+  - base-service.yaml
+
+# =============================================================================
+# Transformer 1 — namespace
+# =============================================================================
+# Injects metadata.namespace: demo-transformers into every resource.
+namespace: demo-transformers
+
+# =============================================================================
+# Transformer 2 — namePrefix
+# =============================================================================
+# "webapp" becomes "demo-webapp" in both resources.
+# The Service selector is also updated so it still matches the Deployment Pods.
+namePrefix: demo-
+
+# =============================================================================
+# Transformer 3 — labels
+# =============================================================================
+# Adds labels to metadata.labels on every resource.
+# includeSelectors: false keeps the Deployment selector immutable-safe.
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: demo-system
+      app.kubernetes.io/managed-by: kustomize
+      environment: demo
+    includeSelectors: false   # do not update Deployment.spec.selector
+
+# =============================================================================
+# Transformer 4 — commonAnnotations  (annotations shorthand)
+# =============================================================================
+# Adds annotations to metadata.annotations on every resource.
+commonAnnotations:
+  docs: "https://github.com/MatGhp/Kubernetes-practices/tree/main/demos/09-kustomize/05-transformers"
+  team: platform
+
+# =============================================================================
+# Transformer 5 — images
+# =============================================================================
+# Changes the image tag of any container whose image name is "nginx".
+# The base YAML keeps "nginx:1.27.0"; this bumps it to 1.27.1 without editing
+# the base file.  Swap newTag for `digest:` to pin to an immutable hash.
+images:
+  - name: nginx
+    newTag: "1.27.1"          # overrides the tag; image name stays "nginx"
+
+# =============================================================================
+# Transformer 6 — replicas
+# =============================================================================
+# Sets spec.replicas on the named Deployment (after namePrefix is applied the
+# full name is "demo-webapp", but Kustomize matches the original base name).
+replicas:
+  - name: webapp              # matches base name (before namePrefix)
+    count: 2
+
+# =============================================================================
+# Transformer 7 — configMapGenerator
+# =============================================================================
+# Generates a ConfigMap with a content-hash suffix in its name.
+# A Deployment referencing this ConfigMap is also updated automatically,
+# triggering a rolling restart on config change.
+configMapGenerator:
+  - name: webapp-config
+    literals:
+      - LOG_LEVEL=info
+      - APP_ENV=demo
+      - MAX_CONNECTIONS=50
+
+# =============================================================================
+# Transformer 8 — secretGenerator
+# =============================================================================
+# Generates a Secret.  Use REPLACE_ME placeholders here; inject real values
+# via CI/CD environment variables, Vault, or External Secrets Operator.
+secretGenerator:
+  - name: webapp-secret
+    literals:
+      - DB_PASSWORD=REPLACE_ME    # ← never commit real secrets to Git
+    type: Opaque
+
+# --- Generator options -------------------------------------------------------
+# Remove this block if you WANT the content-hash suffix (recommended default).
+# Uncomment to get stable names (required when external systems reference them).
+# generatorOptions:
+#   disableNameSuffixHash: true
+#   labels:
+#     generated-by: kustomize

@@ -1,0 +1,45 @@
+# =============================================================================
+# Base Deployment — used by 05-transformers to demonstrate transformer effects
+# =============================================================================
+#
+# This is an intentionally plain Deployment.  Do NOT add env-specific values
+# here — that is the job of transformers in kustomization.yaml.
+#
+# What transformers will modify in this file:
+#   - labels / annotations:  added to metadata, spec.selector, Pod template
+#   - namePrefix / nameSuffix: prepended / appended to metadata.name
+#   - namespace:              injected into metadata.namespace
+#   - images:                 newTag replaces the tag in spec.containers[*].image
+#   - replicas:               replaces spec.replicas
+#
+# =============================================================================
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: webapp              # namePrefix/nameSuffix will modify this
+  # namespace intentionally absent — set by the `namespace:` transformer
+  labels:
+    app: webapp             # labels transformer adds on top of this
+spec:
+  replicas: 1               # replicas transformer overrides this
+  selector:
+    matchLabels:
+      app: webapp           # labels transformer injects additional selectors here
+  template:
+    metadata:
+      labels:
+        app: webapp         # labels transformer injects additional Pod labels here
+    spec:
+      containers:
+        - name: webapp
+          image: nginx:1.27.0   # images transformer changes newName / newTag
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi

@@ -1,0 +1,24 @@
+# =============================================================================
+# Base Service — used by 05-transformers
+# =============================================================================
+#
+# A plain ClusterIP service.  The transformers applied in kustomization.yaml
+# will inject namespace, labels, annotations, and namePrefix automatically.
+#
+# =============================================================================
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: webapp              # namePrefix/nameSuffix applied here too
+  # namespace set by `namespace:` transformer
+  labels:
+    app: webapp
+spec:
+  type: ClusterIP
+  selector:
+    app: webapp             # labels transformer injects matching selectors here
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80
