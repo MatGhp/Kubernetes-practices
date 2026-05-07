@@ -1,0 +1,96 @@
+# =============================================================================
+# Helm Values — Educational Reference
+# =============================================================================
+#
+# What are values?
+#   Values are the user-facing configuration layer of a chart. They are plain
+#   YAML (no Go templates) and supply sensible defaults that users can override
+#   at install or upgrade time — without modifying the chart templates.
+#
+# Values override hierarchy (lowest → highest priority):
+#   1. values.yaml in the chart          (THIS FILE — chart defaults)
+#   2. values.yaml of a parent chart     (if this chart is a sub-chart dependency)
+#   3. -f / --values <file>              (user-supplied override file)
+#   4. --set / --set-string / --set-json (inline CLI overrides — highest priority)
+#
+# Referencing values in templates:
+#   {{ .Values.replicaCount }}           → top-level scalar
+#   {{ .Values.image.repository }}       → nested key (dot-separated path)
+#   {{ .Values.ingress.hosts }}          → list value
+#
+# Scope rules:
+#   - Values are globally accessible via the root context (.) in all templates.
+#   - Inside a range loop or with block, use $ to reach the root context:
+#       {{ $.Values.image.repository }}
+#   - Sub-chart values are scoped: the parent's values.yaml must contain a key
+#     matching the sub-chart name; only those values are visible to the sub-chart.
+#
+# Override examples:
+#
+#   # Override with a file (recommended for environment-specific config):
+#   helm install my-nginx ./nginx-demo -f values-prod.yaml
+#
+#   # Override individual keys:
+#   helm install my-nginx ./nginx-demo \
+#     --set replicaCount=3 \
+#     --set image.tag=1.28.0 \
+#     --set-string service.type=LoadBalancer
+#
+#   # Override a list element:
+#   helm install my-nginx ./nginx-demo \
+#     --set ingress.hosts[0].host=myapp.example.com
+#
+#   # Inspect which values a live release is using:
+#   helm get values my-nginx               # user-supplied overrides only
+#   helm get values my-nginx --all         # all values including chart defaults
+#
+# =============================================================================
+
+replicaCount: 2               # number of Pod replicas in the Deployment
+
+image:
+  repository: nginx           # image name without tag
+  tag: "1.27.0"               # quoted to prevent YAML auto-parsing as float
+  pullPolicy: IfNotPresent    # Always | IfNotPresent | Never
+
+service:
+  type: ClusterIP             # ClusterIP | NodePort | LoadBalancer
+  port: 80                    # port exposed on the Service object
+  targetPort: 80              # port the nginx container actually listens on
+
+resources:
+  # Leaving requests/limits unset allows Pods on any node but risks OOM kills.
+  # Always set both in production to enable the scheduler and protect the node.
+  requests:
+    cpu: 100m                 # 100 millicores = 0.1 CPU core
+    memory: 128Mi
+  limits:
+    cpu: 250m
+    memory: 256Mi
+
+# Liveness probe — Kubernetes restarts the container if this consistently fails
+livenessProbe:
+  path: /                     # HTTP GET path
+  initialDelaySeconds: 10     # wait before first probe (allow container to start)
+  periodSeconds: 15
+
+# Readiness probe — traffic is only routed to the Pod once this passes
+readinessProbe:
+  path: /
+  initialDelaySeconds: 5
+  periodSeconds: 10
+
+# Optional labels added to every resource managed by this chart
+commonLabels: {}
+# commonLabels:
+#   environment: staging
+#   team: platform
+
+# Optional node selector — constrain Pods to nodes with matching labels
+nodeSelector: {}
+
+# Optional tolerations — allow scheduling on tainted nodes
+tolerations: []
+
+# Optional affinity rules — advanced scheduling preferences / requirements
+affinity: {}

@@ -1,0 +1,133 @@
+# =============================================================================
+# Helm Deployment Template — Educational Reference
+# =============================================================================
+#
+# What is a Helm template?
+#   A Helm template is a Kubernetes manifest augmented with Go template
+#   directives enclosed in {{ }} delimiters. During `helm install` or
+#   `helm template`, Helm renders each file in templates/ by substituting
+#   all expressions with real values, producing plain Kubernetes YAML.
+#
+# Built-in objects (available in every template):
+#   .Values                  → merged values (values.yaml + user overrides)
+#   .Release.Name            → the release name given at `helm install <name>`
+#   .Release.Namespace       → target namespace
+#   .Release.IsInstall       → true on first install
+#   .Release.IsUpgrade       → true on upgrade
+#   .Chart.Name              → chart name from Chart.yaml
+#   .Chart.Version           → chart version from Chart.yaml
+#   .Chart.AppVersion        → appVersion from Chart.yaml
+#   .Capabilities.KubeVersion.GitVersion → cluster Kubernetes version string
+#
+# Key Go template syntax:
+#   {{ .Values.image.repository }}           → output a value
+#   {{- ... -}}                              → trim whitespace left / right
+#   {{ if .Values.feature.enabled }} … {{ end }}
+#   {{ range .Values.someList }} … {{ end }}
+#   {{ include "nginx-demo.labels" . }}      → call a named template (_helpers.tpl)
+#
+# Useful Sprig functions (subset):
+#   quote / squote             → wrap in double / single quotes
+#   default <fallback> <val>   → return val, or fallback if val is empty
+#   required <msg> <val>       → fail rendering if val is empty
+#   upper / lower              → string case conversion
+#   toYaml <dict>              → serialise a map or list to YAML text
+#   nindent <n>                → add a leading newline + indent each line n spaces
+#   indent <n>                 → indent each line n spaces (no leading newline)
+#   b64enc / b64dec            → base64 encode/decode
+#
+# Named templates — defined in templates/_helpers.tpl, called with include:
+#   {{ include "nginx-demo.fullname" . }}    → release-prefixed resource name
+#   {{ include "nginx-demo.labels" . }}      → standard Helm label block
+#   {{ include "nginx-demo.selectorLabels" . }} → matchLabels subset
+#
+# See also:
+#   - 01-chart-basics/Chart.yaml  for overall chart concepts and CLI cheatsheet
+#   - 01-chart-basics/values.yaml for the values this template references
+#   - 02-templates/service.yaml   for the Service template
+#
+# =============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Release.Name }}-nginx           # prefix with release name to avoid collisions
+  namespace: {{ .Release.Namespace }}       # namespace supplied at `helm install --namespace`
+  labels:
+    app: {{ .Chart.Name }}                  # chart name (nginx-demo)
+    release: {{ .Release.Name }}            # release name (e.g., my-nginx)
+    version: {{ .Chart.AppVersion | quote }} # appVersion quoted with the Sprig quote function
+spec:
+  replicas: {{ .Values.replicaCount }}      # sourced from values.yaml — default 2
+  selector:
+    matchLabels:
+      app: {{ .Chart.Name }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Chart.Name }}
+        release: {{ .Release.Name }}
+    spec:
+      containers:
+        - name: nginx
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          #         ↑ image name (nginx)           ↑ tag ("1.27.0") — both from values.yaml
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: {{ .Values.livenessProbe.path }}
+              port: http                    # references the named port above
+            initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.readinessProbe.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
+            periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+            # toYaml serialises the .Values.resources map to YAML text.
+            # nindent 12 adds a leading newline then indents each line 12 spaces,
+            # cleanly aligning it under "resources:" without a trailing blank line.
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}         # "." is now the nodeSelector map
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+# Render templates locally (no cluster required):
+#   helm template my-nginx ./nginx-demo
+#   helm template my-nginx ./nginx-demo --set replicaCount=3
+#
+# Dry-run (validates against the live cluster API):
+#   helm install my-nginx ./nginx-demo --dry-run --debug
+#
+# Lint the chart:
+#   helm lint ./nginx-demo
+#
+# Install:
+#   helm install my-nginx ./nginx-demo
+#
+# Upgrade (e.g., bump the image tag):
+#   helm upgrade my-nginx ./nginx-demo --set image.tag=1.28.0
+#
+# Inspect the rendered manifest of a live release:
+#   helm get manifest my-nginx
+#
+# Roll back to a previous revision:
+#   helm rollback my-nginx 1              # revert to revision 1
+#
+# Uninstall:
+#   helm uninstall my-nginx

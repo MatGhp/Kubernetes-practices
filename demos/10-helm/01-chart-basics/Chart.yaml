@@ -1,0 +1,116 @@
+# =============================================================================
+# Helm Chart — Educational Reference
+# =============================================================================
+#
+# What is Helm?
+#   Helm is the package manager for Kubernetes. It bundles related Kubernetes
+#   manifests into a "chart" — a reusable, versioned, and configurable unit.
+#   A chart can be installed multiple times as separate "releases" into the
+#   same or different clusters, each with its own isolated configuration.
+#
+# Key concepts:
+#   - Chart:      A package of Kubernetes resources (like an apt/yum package)
+#   - Release:    A running instance of a chart installed inside a cluster
+#   - Repository: A hosted collection of charts, referenced by URL
+#   - Revision:   An integer counter incremented on every helm upgrade
+#   - Values:     User-supplied configuration that customises chart templates
+#
+# Chart anatomy:
+#
+#   nginx-demo/                  ← chart root (directory name = chart name)
+#   ├── Chart.yaml               ← chart metadata          (THIS FILE)
+#   ├── values.yaml              ← default configuration values
+#   ├── templates/               ← Go-template Kubernetes manifests
+#   │   ├── deployment.yaml      ← Deployment template
+#   │   ├── service.yaml         ← Service template
+#   │   └── _helpers.tpl         ← named templates / partials (never rendered directly)
+#   ├── charts/                  ← sub-chart dependencies (nested charts)
+#   └── .helmignore              ← files excluded when packaging (like .gitignore)
+#
+# Chart types:
+#   - application : Rendered and installed into the cluster (default)
+#   - library     : Provides named templates only; NOT directly installable
+#
+# Helm architecture:
+#
+#   Developer          Helm CLI              Kubernetes API Server
+#      │                  │                          │
+#      │  helm install     │                          │
+#      │─────────────────►│                          │
+#      │                  │  1. Load chart + values  │
+#      │                  │  2. Render templates      │
+#      │                  │  3. POST manifests ──────►│
+#      │                  │                          │ 4. Create resources
+#      │                  │◄─────────────────────────│
+#      │◄─────────────────│  Release stored as Secret │
+#      │  release info     │  (revision history)       │
+#
+# Release lifecycle:
+#   helm install   → revision 1  (DEPLOYED)
+#   helm upgrade   → revision 2, 3, …  (DEPLOYED)
+#   helm rollback  → revision N+1 pointing to earlier config  (DEPLOYED)
+#   helm uninstall → all resources deleted, release record removed
+#
+# =============================================================================
+apiVersion: v2              # v2 = Helm 3 chart format (v1 was Helm 2; always use v2)
+name: nginx-demo            # chart name — must match the directory name exactly
+description: A demo nginx chart for Helm educational purposes
+type: application           # application (installable) or library (reusable templates only)
+version: 0.1.0              # Chart version — SemVer; bump on every chart change
+appVersion: "1.27.0"        # Version of the application inside (nginx image tag)
+                            # Quoted string prevents YAML auto-parsing as float
+
+# =============================================================================
+# Helm CLI Cheatsheet
+# =============================================================================
+#
+# --- Repository management ---
+#   helm repo add bitnami https://charts.bitnami.com/bitnami
+#   helm repo update                              # refresh local cache of all repos
+#   helm repo list
+#   helm search repo nginx                        # search added repos by keyword
+#   helm search hub nginx                         # search Artifact Hub (public index)
+#
+# --- Inspect a chart before installing ---
+#   helm show chart bitnami/nginx                 # show Chart.yaml
+#   helm show values bitnami/nginx                # show default values.yaml
+#   helm show all bitnami/nginx                   # show everything
+#
+# --- Install ---
+#   helm install <release-name> <chart> [flags]
+#
+#   helm install my-nginx ./nginx-demo            # local chart directory
+#   helm install my-nginx bitnami/nginx           # from a repo
+#   helm install my-nginx ./nginx-demo \
+#     --values values-prod.yaml \                 # override file (lower priority)
+#     --set image.tag=1.28.0 \                    # inline override (higher priority)
+#     --namespace prod --create-namespace         # target namespace (create if absent)
+#
+# --- Upgrade ---
+#   helm upgrade my-nginx ./nginx-demo            # upgrade with same values
+#   helm upgrade my-nginx ./nginx-demo --set image.tag=1.28.0
+#   helm upgrade --install my-nginx ./nginx-demo  # install if not present, upgrade if present
+#
+# --- Inspect a live release ---
+#   helm list                                     # all releases in current namespace
+#   helm list -A                                  # all namespaces
+#   helm status my-nginx                          # release status + notes
+#   helm get values my-nginx                      # user-supplied overrides only
+#   helm get values my-nginx --all                # all values including chart defaults
+#   helm get manifest my-nginx                    # rendered YAML that was applied
+#   helm history my-nginx                         # all revisions with status
+#
+# --- Rollback & uninstall ---
+#   helm rollback my-nginx 1                      # roll back to revision 1
+#   helm uninstall my-nginx                       # delete release + all resources
+#   helm uninstall my-nginx --keep-history        # delete resources but keep history
+#
+# --- Dry-run & local rendering ---
+#   helm install my-nginx ./nginx-demo --dry-run --debug    # simulate, shows rendered YAML
+#   helm template my-nginx ./nginx-demo                     # render locally (no cluster needed)
+#   helm template my-nginx ./nginx-demo --set replicaCount=3
+#   helm lint ./nginx-demo                                  # validate chart structure
+#
+# --- Packaging & publishing ---
+#   helm package ./nginx-demo                     # → nginx-demo-0.1.0.tgz
+#   helm push nginx-demo-0.1.0.tgz oci://myregistry.io/charts
