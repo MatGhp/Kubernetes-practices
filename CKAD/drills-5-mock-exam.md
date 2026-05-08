@@ -219,7 +219,8 @@ kubectl apply -f task4.yaml
 
 ```bash
 # EndpointSlice (non-deprecated, v1.33+)
-kubectl get endpointslices -l kubernetes.io/service-name=shop -o jsonpath='{range .items[*]}{.endpoints[*].addresses[*]}{"\n"}{end}' | wc -w   # 10
+kubectl get endpointslices -l kubernetes.io/service-name=shop \
+  -o go-template='{{range .items}}{{range .endpoints}}{{range .addresses}}{{.}}{{"\n"}}{{end}}{{end}}{{end}}' | wc -l   # 10
 ```
 </details>
 
@@ -227,16 +228,20 @@ kubectl get endpointslices -l kubernetes.io/service-name=shop -o jsonpath='{rang
 
 ### Task 5 — Helm release with override (6 pts, 5 min)
 
-Add the `bitnami` Helm repo. Install chart `nginx` as release `front` with `service.type=ClusterIP` and `replicaCount=2` in this namespace.
+In namespace `ns-deploy`, the Helm repo `bitnami` (`https://charts.bitnami.com/bitnami`) has been added for you. Install chart `bitnami/nginx` as release `front` with `replicaCount=2` and `service.type=ClusterIP`.
+
+> **Exam note:** Real CKAD Helm tasks always provide the repo URL (or pre-add the repo) and the exact chart name and `--set` values. You never have to remember third-party URLs.
 
 <details><summary>Answer</summary>
 
 ```bash
+# Repo is already added on the exam; included here so the drill is self-contained.
 helm repo add bitnami https://charts.bitnami.com/bitnami
 helm repo update
+
 helm install front bitnami/nginx \
-  --set service.type=ClusterIP \
   --set replicaCount=2 \
+  --set service.type=ClusterIP \
   -n ns-deploy
 ```
 
