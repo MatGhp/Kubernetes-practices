@@ -161,12 +161,65 @@ kubectl get svc api
 A Service `shop` selects `app=shop` (no version label). Provide a `shop-stable` Deployment (9 replicas, `nginx:1.27`, labels `app=shop,track=stable`) and a `shop-canary` Deployment (1 replica, `nginx:1.28`, labels `app=shop,track=canary`).
 
 <details><summary>Answer</summary>
-See the pattern in [drills-4-modern.md Drill 39](drills-4-modern.md#drill-39--canary-9-stable--1-canary-behind-one-service).
+
+```yaml
+# task4.yaml
+apiVersion: v1
+kind: Service
+metadata:
+  name: shop
+  namespace: ns-deploy
+spec:
+  selector:
+    app: shop          # matches both deployments; no version/track label
+  ports:
+    - port: 80
+      targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-stable
+  namespace: ns-deploy
+spec:
+  replicas: 9
+  selector:
+    matchLabels: { app: shop, track: stable }
+  template:
+    metadata:
+      labels: { app: shop, track: stable }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.27
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shop-canary
+  namespace: ns-deploy
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: shop, track: canary }
+  template:
+    metadata:
+      labels: { app: shop, track: canary }
+    spec:
+      containers:
+        - name: nginx
+          image: nginx:1.28
+```
+
+```bash
+kubectl apply -f task4.yaml
+```
 
 **Verify:**
 
 ```bash
-kubectl get endpoints shop -o jsonpath='{.subsets[*].addresses[*].ip}{"\n"}' | wc -w   # 10
+# EndpointSlice (non-deprecated, v1.33+)
+kubectl get endpointslices -l kubernetes.io/service-name=shop -o jsonpath='{range .items[*]}{.endpoints[*].addresses[*]}{"\n"}{end}' | wc -w   # 10
 ```
 </details>
 
