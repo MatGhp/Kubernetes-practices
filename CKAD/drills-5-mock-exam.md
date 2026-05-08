@@ -257,15 +257,73 @@ kubectl get deploy,svc -l app.kubernetes.io/instance=front
 
 ### Task 6 — Kustomize overlay (8 pts, 6 min)
 
-Given a base Deployment `web` with 1 replica of `nginx:1.27`, write an overlay `staging/` that bumps to 4 replicas and adds `commonLabels: {env: staging}`. Apply with `kubectl apply -k`.
+Given a base Deployment `web` with 1 replica of `nginx:1.27`, write a base + overlay structure under `task6/` so that `kubectl apply -k task6/overlays/staging` produces a Deployment with **4 replicas** and label `env=staging`.
 
 <details><summary>Answer</summary>
-See [drills-4-modern.md Drill 41](drills-4-modern.md#drill-41--kustomize-overlay).
+
+Layout:
+
+```
+task6/
+├── base/
+│   ├── deployment.yaml
+│   └── kustomization.yaml
+└── overlays/
+    └── staging/
+        ├── kustomization.yaml
+        └── replica-patch.yaml
+```
+
+```yaml
+# task6/base/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: web }
+spec:
+  replicas: 1
+  selector: { matchLabels: { app: web } }
+  template:
+    metadata: { labels: { app: web } }
+    spec:
+      containers:
+        - { name: nginx, image: nginx:1.27 }
+```
+
+```yaml
+# task6/base/kustomization.yaml
+resources: [deployment.yaml]
+```
+
+```yaml
+# task6/overlays/staging/kustomization.yaml
+resources: [../../base]
+labels:
+  - pairs: { env: staging }
+    includeSelectors: false
+patches:
+  - path: replica-patch.yaml
+    target: { kind: Deployment, name: web }
+```
+
+```yaml
+# task6/overlays/staging/replica-patch.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata: { name: web }
+spec:
+  replicas: 4
+```
+
+```bash
+kubectl apply -k task6/overlays/staging -n ns-deploy
+```
+
+> **Note:** `commonLabels` is deprecated in newer Kustomize; use `labels:` with `includeSelectors: false` so the new label isn't injected into the immutable `selector.matchLabels`.
 
 **Verify:**
 
 ```bash
-kubectl get deploy web -o jsonpath='{.spec.replicas} {.metadata.labels.env}{"\n"}'   # 4 staging
+kubectl get deploy web -n ns-deploy -o jsonpath='{.spec.replicas} {.metadata.labels.env}{"\n"}'   # 4 staging
 ```
 </details>
 
@@ -434,16 +492,58 @@ kubectl get netpol -n ns-config
 
 ### Task 11 — Path-based Ingress (8 pts, 6 min)
 
-Two Deployments (`web-a`, `web-b`, both `nginx:1.27`, 1 replica) and matching ClusterIP Services. Create Ingress `paths` so `/a` → `web-a`, `/b` → `web-b`. Use `pathType: Prefix`. Assume the cluster's default IngressClass.
+In namespace `ns-network`, two Deployments (`web-a`, `web-b`, both `nginx:1.27`, 1 replica) and matching ClusterIP Services on port 80 already exist. Create an Ingress named `paths` so that:
+
+- `/a` → Service `web-a` on port 80
+- `/b` → Service `web-b` on port 80
+
+Use `pathType: Prefix`. Use the cluster's default IngressClass.
 
 <details><summary>Answer</summary>
-See [drills-2-advanced.md Drill 31](drills-2-advanced.md#drill-31--path-based-ingress).
+
+First create the prerequisites (the real exam will have these pre-created):
+
+```bash
+kubectl -n ns-network create deploy web-a --image=nginx:1.27
+kubectl -n ns-network create deploy web-b --image=nginx:1.27
+kubectl -n ns-network expose deploy web-a --port=80
+kubectl -n ns-network expose deploy web-b --port=80
+```
+
+```yaml
+# task11.yaml
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: paths
+  namespace: ns-network
+spec:
+  rules:
+    - http:
+        paths:
+          - path: /a
+            pathType: Prefix
+            backend:
+              service:
+                name: web-a
+                port: { number: 80 }
+          - path: /b
+            pathType: Prefix
+            backend:
+              service:
+                name: web-b
+                port: { number: 80 }
+```
+
+```bash
+kubectl apply -f task11.yaml
+```
 
 **Verify:**
 
 ```bash
-kubectl get ingress paths
-kubectl describe ingress paths | grep -A3 "Host\|Path"
+kubectl get ingress paths -n ns-network
+kubectl describe ingress paths -n ns-network | grep -E 'Path|Backend'
 ```
 </details>
 
@@ -514,7 +614,7 @@ kill $PF
 
 ### Task 14 — Diagnose a CrashLooping Pod (8 pts, 7 min)
 
-Apply this manifest as-is, then **fix** it without deleting and recreating the Pod (use `kubectl edit`):
+Apply this manifest as-is, diagnose the failure, then fix it so the Pod reaches `Running`:
 
 ```yaml
 apiVersion: v1
@@ -546,14 +646,14 @@ kubectl get pod task14
 kubectl describe pod task14 | grep -A2 "Last State\|Reason\|Exit Code"
 kubectl logs task14 --previous
 
-# Fix in-place — Pod's `spec.containers[*].command` is mutable for non-running fields? No: most fields are immutable.
-# `kubectl edit pod task14` will reject. The expected workflow:
+# Fix — Pod's `spec.containers[*].command` is immutable, so `kubectl edit` will reject the change.
+# Recreate via replace --force (or delete + apply):
 kubectl get pod task14 -o yaml > task14.yaml
-# fix command to ["sleep","3600"] in the file
+# edit task14.yaml: change command to ["sleep","3600"]
 kubectl replace --force -f task14.yaml
 ```
 
-**Note:** The exam expects you to recognise that Pod `command` is immutable — `replace --force` (or delete+apply) is the correct fix. Full credit for either.
+**Note:** The exam expects you to recognise that Pod `command` is immutable. `replace --force` and `delete` + `apply` both earn full credit.
 
 **Verify:**
 
