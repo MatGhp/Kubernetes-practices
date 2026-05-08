@@ -11,6 +11,7 @@ A hands-on collection of Kubernetes configurations and practical examples, organ
 - [Learning Path](#learning-path)
 - [Demos Overview](#demos-overview)
 - [Projects](#projects)
+- [CKAD Exam Preparation](#ckad-exam-preparation)
 - [Usage Examples](#usage-examples)
 - [Contributing](#contributing)
 - [License](#license)
@@ -23,29 +24,40 @@ A hands-on collection of Kubernetes configurations and practical examples, organ
 - Networking and service discovery
 - State persistence and storage
 - Security best practices
-- Advanced patterns (CRDs, Kustomize)
+- Advanced patterns (CRDs, Kustomize, Helm)
 - Multi-container design patterns
 - Observability and monitoring
+- CKAD exam preparation and practice drills
 
 ## 📁 Repository Structure
 
 ```
 .
-├── demos/                          # Organized learning demos by topic
-│   ├── 01-configuration/           # Core K8s objects and configuration
-│   ├── 02-multi-container/         # Multi-container pod patterns
-│   ├── 03-observability/           # Health checks and probes
-│   ├── 04-pod-design/              # Labels, annotations, deployments
-│   ├── 05-services-and-networking/ # Services, Ingress, Network Policies
-│   ├── 06-state-persistence/       # Volumes, PV, PVC, StatefulSets
-│   ├── 07-security/                # RBAC, Security contexts
-│   ├── 08-custom-resource-definition/ # Custom Resources (CRDs)
-│   └── 09-kustomize/               # Kustomize configurations
-├── kub-network/                    # Multi-service networking demo
-│   ├── auth-api/                   # Authentication service
-│   ├── users-api/                  # Users management service
-│   └── tasks-api/                  # Tasks management service
-└── kub-persistent-volume/          # Persistent volume demo application
+├── CKAD/                                      # CKAD exam preparation materials
+│   ├── scripts/                               # Environment management scripts
+│   ├── drills-1-core.md                       # Beginner drills
+│   ├── drills-2-advanced.md                   # Intermediate drills
+│   ├── drills-3-imperative.md                 # Imperative kubectl patterns
+│   ├── drills-4-modern.md                     # Modern Kubernetes patterns
+│   ├── drills-5-mock-exam.md                  # Full mock exam
+│   └── drills-6-community.md                  # Community drills
+├── demos/                                     # Organized learning demos by topic
+│   ├── 01-configuration/                      # Core K8s objects and configuration
+│   ├── 02-multi-container/                    # Multi-container pod patterns
+│   ├── 03-observability/                      # Health checks and probes
+│   ├── 04-pod-design/                         # Labels, annotations, deployments, HPA
+│   ├── 05-services-and-networking/            # Services, Ingress, Network Policies
+│   ├── 06-state-persistence/                  # Volumes, PV, PVC, StatefulSets
+│   ├── 07-security/                           # RBAC, Security contexts
+│   ├── 08-custom-resource-definition/         # Custom Resources (CRDs) — Go
+│   ├── 08-custom-resource-definition-dotnet/  # Custom Resources (CRDs) — .NET
+│   ├── 09-kustomize/                          # Kustomize configurations
+│   └── 10-helm/                               # Helm chart examples
+├── kub-network/                               # Multi-service networking demo
+│   ├── auth-api/                              # Authentication service
+│   ├── users-api/                             # Users management service
+│   └── tasks-api/                             # Tasks management service
+└── kub-persistent-volume/                     # Persistent volume demo application
 ```
 
 ## 🔧 Prerequisites
@@ -60,6 +72,9 @@ Before getting started, ensure you have the following installed:
   - Cloud provider (GKE, EKS, AKS)
 - **kubectl** (v1.20 or later) - [Install kubectl](https://kubernetes.io/docs/tasks/tools/)
 - **Docker Compose** (for running multi-service projects locally)
+- **Helm** (v3.x or later) - [Install Helm](https://helm.sh/docs/intro/install/) (for `10-helm` demos)
+- **WSL2** (Windows only) - Required for CKAD scripts ([Setup guide](CKAD/linux-for-windows-users.md))
+- **.NET SDK** (v8.0 or later, optional) - [Install .NET](https://dotnet.microsoft.com/download) (for `08-custom-resource-definition-dotnet`)
 
 ### Verify Installation
 
@@ -87,7 +102,18 @@ cd Kubernetes-practices
 
 ### 2. Start Your Kubernetes Cluster
 
-**Using Minikube:**
+**Recommended (using CKAD scripts):**
+```powershell
+# Windows — opens a new WSL terminal and boots the cluster
+pwsh -NoProfile -File .\CKAD\scripts\Start-CKAD.ps1
+```
+
+```bash
+# WSL — starts cluster and persists aliases/KUBECONFIG in your shell
+source ./CKAD/scripts/ckad-up.sh
+```
+
+**Using Minikube directly:**
 ```bash
 minikube start
 ```
@@ -132,6 +158,7 @@ Follow this recommended path for structured learning:
    - Rolling updates and rollbacks
    - Blue-Green and Canary deployments
    - Jobs and CronJobs
+   - Horizontal Pod Autoscaler (HPA)
 
 4. **05-services-and-networking/** - Deep dive into networking
    - Service types (ClusterIP, NodePort, LoadBalancer)
@@ -158,13 +185,27 @@ Follow this recommended path for structured learning:
    - Pod security policies
    - Admission webhooks
 
-8. **08-custom-resource-definition/** - Extend Kubernetes
+8. **08-custom-resource-definition/** - Extend Kubernetes (Go)
    - Custom Resource Definitions (CRDs)
-   - Custom controllers
+   - Custom controllers in Go
+
+   **08-custom-resource-definition-dotnet/** - Extend Kubernetes (.NET)
+   - Custom controllers in C#
 
 9. **09-kustomize/** - Configuration management
    - Kustomize basics
+   - Patches and transformers
    - Multi-environment configurations
+
+10. **10-helm/** - Kubernetes package management
+    - Helm chart basics and structure
+    - Values files and template rendering
+
+### CKAD Exam Preparation
+- **CKAD/** - Structured practice for the exam
+  - Progressive drills (core → advanced → imperative → modern → mock)
+  - Automated environment scripts
+  - Linux/WSL2 productivity guide
 
 ## 🎪 Demos Overview
 
@@ -210,6 +251,7 @@ Pod management and deployment strategies:
 - Blue-Green deployments
 - Canary deployments
 - Jobs and CronJobs
+- Horizontal Pod Autoscaler (HPA)
 
 ### 05-services-and-networking
 Networking concepts:
@@ -233,16 +275,29 @@ Security best practices:
 - Validating webhooks
 
 ### 08-custom-resource-definition
-Extending Kubernetes:
+Extending Kubernetes with Go:
 - Custom Resource Definition example (FlightTicket)
 - Custom resource instances
-- Basic controller implementation
+- Basic controller implementation in Go
+
+### 08-custom-resource-definition-dotnet
+Extending Kubernetes with .NET:
+- Custom Resource Definition (DatabaseBackup)
+- C# controller implementation
+- Dockerfile and Kubernetes deployment for the controller
 
 ### 09-kustomize
 Configuration management with Kustomize:
 - Base and overlay structure
 - Multi-folder organization
-- Environment-specific configurations
+- Environment-specific configurations (dev, staging, prod)
+- Patches and transformers
+
+### 10-helm
+Kubernetes package management with Helm:
+- Chart structure and `Chart.yaml` metadata
+- Values files and template rendering
+- Deploying and managing releases
 
 ## 🏗️ Projects
 
@@ -318,6 +373,45 @@ kubectl get pv
 kubectl get pvc
 kubectl get services
 ```
+
+## 🎓 CKAD Exam Preparation
+
+The `CKAD/` folder is a complete preparation system for the [Certified Kubernetes Application Developer](https://training.linuxfoundation.org/certification/certified-kubernetes-application-developer-ckad/) exam.
+
+### Drill Files
+
+| File | Level | Description |
+|------|-------|-------------|
+| [drills-1-core.md](CKAD/drills-1-core.md) | Beginner | Core objects: Pods, Deployments, Services, ConfigMaps, Secrets |
+| [drills-2-advanced.md](CKAD/drills-2-advanced.md) | Intermediate | Multi-container, security, RBAC, networking, persistence |
+| [drills-3-imperative.md](CKAD/drills-3-imperative.md) | All levels | Fast imperative kubectl patterns for speed under exam conditions |
+| [drills-4-modern.md](CKAD/drills-4-modern.md) | Advanced | CRDs, Kustomize, Helm, modern patterns |
+| [drills-5-mock-exam.md](CKAD/drills-5-mock-exam.md) | Exam sim | Full timed mock exam |
+| [drills-6-community.md](CKAD/drills-6-community.md) | Mixed | Community-contributed exercises |
+
+### Environment Scripts
+
+Manage your local CKAD practice cluster with the scripts in [`CKAD/scripts/`](CKAD/scripts/README.md):
+
+```powershell
+# Windows — opens a new WSL terminal and boots the cluster
+pwsh -NoProfile -File .\CKAD\scripts\Start-CKAD.ps1
+```
+
+```bash
+# WSL — starts cluster and persists aliases/KUBECONFIG in your shell
+source ./CKAD/scripts/ckad-up.sh
+
+# Stop cluster (keeps state)
+bash ./CKAD/scripts/ckad-down.sh
+
+# Delete cluster (clean slate)
+CKAD_DELETE=1 bash ./CKAD/scripts/ckad-down.sh
+```
+
+### Linux Setup (Windows Users)
+
+If you're on Windows, see [linux-for-windows-users.md](CKAD/linux-for-windows-users.md) for WSL2 setup, vim configuration, and shell productivity tips.
 
 ## 💡 Usage Examples
 
