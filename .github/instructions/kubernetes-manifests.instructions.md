@@ -117,7 +117,7 @@ Each command gets a one-line comment above it explaining what it does.
 When completing a file, ensure it covers:
 - [ ] All major variants/types of the resource are demonstrated
 - [ ] Every variant has an ASCII diagram showing data/traffic flow
-- [ ] Every spec field has an inline comment
+- [ ] Every non-obvious spec field has an inline comment explaining its purpose
 - [ ] Imperative create equivalents for each variant
 - [ ] Inspect, debug, and testing commands specific to this resource type
 - [ ] Cross-references to related files in the repo
@@ -144,3 +144,10 @@ Use current stable apiVersions:
 | HorizontalPodAutoscaler | `autoscaling/v2` |
 | StorageClass | `storage.k8s.io/v1` |
 | CustomResourceDefinition | `apiextensions.k8s.io/v1` |
+
+## Custom Resources (CRDs)
+
+For manifests that define or use Custom Resources:
+- Include a header comment explaining what the CRD introduces and what problem it solves
+- Add inline comments on all custom fields in `spec`, since readers cannot rely on prior knowledge of the schema
+- Cross-reference the CRD definition file from any CR instance manifest (e.g., `# Requires crd-definition.yaml to be applied first`)

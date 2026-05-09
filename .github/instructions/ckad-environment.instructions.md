@@ -4,7 +4,7 @@ applyTo: '**'
 
 # CKAD environment: up / down via Copilot
 
-When the user asks to **start / boot / up / launch** the CKAD practice environment, or **stop / down / tear down / delete** it, use the scripts in [`CKAD/scripts/`](../../CKAD/scripts/README.md). Do not invent commands; do not run `minikube start` manually.
+When the user asks to **start / boot / up / launch** the CKAD practice environment, or **stop / down / tear down / delete** it, use the scripts in [`CKAD/scripts/`](../../CKAD/scripts/README.md). For the CKAD environment, do not invent commands; do not run `minikube start` manually.
 
 ## Intent → action mapping
 
@@ -54,9 +54,17 @@ CKAD_DELETE=1 bash ./CKAD/scripts/ckad-down.sh
 
 ## Rules for Copilot
 
+### Script Execution
+
 1. Always prefer the scripts above. Only fall back to raw `minikube`/`kubectl` if a script fails and the user asks to debug.
-2. Before running UP, verify Docker Desktop is running (`docker info`). If it is not, tell the user to start Docker Desktop first — do not attempt to start it from the shell.
-3. Do not run these scripts silently in the background. UP is interactive (new terminal tab); DOWN is a short foreground command.
-4. Never call `minikube delete` directly for this workspace — route it through `CKAD_DELETE=1 bash ./CKAD/scripts/ckad-down.sh` so the correct profile (`ckad`) is targeted.
+2. Do not run these scripts silently in the background. UP is interactive (new terminal tab); DOWN is a short foreground command.
+3. Never call `minikube delete` directly for this workspace — route it through `CKAD_DELETE=1 bash ./CKAD/scripts/ckad-down.sh` so the correct profile (`ckad`) is targeted.
+
+### Docker Verification
+
+4. Before running UP, verify Docker Desktop is running (`docker info`). If it is not, tell the user to start Docker Desktop first — do not attempt to start it from the shell.
+
+### Post-Execution Checks
+
 5. After UP, a quick health check is: `kubectl get nodes` and `kubectl config current-context` (should be `ckad`).
 6. Full reference lives in [CKAD/scripts/README.md](../../CKAD/scripts/README.md) — link to it instead of restating details.
