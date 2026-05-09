@@ -18,9 +18,10 @@ The goal is **not** to learn Linux. The goal is to stop hesitating in a Linux te
 - [8. Permissions and `sudo`](#8-permissions-and-sudo)
 - [9. Environment Variables and Aliases](#9-environment-variables-and-aliases)
 - [10. Processes, Jobs, and Signals](#10-processes-jobs-and-signals)
-- [11. PowerShell → Bash Cheat Sheet](#11-powershell--bash-cheat-sheet)
-- [12. Common Pitfalls for Windows Users](#12-common-pitfalls-for-windows-users)
-- [13. 15-Minute Warm-Up Drill](#13-15-minute-warm-up-drill)
+- [11. vim Basics](#11-vim-basics)
+- [12. PowerShell → Bash Cheat Sheet](#12-powershell--bash-cheat-sheet)
+- [13. Common Pitfalls for Windows Users](#13-common-pitfalls-for-windows-users)
+- [14. 15-Minute Warm-Up Drill](#14-15-minute-warm-up-drill)
 
 ---
 
@@ -158,6 +159,7 @@ This is the single biggest productivity leap coming from PowerShell.
 | `cmd >> file` | Append stdout to `file` |
 | `cmd 2> file` | Send stderr to `file` |
 | `cmd > out 2>&1` | Send stdout + stderr to `out` |
+| `cmd 2>/dev/null` | Discard stderr (suppress error output) |
 | `cmd < file` | Feed `file` as stdin |
 | `cmd1 \| cmd2` | Pipe stdout of `cmd1` into stdin of `cmd2` |
 
@@ -202,16 +204,19 @@ Use `<<'EOF'` (quoted) to write `$vars` **literally** instead of expanding them.
 |---|---|
 | `grep pattern file` | Find lines matching `pattern` |
 | `grep -r pattern dir` | Recurse into a directory |
-| `grep -E 'a\|b'` | Extended regex (alternation) |
+| `grep -E 'a|b'` | Extended regex (alternation) |
 | `grep -v pattern` | **Invert** — lines NOT matching |
 | `grep -i pattern` | Case-insensitive |
 | `sort` | Sort lines |
 | `uniq` | Collapse adjacent duplicate lines (usually after `sort`) |
+| `uniq -c` | Same but prefixes each line with occurrence count |
 | `wc -l` | Count lines |
 | `cut -d: -f1` | Split each line on `:` and take field 1 |
 | `awk '{print $2}'` | Print 2nd whitespace-separated field |
 | `sed 's/foo/bar/g'` | Stream-edit: replace `foo` with `bar` |
 | `xargs` | Turn stdin into args for another command |
+| `find dir -name "*.yaml"` | Find files by name pattern recursively |
+| `find / -type f -perm /111` | Find executable files |
 
 Examples:
 
@@ -300,6 +305,8 @@ Key files:
 | `~/.profile` | Login shells; on Ubuntu it sources `~/.bashrc` |
 | `~/.bash_profile` | Login shells (if present). Default Ubuntu does **not** use this — do not put CKAD setup here |
 
+**`Ctrl+R` — reverse history search:** Press `Ctrl+R`, start typing any part of a previous command — bash searches backwards through history and shows the first match. Press `Ctrl+R` again for an older match, `Enter` to run, or `→` / `Esc` to edit. Far faster than pressing `↑` repeatedly under time pressure.
+
 ---
 
 ## 10. Processes, Jobs, and Signals
@@ -325,7 +332,49 @@ kill -9 <PID>          # SIGKILL (last resort)
 
 ---
 
-## 11. PowerShell → Bash Cheat Sheet
+## 11. vim Basics
+
+vim has three modes. Losing track of which mode you're in is the #1 beginner problem.
+
+| Mode | Enter with | What you can do |
+|---|---|---|
+| **Normal** | `Esc` (always safe) | Navigate, delete, copy, paste, run commands |
+| **Insert** | `i` (before cursor), `a` (after cursor), `o` (new line below) | Type text |
+| **Command** | `:` from Normal mode | Save, quit, search-replace, settings |
+
+**Survival commands:**
+
+```bash
+# Saving / quitting (type : to enter Command mode first)
+:wq        # save and quit
+:q!        # quit WITHOUT saving
+:w         # save without quitting
+
+# Navigation (Normal mode)
+h j k l    # ← ↓ ↑ → (arrow keys also work)
+0  $       # beginning / end of line
+gg  G      # top / bottom of file
+/pattern   # search forward; n = next, N = previous
+
+# Editing (Normal mode)
+i          # enter Insert mode before cursor
+Esc        # return to Normal mode (press when lost)
+dd         # delete (cut) current line
+yy         # yank (copy) current line
+p          # paste below current line
+u          # undo
+Ctrl+r     # redo
+
+# Settings (Command mode)
+:set number      # show line numbers
+:set paste       # disable auto-indent — use before pasting from clipboard
+```
+
+> **Exam tip:** If vim is misbehaving (unexpected auto-indent on paste, keys not working as expected), press `Esc` twice to ensure you're in Normal mode. To clear the entire file and start fresh: `ggdG` (go to top, delete to end).
+
+---
+
+## 12. PowerShell → Bash Cheat Sheet
 
 | Goal | PowerShell | Bash |
 |---|---|---|
@@ -348,7 +397,7 @@ Important difference: **PowerShell pipes objects, bash pipes text.** Everything 
 
 ---
 
-## 12. Common Pitfalls for Windows Users
+## 13. Common Pitfalls for Windows Users
 
 - **Case sensitivity.** `Pod.yaml` and `pod.yaml` are two different files. Tab-completion is your friend — use it.
 - **CRLF line endings.** Files edited in Notepad often break on Linux. Configure git: `git config --global core.autocrlf input`. In `vim`, fix with `:set fileformat=unix` then `:wq`.
@@ -364,7 +413,7 @@ Important difference: **PowerShell pipes objects, bash pipes text.** Everything 
 
 ---
 
-## 13. 15-Minute Warm-Up Drill
+## 14. 15-Minute Warm-Up Drill
 
 Run this inside WSL. If anything takes more than a few seconds, repeat until it doesn't.
 
