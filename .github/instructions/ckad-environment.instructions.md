@@ -29,7 +29,16 @@ pwsh -NoProfile -File .\CKAD\scripts\Start-CKAD.ps1
 source ./CKAD/scripts/ckad-up.sh
 ```
 
-Useful env-var overrides (set before the command): `CKAD_PROFILE`, `CKAD_DRIVER`, `CKAD_NS`, `CKAD_RESET=1`.
+Useful env-var overrides (set before the command):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `CKAD_PROFILE` | `ckad` | minikube profile name |
+| `CKAD_DRIVER` | `docker` | minikube driver |
+| `CKAD_NS` | `practice` | namespace created and pinned as the kubectl default after UP |
+| `CKAD_RESET` | `0` | set to `1` to delete the profile first (clean slate) |
+
+> **Note:** After UP, the default namespace is pinned to `practice`. When running mock exam tasks, switch to the correct section namespace explicitly: `kubectl config set-context --current --namespace=ns-build` (or `ns-deploy`, `ns-config`, etc.).
 
 ## DOWN
 

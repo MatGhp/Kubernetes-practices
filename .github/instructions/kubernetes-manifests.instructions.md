@@ -28,7 +28,7 @@ All YAML manifests must follow these conventions.
 
 ## Images
 
-- Use specific image tags (`nginx:1.21`), never `latest`
+- Use specific image tags (`nginx:1.27`), never `latest`
 
 ## Security Defaults
 
@@ -136,7 +136,7 @@ Use current stable apiVersions:
 
 | Resource | apiVersion |
 |----------|-----------|
-| Pod, Service, ConfigMap, Secret, Namespace, ServiceAccount, PV, PVC | `v1` |
+| Pod, Service, ConfigMap, Secret, Namespace, ServiceAccount, PV, PVC, LimitRange, ResourceQuota | `v1` |
 | Deployment, ReplicaSet, StatefulSet, DaemonSet | `apps/v1` |
 | Job, CronJob | `batch/v1` |
 | Ingress, NetworkPolicy | `networking.k8s.io/v1` |
