@@ -382,20 +382,26 @@ spec:
   securityContext:
     runAsUser: 1001
     runAsGroup: 2002
-    fsGroup: 2002
+    fsGroup: 2002       # sets owning group on mounted volumes
   containers:
     - name: nginx
       image: nginx:1.27
       securityContext:
-        readOnlyRootFilesystem: true
+        readOnlyRootFilesystem: true        # MUST be container-level, not pod-level (invalid in pod level)
         allowPrivilegeEscalation: false
       volumeMounts:
         - { name: cache, mountPath: /var/cache/nginx }
         - { name: run,   mountPath: /var/run }
   volumes:
-    - { name: cache, emptyDir: {} }
+    - { name: cache, emptyDir: {} }   # separate volumes, not one shared emptyDir
     - { name: run,   emptyDir: {} }
 ```
+
+> **Common mistakes to avoid:**
+>
+> 1. **`readOnlyRootFilesystem` at pod level** — this field belongs under `spec.containers[*].securityContext`, not `spec.securityContext`. Placing it at pod level is silently ignored; the filesystem stays writable.
+> 2. **Missing `fsGroup`** — without it, mounted volumes are owned by root. The process can still write because emptyDir defaults to mode `0777`, but the task explicitly requires group `2002`.
+> 3. **One emptyDir for both mounts** — Kubernetes allows it, but sharing one volume across two mount paths creates hidden coupling. Use two separate `emptyDir` volumes.
 
 **Verify:**
 
