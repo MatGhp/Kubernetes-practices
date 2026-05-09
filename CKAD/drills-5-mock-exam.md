@@ -415,7 +415,7 @@ kubectl exec task8 -- touch /test 2>&1 | grep -i "read-only"
 
 ### Task 9 — ServiceAccount + read-only Role (6 pts, 5 min)
 
-Create ServiceAccount `viewer`, Role `pod-viewer` allowing `get,list,watch` on `pods`, and a RoleBinding `viewer-binds-pod-viewer` binding the SA to the Role. Mount the SA in a Pod `task9` (`bitnami/kubectl:latest`) and run `kubectl get pods` from inside.
+Create ServiceAccount `viewer`, Role `pod-viewer` allowing `get,list,watch` on `pods`, and a RoleBinding `viewer-binds-pod-viewer` binding the SA to the Role. Create a Pod `task9` (`bitnami/kubectl:latest`) using the `viewer` ServiceAccount. Confirm the SA can list pods in namespace `ns-config` but **cannot** list Deployments (expect `Forbidden`).
 
 <details><summary>Answer</summary>
 
@@ -440,8 +440,8 @@ spec:
 **Verify:**
 
 ```bash
-kubectl exec task9 -- kubectl get pods -n ns-config
-kubectl exec task9 -- kubectl get deploy -n ns-config 2>&1 | grep -i forbidden
+kubectl exec task9 -- kubectl get pods                              # succeeds — SA has pod-viewer Role
+kubectl exec task9 -- kubectl get deploy 2>&1 | grep -i forbidden   # denied — Deployments not in Role
 ```
 </details>
 
