@@ -257,45 +257,40 @@ kubectl get deploy,svc -l app.kubernetes.io/instance=front
 
 ### Task 6 — Kustomize overlay (8 pts, 6 min)
 
-Given a base Deployment `web` with 1 replica of `nginx:1.27`, write a base + overlay structure under `task6/` so that `kubectl apply -k task6/overlays/staging` produces a Deployment with **4 replicas** and label `env=staging`.
+A base is **already provided** at `~/task6/base/` containing a Deployment `web` (1 replica of `nginx:1.27`) and a `kustomization.yaml` listing it as a resource.
+
+Create an overlay at `~/task6/overlays/staging/` that, when applied with `kubectl apply -k ~/task6/overlays/staging -n ns-deploy`, produces a Deployment `web` with **4 replicas** and label `env=staging`. Do not modify any file under `base/`.
+
+> **Setup (run once before the timer — simulates the pre-created files the real exam gives you):**
+>
+> ```bash
+> mkdir -p ~/task6/base ~/task6/overlays/staging
+>
+> cat > ~/task6/base/deployment.yaml <<'EOF'
+> apiVersion: apps/v1
+> kind: Deployment
+> metadata: { name: web }
+> spec:
+>   replicas: 1
+>   selector: { matchLabels: { app: web } }
+>   template:
+>     metadata: { labels: { app: web } }
+>     spec:
+>       containers:
+>         - { name: nginx, image: nginx:1.27 }
+> EOF
+>
+> cat > ~/task6/base/kustomization.yaml <<'EOF'
+> resources: [deployment.yaml]
+> EOF
+> ```
 
 <details><summary>Answer</summary>
 
-Layout:
-
-```
-task6/
-├── base/
-│   ├── deployment.yaml
-│   └── kustomization.yaml
-└── overlays/
-    └── staging/
-        ├── kustomization.yaml
-        └── replica-patch.yaml
-```
+You only author two files under `~/task6/overlays/staging/`:
 
 ```yaml
-# task6/base/deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata: { name: web }
-spec:
-  replicas: 1
-  selector: { matchLabels: { app: web } }
-  template:
-    metadata: { labels: { app: web } }
-    spec:
-      containers:
-        - { name: nginx, image: nginx:1.27 }
-```
-
-```yaml
-# task6/base/kustomization.yaml
-resources: [deployment.yaml]
-```
-
-```yaml
-# task6/overlays/staging/kustomization.yaml
+# ~/task6/overlays/staging/kustomization.yaml
 resources: [../../base]
 labels:
   - pairs: { env: staging }
@@ -306,7 +301,7 @@ patches:
 ```
 
 ```yaml
-# task6/overlays/staging/replica-patch.yaml
+# ~/task6/overlays/staging/replica-patch.yaml
 apiVersion: apps/v1
 kind: Deployment
 metadata: { name: web }
@@ -315,7 +310,7 @@ spec:
 ```
 
 ```bash
-kubectl apply -k task6/overlays/staging -n ns-deploy
+kubectl apply -k ~/task6/overlays/staging -n ns-deploy
 ```
 
 > **Note:** `commonLabels` is deprecated in newer Kustomize; use `labels:` with `includeSelectors: false` so the new label isn't injected into the immutable `selector.matchLabels`.
@@ -492,23 +487,23 @@ kubectl get netpol -n ns-config
 
 ### Task 11 — Path-based Ingress (8 pts, 6 min)
 
-In namespace `ns-network`, two Deployments (`web-a`, `web-b`, both `nginx:1.27`, 1 replica) and matching ClusterIP Services on port 80 already exist. Create an Ingress named `paths` so that:
+In namespace `ns-network`, two Deployments (`web-a`, `web-b`, both `nginx:1.27`, 1 replica) and matching ClusterIP Services on port 80 **already exist**. Create an Ingress named `paths` so that:
 
 - `/a` → Service `web-a` on port 80
 - `/b` → Service `web-b` on port 80
 
-Use `pathType: Prefix`. Use the cluster's default IngressClass.
+Use `pathType: Prefix` and the cluster's default IngressClass.
+
+> **Setup (run once before the timer — simulates the pre-created Deployments and Services):**
+>
+> ```bash
+> kubectl -n ns-network create deploy web-a --image=nginx:1.27
+> kubectl -n ns-network create deploy web-b --image=nginx:1.27
+> kubectl -n ns-network expose deploy web-a --port=80
+> kubectl -n ns-network expose deploy web-b --port=80
+> ```
 
 <details><summary>Answer</summary>
-
-First create the prerequisites (the real exam will have these pre-created):
-
-```bash
-kubectl -n ns-network create deploy web-a --image=nginx:1.27
-kubectl -n ns-network create deploy web-b --image=nginx:1.27
-kubectl -n ns-network expose deploy web-a --port=80
-kubectl -n ns-network expose deploy web-b --port=80
-```
 
 ```yaml
 # task11.yaml
@@ -594,6 +589,14 @@ kubectl run dns --rm -it --restart=Never --image=busybox:1.36 -- \
 ### Task 13 — `port-forward` to a private Service (6 pts, 3 min)
 
 Forward local port 9090 to Service `api` (port 80) in namespace `ns-network`, then `curl` `http://localhost:9090` to confirm a 200 response. Run the forward in the background and clean it up.
+
+> **Setup (run once before the timer — simulates the pre-created `api` Service):**
+>
+> ```bash
+> kubectl -n ns-network create deploy api --image=nginx:1.27
+> kubectl -n ns-network expose deploy api --port=80
+> kubectl -n ns-network wait --for=condition=Available deploy/api --timeout=30s
+> ```
 
 <details><summary>Answer</summary>
 
