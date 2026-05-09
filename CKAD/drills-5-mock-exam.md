@@ -158,7 +158,7 @@ kubectl get svc api
 
 ### Task 4 — Canary at 10% (6 pts, 5 min)
 
-A Service `shop` selects `app=shop` (no version label). Provide a `shop-stable` Deployment (9 replicas, `nginx:1.27`, labels `app=shop,track=stable`) and a `shop-canary` Deployment (1 replica, `nginx:1.28`, labels `app=shop,track=canary`).
+A Service `shop` selects `app=shop` (no version label). Create a `shop-stable` Deployment (9 replicas, `nginx:1.27`, labels `app=shop,track=stable`) and a `shop-canary` Deployment (1 replica, `nginx:1.28`, labels `app=shop,track=canary`).
 
 <details><summary>Answer</summary>
 
@@ -330,7 +330,7 @@ kubectl get deploy web -n ns-deploy -o jsonpath='{.spec.replicas} {.metadata.lab
 
 ### Task 7 — ConfigMap + Secret consumption (6 pts, 4 min)
 
-Create ConfigMap `app-cfg` with key `LOG_LEVEL=debug`. Create Secret `app-sec` with key `API_KEY=s3cr3t`. Run a Pod `task7` (`nginx:1.27`) that exposes `LOG_LEVEL` as an env var from the ConfigMap and mounts the Secret at `/etc/secrets`.
+Create ConfigMap `app-cfg` with key `LOG_LEVEL=debug`. Create Secret `app-sec` with key `API_KEY=s3cr3t`. Create a Pod `task7` (`nginx:1.27`) that exposes `LOG_LEVEL` as an env var from the ConfigMap and mounts the Secret at `/etc/secrets`.
 
 <details><summary>Answer</summary>
 
@@ -552,7 +552,7 @@ kubectl describe ingress paths -n ns-network | grep -E 'Path|Backend'
 
 ### Task 12 — Headless Service for stable DNS (6 pts, 4 min)
 
-Create a headless Service (`clusterIP: None`) `db` on port 5432 selecting `app=db`. Then a 2-replica Deployment `db` (`postgres:16`, env `POSTGRES_PASSWORD=x`). Demonstrate that DNS returns **both** Pod IPs.
+Create a headless Service (`clusterIP: None`) `db` on port 5432 selecting `app=db`. Create a 2-replica Deployment `db` (`postgres:16`, env `POSTGRES_PASSWORD=x`). Confirm that an `nslookup` of `db.ns-network.svc.cluster.local` returns **two** IP addresses.
 
 <details><summary>Answer</summary>
 
@@ -677,13 +677,17 @@ kubectl wait --for=condition=Ready pod/task14 --timeout=30s
 
 A running Pod `target` (image `nginx:1.27`) has no shell debugging tools. Without restarting it, attach an ephemeral `busybox:1.36` container, `wget` `localhost`, and capture the response status into a file `/tmp/probe.txt` on your local host.
 
+> **Setup (run once before the timer — simulates the running Pod the real exam gives you):**
+>
+> ```bash
+> kubectl run target --image=nginx:1.27 -n ns-observe
+> kubectl wait --for=condition=Ready pod/target -n ns-observe --timeout=30s
+> ```
+
 <details><summary>Answer</summary>
 
 ```bash
-kubectl run target --image=nginx:1.27
-kubectl wait --for=condition=Ready pod/target --timeout=30s
-
-kubectl debug -it target --image=busybox:1.36 --target=target -- \
+kubectl debug -it target -n ns-observe --image=busybox:1.36 --target=target -- \
   sh -c "wget -qSO- http://localhost 2>&1 | head -5" \
   > /tmp/probe.txt
 cat /tmp/probe.txt
