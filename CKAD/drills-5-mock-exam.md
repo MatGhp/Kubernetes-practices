@@ -704,6 +704,9 @@ cat /tmp/probe.txt
 > **Namespace:** `ns-build` (switch back if needed)
 
 Use minikube's Docker daemon to build and deploy a custom image **without a registry**:
+
+> **Practice-environment note:** If `docker` is not available in your WSL shell, substitute `minikube image build -t my-app:v1 . -p ckad` for the `docker build` step and `minikube image rm my-app:v1 -p ckad` for cleanup. The real exam terminal has Docker installed; train the `docker build` path when possible.
+
 1. Create a `Dockerfile` (base: `nginx:1.27`) that copies a local `index.html` containing `Hello CKAD` to `/usr/share/nginx/html/index.html`.
 2. Build the image as `my-app:v1` inside minikube's Docker daemon (`eval $(minikube docker-env -p ckad)`).
 3. Run a Pod `task16` (namespace `ns-build`) using that image with `imagePullPolicy: Never`.
