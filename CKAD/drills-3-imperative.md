@@ -842,6 +842,78 @@ kubectl top pods  --all-namespaces
 
 ---
 
+### Drill 36 - DNS probe: nslookup from inside the cluster
+**Budget:** 2 min
+**Task:** Service `api-svc` (ClusterIP, port 80) exists in namespace `practice` from Drill 7.
+1. Resolve `api-svc` by its **short name** from a throwaway Pod in the same namespace.
+2. Resolve it by its **FQDN** from a throwaway Pod in a different namespace `other`.
+
+<details><summary>Answer</summary>
+
+```bash
+# Short name - works only within the same namespace
+kubectl run probe --rm -it --restart=Never --image=busybox:1.36 -- \
+  nslookup api-svc
+
+# FQDN - works from any namespace
+kubectl create ns other --dry-run=client -o yaml | kubectl apply -f -
+kubectl run probe -n other --rm -it --restart=Never --image=busybox:1.36 -- \
+  nslookup api-svc.practice.svc.cluster.local
+```
+
+> Short names are resolved by appending the Pod's search domains (`practice.svc.cluster.local`, `svc.cluster.local`, `cluster.local`). A Pod in `other` has different search domains, so `api-svc` alone fails. The FQDN always works.
+>
+> FQDN pattern: `<service>.<namespace>.svc.cluster.local`
+</details>
+
+---
+
+### Drill 37 - HTTP probe from inside the cluster
+**Budget:** 2 min
+**Task:** Service `api-svc` (ClusterIP, port 80) exists in namespace `practice`.
+1. Send an HTTP GET to `api-svc:80` from a throwaway Pod and print the full response body.
+2. Print only the HTTP status line (no body) using a `curl`-capable image.
+
+<details><summary>Answer</summary>
+
+```bash
+# wget - busybox has it built in, no extra image needed
+kubectl run probe --rm -it --restart=Never --image=busybox:1.36 -- \
+  wget -qO- --timeout=2 http://api-svc:80
+
+# curl - needs curlimages/curl (busybox has no curl)
+kubectl run probe --rm -i --restart=Never --image=curlimages/curl -- \
+  curl -sI http://api-svc:80 | head -1
+```
+
+> `wget -qO- --timeout=2` is the exam workhorse: `-q` suppresses progress noise, `-O-` sends output to stdout, `--timeout=2` prevents hanging on a broken Service.
+>
+> Use `curlimages/curl` only when you need curl-specific flags (e.g. `-H`, `--resolve`, `-d`). For a simple reachability check, busybox wget is faster to type.
+</details>
+
+---
+
+### Drill 38 - `port-forward`: reach a Service from your terminal
+**Budget:** 2 min
+**Task:** Forward local port 8888 to `api-svc:80` in namespace `practice`, confirm with `curl`, then clean up the forward.
+
+<details><summary>Answer</summary>
+
+```bash
+kubectl port-forward svc/api-svc 8888:80 -n practice &
+PF=$!
+sleep 1
+curl -s http://localhost:8888 | head -1
+kill $PF
+```
+
+> `port-forward` runs on **your terminal**, not inside the cluster. It tunnels traffic through the API server - useful for testing a Service that has no NodePort or Ingress.
+>
+> Pattern: `kubectl port-forward <type>/<name> <local>:<remote> -n <ns> &` then `kill $!` when done. Works on pods, services, and deployments.
+</details>
+
+---
+
 ## Cleanup
 
 ```bash
@@ -877,5 +949,5 @@ kubectl delete ns practice && kubectl create ns practice
 - Solved within 1.5× budget, or peeked once → **1 pt**
 - Did not solve, or used full answer → **0 pts**
 
-Target for exam-readiness: **58+ / 70** across a full 35-drill run, with **zero misses** in Sections H and I (debug/inspect/cluster-ops - these are the time-savers).
+Target for exam-readiness: **64+ / 76** across a full 38-drill run, with **zero misses** in Sections H and I (debug/inspect/cluster-ops - these are the time-savers).
 
