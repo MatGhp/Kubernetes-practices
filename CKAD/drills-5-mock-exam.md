@@ -867,7 +867,7 @@ spec:
           image: nginx:doesnotexist
           resources:
             requests: { cpu: "500m", memory: "128Mi" }
-            limits:   { cpu: "100m", memory: "64Mi" }
+            limits:   { cpu: "1",    memory: "64Mi" }
 ```
 
 <details><summary>Answer</summary>
@@ -888,7 +888,7 @@ spec:
           image: nginx:doesnotexist
           resources:
             requests: { cpu: "500m", memory: "128Mi" }
-            limits:   { cpu: "100m", memory: "64Mi" }
+            limits:   { cpu: "1",    memory: "64Mi" }
 EOF
 
 # Diagnose
@@ -902,11 +902,11 @@ kubectl describe pod -n ns-observe -l app=task18 | grep -A5 "State\|Reason\|Even
 kubectl set image deployment/task18 app=nginx:1.27 -n ns-observe
 ```
 
-**Bug 2 - cpu limit < request:** `limits.cpu: 100m` is less than `requests.cpu: 500m`. Kubernetes rejects pods with this constraint. Fix with `kubectl edit`:
+**Bug 2 - memory limit < request:** `limits.memory: 64Mi` is less than `requests.memory: 128Mi`. Kubernetes rejects the pod at admission with `Invalid value: "64Mi": must be greater than or equal to request`. Fix with `kubectl edit`:
 
 ```bash
 kubectl edit deployment task18 -n ns-observe
-# change limits.cpu from "100m" to "1"
+# change limits.memory from "64Mi" to "256Mi"
 ```
 
 Then watch the rollout complete:
