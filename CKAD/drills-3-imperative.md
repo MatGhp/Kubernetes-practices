@@ -214,9 +214,9 @@ Verify:
 kubectl get hpa api
 ```
 
-> `--cpu=70%` replaces the deprecated `--cpu-percent=70` flag (deprecation warning added in kubectl 1.34). Use `--cpu=500m` instead for an absolute milliCPU target.
+> `--cpu` accepts a percentage (`70%`) or an absolute milliCPU value (`500m`). Use `--memory` for memory-based scaling: `--memory=200Mi` or `--memory=70%`.
 >
-> `kubectl top` and the HPA need `metrics-server`. See [README §9.4](README.md#94-metrics-server--kubectl-top-drill-33).
+> `kubectl top` and the HPA need `metrics-server`. See [README §9.4](README.md#94-metrics-server--kubectl-top-drill-35).
 </details>
 
 ---
@@ -397,13 +397,16 @@ kubectl get secret web-tls -o jsonpath='{.type}'
 <details><summary>Answer</summary>
 
 ```bash
-kubectl create job countdown --image=busybox -o yaml --dry-run=client -- \
-  sh -c 'for i in 9 8 7 6 5 4 3 2 1 0; do echo $i; done' \
-  | sed 's/backoffLimit: 6/backoffLimit: 4/' \
-  | kubectl apply -f -
+kubectl create job countdown --image=busybox $do -- \
+  sh -c 'for i in 9 8 7 6 5 4 3 2 1 0; do echo $i; done' > countdown.yaml
+# Set backoffLimit: 4 (default is 6)
+vim countdown.yaml
+kubectl apply -f countdown.yaml
 ```
 
-> `kubectl create job` has no `--backoff-limit` flag - generate YAML with `--dry-run=client -o yaml`, patch `backoffLimit`, then pipe to `kubectl apply`.
+> `kubectl create job` has no `--backoff-limit` flag - generate YAML first, edit the field, then apply.
+>
+> **Caution:** A one-pipe shortcut (`... $do | sed 's/backoffLimit: 6/backoffLimit: 4/' | kubectl apply -f -`) silently breaks if the Kubernetes default changes from `6`.
 
 Verify:
 
@@ -772,6 +775,73 @@ kubectl api-versions | grep '^networking.k8s.io/v1$'
 
 ---
 
+## Section I - Context, wait, and top
+
+These three commands appear in nearly every drill's Verify block and in every exam task header. Drill them until they are reflex.
+
+### Drill 33 - Switch context and pin a namespace
+**Budget:** 2 min
+**Task:**
+1. List all available contexts.
+2. Switch to context `ckad` (assuming it exists).
+3. Pin the default namespace to `practice` without editing a YAML file.
+4. Confirm the active context and namespace.
+
+<details><summary>Answer</summary>
+
+```bash
+kubectl config get-contexts
+kubectl config use-context ckad
+kubectl config set-context --current --namespace=practice
+kubectl config current-context
+kubectl config view --minify | grep namespace
+```
+
+> On the real exam, the question header gives you the context (`kubectl config use-context k8s`) and often a namespace. Run both commands before touching anything else.
+</details>
+
+---
+
+### Drill 34 - `kubectl wait`
+**Budget:** 2 min
+**Task:**
+1. Wait for Pod `nginx` to be `Ready` (timeout 30 s).
+2. Wait for Job `countdown` to `Complete` (timeout 60 s).
+3. Wait for Pod `nginx` to be deleted entirely (timeout 20 s).
+
+<details><summary>Answer</summary>
+
+```bash
+kubectl wait pod/nginx      --for=condition=Ready    --timeout=30s
+kubectl wait job/countdown  --for=condition=Complete --timeout=60s
+kubectl wait pod/nginx      --for=delete             --timeout=20s
+```
+
+> `--for=condition=Ready` and `--for=condition=Complete` are the two you will use most. `--for=delete` is handy when you need a clean slate before recreating a resource.
+</details>
+
+---
+
+### Drill 35 - `kubectl top`
+**Budget:** 2 min
+**Task:**
+1. Show node CPU/memory utilisation sorted by CPU descending.
+2. Show pod CPU/memory in namespace `practice` sorted by memory descending.
+3. Show pod CPU/memory for all namespaces.
+
+<details><summary>Answer</summary>
+
+```bash
+kubectl top nodes --sort-by=cpu
+kubectl top pods  --sort-by=memory
+kubectl top pods  --all-namespaces
+```
+
+> `kubectl top` requires `metrics-server`. On Minikube: `minikube addons enable metrics-server`. Allow ~60 s after enabling for the first scrape to arrive. The HPA also uses `metrics-server` - if `kubectl get hpa api` shows `<unknown>` for CPU, metrics-server is missing or not yet ready.
+</details>
+
+---
+
 ## Cleanup
 
 ```bash
@@ -807,5 +877,5 @@ kubectl delete ns practice && kubectl create ns practice
 - Solved within 1.5× budget, or peeked once → **1 pt**
 - Did not solve, or used full answer → **0 pts**
 
-Target for exam-readiness: **52+ / 64** across a full 32-drill run, with **zero misses** in Section H (debug/inspect - these are the time-savers).
+Target for exam-readiness: **58+ / 70** across a full 35-drill run, with **zero misses** in Sections H and I (debug/inspect/cluster-ops - these are the time-savers).
 
