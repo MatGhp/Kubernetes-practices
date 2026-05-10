@@ -16,7 +16,7 @@ Everything in this guide is shaped around those three.
 
 - [1. Environment Setup](#1-environment-setup)
   - [1.1 Minikube profile](#11-minikube-profile-dedicated-to-ckad)
-  - [1.2 Windows users — WSL2 + Linux + vim](#12-windows-users--wsl2--linux--vim)
+  - [1.2 Windows users - WSL2 + Linux + vim](#12-windows-users--wsl2--linux--vim)
 - [2. Shell Productivity Setup](#2-shell-productivity-setup)
   - [2.1 The block](#21-the-block)
   - [2.2 Permanent setup on WSL / Ubuntu (practice machine)](#22-permanent-setup-on-wsl--ubuntu-practice-machine)
@@ -67,7 +67,7 @@ kubectl create namespace practice
 
 > Keep the same driver across sessions so performance stays predictable.
 
-### 1.2 Windows users — WSL2 + Linux + vim
+### 1.2 Windows users - WSL2 + Linux + vim
 
 The exam runs on Linux with terminal editing (typically `vim`). The goal for Windows users is to remove hesitation on shell + vim.
 
@@ -78,7 +78,7 @@ Recommended setup:
 - **Minikube** (driver: `docker`)
 - **vim**
 
-Run all CKAD practice inside WSL — not PowerShell. This makes:
+Run all CKAD practice inside WSL - not PowerShell. This makes:
 
 - commands behave like exam conditions,
 - `vim` native and fast,
@@ -90,8 +90,8 @@ Run all CKAD practice inside WSL — not PowerShell. This makes:
 
 Set these up so every drill is faster. There are **two scenarios**:
 
-- **Practice machine (WSL/Ubuntu)** — install permanently in `~/.bashrc`. Do this once.
-- **Exam machine** — the shell is fresh and nothing is preloaded. You paste a one-time warm-up block at the start of the exam. See [§10.1](#101-one-time-warm-up-run-once-when-the-exam-terminal-opens).
+- **Practice machine (WSL/Ubuntu)** - install permanently in `~/.bashrc`. Do this once.
+- **Exam machine** - the shell is fresh and nothing is preloaded. You paste a one-time warm-up block at the start of the exam. See [§10.1](#101-one-time-warm-up-run-once-when-the-exam-terminal-opens).
 
 Both scenarios use the same content.
 
@@ -128,20 +128,20 @@ Typical generate → edit → validate → apply loop:
 ```bash
 k create deployment api --image=nginx:1.27 $do > deployment.yaml
 vim deployment.yaml
-kv deployment.yaml          # server-side dry-run — catches schema + admission errors
+kv deployment.yaml          # server-side dry-run - catches schema + admission errors
 ka deployment.yaml          # apply for real
 kg deploy,pod               # confirm
 ```
 
 ### 2.2 Permanent setup on WSL / Ubuntu (practice machine)
 
-**Step 1 — install `bash-completion`** (Ubuntu auto-sources it from `~/.bashrc`):
+**Step 1 - install `bash-completion`** (Ubuntu auto-sources it from `~/.bashrc`):
 
 ```bash
 sudo apt update && sudo apt install -y bash-completion
 ```
 
-**Step 2 — append the block to `~/.bashrc`** with a **quoted heredoc** so `$do` and `$(...)` are written literally, not expanded. Copy and run this in your terminal exactly as-is (the closing `EOF` must sit at column 1):
+**Step 2 - append the block to `~/.bashrc`** with a **quoted heredoc** so `$do` and `$(...)` are written literally, not expanded. Copy and run this in your terminal exactly as-is (the closing `EOF` must sit at column 1):
 
 ```bash
 cat >> ~/.bashrc <<'EOF'
@@ -160,13 +160,13 @@ complete -F __start_kubectl k
 EOF
 ```
 
-**Step 3 — reload the shell:**
+**Step 3 - reload the shell:**
 
 ```bash
 source ~/.bashrc
 ```
 
-**Step 4 — verify:**
+**Step 4 - verify:**
 
 ```bash
 k version --client     # alias works
@@ -175,7 +175,7 @@ k get po<TAB>          # completes to: k get pods
 ```
 
 > Notes
-> - Put it in `~/.bashrc`, **not** `~/.bash_profile` — default Ubuntu does not source the latter.
+> - Put it in `~/.bashrc`, **not** `~/.bash_profile` - default Ubuntu does not source the latter.
 > - Run the `cat >>` block **once**. If you run it again, first remove the marked section (`# ---- CKAD kubectl setup ----`) from `~/.bashrc`.
 > - zsh users: write the block into `~/.zshrc`, replace `kubectl completion bash` with `kubectl completion zsh`, and prepend `autoload -U compinit && compinit`.
 
@@ -325,16 +325,16 @@ kubectl get pods -w
 
 ### 5.1 Three-phase method
 
-1. **Accuracy (no timer)** — solve each task correctly from memory.
-2. **Soft timer** — 10–15 minutes per task.
-3. **Mixed drill** — 5 tasks back-to-back using only official Kubernetes docs and `kubectl --help` / `kubectl explain`.
+1. **Accuracy (no timer)** - solve each task correctly from memory.
+2. **Soft timer** - 10–15 minutes per task.
+3. **Mixed drill** - 5 tasks back-to-back using only official Kubernetes docs and `kubectl --help` / `kubectl explain`.
 
 ### 5.2 60-minute drill format
 
-- **10 min** — cluster reset + 2 warm-up tasks
-- **35 min** — 3 medium tasks (deployments, config, probes)
-- **10 min** — 1 debugging task (broken pod or service)
-- **5 min** — log commands you fumbled
+- **10 min** - cluster reset + 2 warm-up tasks
+- **35 min** - 3 medium tasks (deployments, config, probes)
+- **10 min** - 1 debugging task (broken pod or service)
+- **5 min** - log commands you fumbled
 
 Track misses in a simple file (`task`, `mistake`, `fix`, `faster command`).
 
@@ -356,7 +356,7 @@ Setting the default namespace once saves typing `-n practice` on every command.
 
 Two scripts automate everything in §1 + §2 + §5.3 so every practice session starts in under 10 seconds. **Full docs:** [scripts/README.md](scripts/README.md).
 
-- **[scripts/Start-CKAD.ps1](scripts/Start-CKAD.ps1)** — Windows launcher. Opens Windows Terminal → WSL Ubuntu and sources the bootstrap below. Pin it to your taskbar or run from PowerShell:
+- **[scripts/Start-CKAD.ps1](scripts/Start-CKAD.ps1)** - Windows launcher. Opens Windows Terminal → WSL Ubuntu and sources the bootstrap below. Pin it to your taskbar or run from PowerShell:
 
   ```powershell
   cd C:\me\git\Kubernetes-practices\CKAD
@@ -364,14 +364,14 @@ Two scripts automate everything in §1 + §2 + §5.3 so every practice session s
   .\scripts\Start-CKAD.ps1 -Reset    # full clean-slate (deletes the profile first)
   ```
 
-- **[scripts/ckad-up.sh](scripts/ckad-up.sh)** — WSL bootstrap. Idempotent. Can also be run directly inside an existing WSL shell:
+- **[scripts/ckad-up.sh](scripts/ckad-up.sh)** - WSL bootstrap. Idempotent. Can also be run directly inside an existing WSL shell:
 
   ```bash
   source CKAD/scripts/ckad-up.sh            # preferred: keeps alias k / $do / $now in the shell
   CKAD_RESET=1 source CKAD/scripts/ckad-up.sh  # clean slate
   ```
 
-- **[scripts/ckad-down.sh](scripts/ckad-down.sh)** — stop (default) or delete (`CKAD_DELETE=1`) the minikube profile at the end of a session.
+- **[scripts/ckad-down.sh](scripts/ckad-down.sh)** - stop (default) or delete (`CKAD_DELETE=1`) the minikube profile at the end of a session.
 
 What `ckad-up.sh` does:
 
@@ -388,12 +388,12 @@ What `ckad-up.sh` does:
 Run these repeatedly until they feel automatic.
 
 > Six drill sheets are available (study them in order):
-> 1. [drills-1-core.md](drills-1-core.md) — 25 scenario-based drills (build a thing).
-> 2. [drills-2-advanced.md](drills-2-advanced.md) — 12 advanced drills (SecurityContext, ServiceAccount, Ingress, Observability, multi-container, `kubectl edit`).
-> 3. [drills-3-imperative.md](drills-3-imperative.md) — 32 verb-based drills that drill **every imperative `kubectl` command shape** the exam expects (speed multipliers).
-> 4. [drills-4-modern.md](drills-4-modern.md) — 12 current-curriculum gap fillers (blue-green & canary, Helm, Kustomize, scheduling, `LimitRange`, `StorageClass`, CRD, PDB, `kubectl debug`).
-> 5. [drills-5-mock-exam.md](drills-5-mock-exam.md) — 15-task, 2-hour timed simulation with self-scoring rubric. Take it last.
-> 6. [drills-6-community.md](drills-6-community.md) — 12 gap-fillers inspired by the MIT-licensed `dgkanatsios/CKAD-exercises` (`kubectl explain`, downwardAPI, `subPath`, ExternalName, `rollout pause`, `kubectl cp`, etc.).
+> 1. [drills-1-core.md](drills-1-core.md) - 25 scenario-based drills (build a thing).
+> 2. [drills-2-advanced.md](drills-2-advanced.md) - 12 advanced drills (SecurityContext, ServiceAccount, Ingress, Observability, multi-container, `kubectl edit`).
+> 3. [drills-3-imperative.md](drills-3-imperative.md) - 32 verb-based drills covering every imperative `kubectl` command shape the exam expects (speed multipliers).
+> 4. [drills-4-modern.md](drills-4-modern.md) - 13 current-curriculum gap fillers (blue-green & canary, Helm, Kustomize, scheduling, `LimitRange`, `StorageClass`, CRD, PDB, `kubectl debug`, HPA).
+> 5. [drills-5-mock-exam.md](drills-5-mock-exam.md) - 18-task, ~2.5-hour timed simulation with self-scoring rubric. Take it last.
+> 6. [drills-6-community.md](drills-6-community.md) - 15 gap-fillers inspired by the MIT-licensed `dgkanatsios/CKAD-exercises` (`kubectl explain`, downwardAPI, `subPath`, ExternalName, `rollout pause`, `kubectl cp`, etc.).
 
 ### Curriculum coverage matrix
 
@@ -409,7 +409,7 @@ Map of every published [CKAD curriculum](https://github.com/cncf/curriculum) com
 | | Deployment strategies (blue-green, canary) | 4 (D38–39), 5 (T4) |
 | | Helm | 4 (D40), 5 (T5) |
 | | Kustomize | 4 (D41), 5 (T6) |
-| | Horizontal Pod Autoscaler (HPA) | 4 (D49b) — demo: [`demos/04-pod-design/08-hpa-definition.yaml`](../demos/04-pod-design/08-hpa-definition.yaml) |
+| | Horizontal Pod Autoscaler (HPA) | 4 (D49b) - demo: [`demos/04-pod-design/08-hpa-definition.yaml`](../demos/04-pod-design/08-hpa-definition.yaml) |
 | **Env, Config & Security (25%)** | ConfigMaps, Secrets | 1 (D11–15), 5 (T7) |
 | | SecurityContext | 2 (D26–28), 5 (T8) |
 | | ServiceAccount, Role/RoleBinding | 2 (D29–30), 5 (T9) |
@@ -426,7 +426,7 @@ Map of every published [CKAD curriculum](https://github.com/cncf/curriculum) com
 | | `kubectl wait`, `cp`, port-forward | 5 (T13), 6 (D59, 61) |
 | | PodDisruptionBudget | 4 (D48) |
 
-If a row has only one file, that area is **lightly practiced** — make it your first weak-spot drill before booking the real exam.
+If a row has only one file, that area is **lightly practiced** - make it your first weak-spot drill before booking the real exam.
 
 ### Core workloads
 
@@ -507,20 +507,20 @@ Key diagnostic signals:
 
 ## 8. Common Pitfalls
 
-- **Forgot the namespace** — set it once per session: `kubectl config set-context --current --namespace=practice`.
-- **Wrong context** — before anything destructive: `kubectl config current-context`.
-- **Indentation in YAML** — use the `vim` config in [2.3](#23-vim-config-for-yaml); always `kubectl apply --dry-run=client -f file.yaml` before the real apply.
-- **Writing YAML from scratch** — almost always slower than generating with `--dry-run=client -o yaml`.
-- **Editing live objects** — prefer `kubectl edit <resource>` over recreating when the task says “modify”.
-- **Slow deletes** — use `$now` (`--grace-period=0 --force`) when the task says to remove fast.
-- **Service selector mismatch** — check `kubectl get pods --show-labels` vs `kubectl describe svc`.
-- **Probes failing** — check path, port, and `initialDelaySeconds`; probe must match what the app actually exposes.
+- **Forgot the namespace** - set it once per session: `kubectl config set-context --current --namespace=practice`.
+- **Wrong context** - before anything destructive: `kubectl config current-context`.
+- **Indentation in YAML** - use the `vim` config in [2.3](#23-vim-config-for-yaml); always `kubectl apply --dry-run=client -f file.yaml` before the real apply.
+- **Writing YAML from scratch** - almost always slower than generating with `--dry-run=client -o yaml`.
+- **Editing live objects** - prefer `kubectl edit <resource>` over recreating when the task says “modify”.
+- **Slow deletes** - use `$now` (`--grace-period=0 --force`) when the task says to remove fast.
+- **Service selector mismatch** - check `kubectl get pods --show-labels` vs `kubectl describe svc`.
+- **Probes failing** - check path, port, and `initialDelaySeconds`; probe must match what the app actually exposes.
 
 ---
 
 ## 9. Local Practice vs Real Exam
 
-A few drills depend on Minikube-specific setup (CNI, addons, default StorageClass). The exam cluster is **not Minikube** — the local caveat goes away, but a different set of rules applies. The drills link here instead of repeating this content.
+A few drills depend on Minikube-specific setup (CNI, addons, default StorageClass). The exam cluster is **not Minikube**; different rules apply, and they're worth knowing before exam day.
 
 **General principle:** on the real exam the cluster is already provisioned. You don't `enable` addons, install controllers, pick a CNI, or create StorageClasses. You write the resource the task asks for, set the right namespace, and validate by behavior.
 
@@ -530,13 +530,13 @@ A few drills depend on Minikube-specific setup (CNI, addons, default StorageClas
 
 **On the real exam:**
 
-1. **An Ingress controller is already running** — don't deploy one. Confirm and move on:
+1. **An Ingress controller is already running** - don't deploy one. Confirm and move on:
    ```bash
    kubectl get ingressclass
    kubectl get pods -A | grep -iE 'ingress|nginx|traefik'
    ```
 2. **Set `ingressClassName` explicitly** when the task names a class (or one is the cluster default). Without it the controller may silently ignore your Ingress.
-3. **Scaffold imperatively, then edit** — saves typos in `pathType` and the nested `service.port` block:
+3. **Scaffold imperatively, then edit** - saves typos in `pathType` and the nested `service.port` block:
    ```bash
    kubectl create ingress app -n <ns> \
      --rule="/=web:80" --rule="/api=api:80" \
@@ -544,8 +544,8 @@ A few drills depend on Minikube-specific setup (CNI, addons, default StorageClas
    # host-based variant:
    kubectl create ingress app --rule="web.local/*=web:80" --dry-run=client -o yaml
    ```
-4. **`pathType` is mandatory** — admission rejects the object without it. Use `Prefix` unless told otherwise.
-5. **`backend.service.port` must match the Service** — use `port.number` or `port.name`, whichever the Service exposes (`kubectl get svc <name> -o yaml`).
+4. **`pathType` is mandatory** - admission rejects the object without it. Use `Prefix` unless told otherwise.
+5. **`backend.service.port` must match the Service** - use `port.number` or `port.name`, whichever the Service exposes (`kubectl get svc <name> -o yaml`).
 6. **No `minikube ip`, no `/etc/hosts` edits.** Validate from a throwaway pod or with curl headers:
    ```bash
    kubectl run tmp --rm -it --image=curlimages/curl --restart=Never -- \
@@ -553,9 +553,9 @@ A few drills depend on Minikube-specific setup (CNI, addons, default StorageClas
    # or, if a NodePort/LoadBalancer is reachable:
    curl -s --resolve web.local:80:<addr> http://web.local/
    ```
-7. **`ADDRESS` may stay empty** in `kubectl get ingress` — it is **not** part of grading. The grader inspects the spec.
+7. **`ADDRESS` may stay empty** in `kubectl get ingress` - it is **not** part of grading. The grader inspects the spec.
 8. **Watch the namespace.** Ingress and backend Services must live in the **same namespace**.
-9. **TLS only if asked**, and only with a Secret the task provides — never generate certificates.
+9. **TLS only if asked**, and only with a Secret the task provides - never generate certificates.
 10. **Score on spec, then move on.** If `kubectl get ingress <name> -o yaml` shows the right class, rules, paths, `pathType`, and ports, you're done.
 
 30-second fast-path:
@@ -572,28 +572,28 @@ kubectl describe ingress <name> | grep -E 'Class|Host|Path|Backend'
 
 ### 9.2 NetworkPolicy (drill 23)
 
-> **Local env:** Minikube needs a CNI that enforces NetworkPolicy — start with `minikube start -p ckad --cni=calico` to actually test enforcement.
+> **Local env:** Minikube needs a CNI that enforces NetworkPolicy - start with `minikube start -p ckad --cni=calico` to actually test enforcement.
 
 **On the real exam:**
 
-1. **The CNI already enforces policies** — don't try to install or change one.
-2. **Read the namespace** — apply with `-n <ns>` and confirm with `kubectl get netpol -n <ns>`.
-3. **Set `policyTypes` explicitly** (`Ingress`, `Egress`, or both). Omitting it means "infer from rules" — a common silent-fail when the question says "deny all egress".
+1. **The CNI already enforces policies** - don't try to install or change one.
+2. **Read the namespace** - apply with `-n <ns>` and confirm with `kubectl get netpol -n <ns>`.
+3. **Set `policyTypes` explicitly** (`Ingress`, `Egress`, or both). Omitting it means "infer from rules" - a common silent-fail when the question says "deny all egress".
 4. **Default-deny is empty rules, not missing rules.** To deny all ingress for a selector use `policyTypes: [Ingress]` with **no** `ingress:` key (or `ingress: []`). Same for egress.
-5. **Selector scoping matters.** `from.podSelector` matches pods in the **same namespace**; cross-namespace requires `namespaceSelector` (often combined with `podSelector`). Namespace labels matter — `kubectl label ns <ns> name=<ns>` if needed.
-6. **DNS often needs an explicit egress rule** — UDP/TCP 53 to `kube-system` — when the task restricts egress and the pod resolves Service names.
+5. **Selector scoping matters.** `from.podSelector` matches pods in the **same namespace**; cross-namespace requires `namespaceSelector` (often combined with `podSelector`). Namespace labels matter - `kubectl label ns <ns> name=<ns>` if needed.
+6. **DNS often needs an explicit egress rule** - UDP/TCP 53 to `kube-system` - when the task restricts egress and the pod resolves Service names.
 7. **Validate by traffic, not by `describe`.** The grader checks behavior:
    ```bash
    kubectl run probe --rm -it --image=busybox --restart=Never --labels=role=client \
      -- wget -qO- --timeout=2 http://web.<ns>.svc.cluster.local || echo BLOCKED
    ```
-8. **Don't restart pods.** Policies apply immediately to existing pods — recreating workloads wastes time.
+8. **Don't restart pods.** Policies apply immediately to existing pods - recreating workloads wastes time.
 
 ### 9.3 PV / PVC / StorageClass (drill 25)
 
 > **Local env:** Minikube ships with a default `standard` StorageClass (hostpath), so the PVC binds automatically without creating a PV.
 
-**On the real exam** — behavior depends on the task. Two patterns are common; **read the question** to know which:
+**On the real exam** - behavior depends on the task. Two patterns are common; **read the question** to know which:
 
 1. **"Create a PVC that binds."** A default StorageClass exists. Don't set `storageClassName` and the PVC will bind. Confirm:
    ```bash
@@ -604,10 +604,10 @@ kubectl describe ingress <name> | grep -E 'Class|Host|Path|Backend'
    - Use **`storageClassName: ""`** on PVC and PV to opt out of dynamic provisioning, **or** set the same explicit class name on both.
    - Match `accessModes` exactly and ensure `PV.capacity.storage >= PVC.requests.storage`.
    - Use a `selector` on the PVC if the task names labels for the PV.
-3. **`ReadWriteOnce` vs `ReadWriteMany`** — only request RWX if the task says so; most exam clusters' default class only provides RWO and the PVC will hang in `Pending`.
+3. **`ReadWriteOnce` vs `ReadWriteMany`** - only request RWX if the task says so; most exam clusters' default class only provides RWO and the PVC will hang in `Pending`.
 4. **`Pending` PVC = read the events.** `kubectl describe pvc <name>` shows the exact mismatch (no class, no matching PV, wrong access mode, capacity too small).
-5. **Reclaim policy** — only set `persistentVolumeReclaimPolicy: Retain` on the PV when the task explicitly requires data to survive PVC deletion.
-6. **Verify across pods** with `kubectl exec` (write from one, read from another) — don't trust `kubectl get pvc` alone for round-trip tasks.
+5. **Reclaim policy** - only set `persistentVolumeReclaimPolicy: Retain` on the PV when the task explicitly requires data to survive PVC deletion.
+6. **Verify across pods** with `kubectl exec` (write from one, read from another) - don't trust `kubectl get pvc` alone for round-trip tasks.
 
 ### 9.4 metrics-server / `kubectl top` (drill 33)
 
@@ -620,8 +620,8 @@ kubectl describe ingress <name> | grep -E 'Class|Host|Path|Backend'
    ```bash
    kubectl -n kube-system get deploy metrics-server
    ```
-3. **Wait ~30 s** — metrics need a scrape interval before the first values appear, especially if pods just started.
-4. **Don't troubleshoot it further** — it's not part of the question. Move on, return at the end if needed.
+3. **Wait ~30 s** - metrics need a scrape interval before the first values appear, especially if pods just started.
+4. **Don't troubleshoot it further** - it's not part of the question. Move on, return at the end if needed.
 
 ---
 
@@ -629,7 +629,7 @@ kubectl describe ingress <name> | grep -E 'Class|Host|Path|Backend'
 
 ### 10.1 One-time warm-up (run once when the exam terminal opens)
 
-The exam shell is fresh — aliases and completion are **not** preloaded, and nothing you set in one task's shell carries over automatically. Paste the [§2.1 block](#21-the-block) at the very start:
+The exam shell is fresh - aliases and completion are **not** preloaded, and nothing you set in one task's shell carries over automatically. Paste the [§2.1 block](#21-the-block) at the very start:
 
 ```bash
 alias k=kubectl
@@ -646,7 +646,7 @@ complete -F __start_kubectl k
 Tips for speed on the exam machine:
 
 - Keep the block in a **text file on your local machine** so you can paste it in one keystroke; do not re-type it.
-- If the exam terminal tab is replaced (new shell), paste the block again — it is cheap.
+- If the exam terminal tab is replaced (new shell), paste the block again - it is cheap.
 - Open the allowed docs tab (`kubernetes.io/docs`) **before** starting the clock-sensitive work.
 
 ### 10.2 Per-task runbook
@@ -703,4 +703,5 @@ You should be able to do all of these without thinking.
 - `kubectl rollout undo deployment/web`
 - `kubectl explain pod.spec.containers`
 
-If any of those costs more than a few seconds — drill it until it does not.
+If any of those costs more than a few seconds - drill it until it does not.
+

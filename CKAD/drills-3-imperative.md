@@ -1,10 +1,10 @@
 # CKAD Imperative `kubectl` Drills
 
-A verb-focused drill sheet. Each drill targets **one imperative `kubectl` command shape** that pays off on the exam — fast resource creation without writing YAML from scratch.
+A verb-focused drill sheet. Each drill targets **one imperative `kubectl` command shape** that pays off on the exam - fast resource creation without writing YAML from scratch.
 
 > Companion to the scenario-based drills:
-> - [drills-1-core.md](drills-1-core.md) — 25 build-a-thing drills.
-> - [drills-2-advanced.md](drills-2-advanced.md) — 12 advanced drills (SecurityContext, ServiceAccount, Ingress, Observability, multi-container, `kubectl edit`).
+> - [drills-1-core.md](drills-1-core.md) - 25 build-a-thing drills.
+> - [drills-2-advanced.md](drills-2-advanced.md) - 12 advanced drills (SecurityContext, ServiceAccount, Ingress, Observability, multi-container, `kubectl edit`).
 
 Run all drills in a reset Minikube profile. See [README.md §5.3](README.md#53-minikube-reset-loop).
 
@@ -29,7 +29,7 @@ All answers assume the current namespace is `practice`.
 ## How to use this lab
 
 1. Pick **5 drills** at random.
-2. Set a **timer** per drill (see budgets — most are 1–2 min).
+2. Set a **timer** per drill (see budgets - most are 1–2 min).
 3. Solve **without** opening the answer. Allowed help: `kubectl --help`, `kubectl explain`, [kubernetes.io/docs](https://kubernetes.io/docs/).
 4. Only expand the answer after you finish **or** time runs out.
 5. Log each miss (`drill`, `mistake`, `faster command`).
@@ -38,9 +38,9 @@ The point is **muscle memory**: when the exam gives you a command to run inside 
 
 ---
 
-## Section A — Pods & Deployments
+## Section A - Pods & Deployments
 
-### Drill 1 — Run a one-off Pod
+### Drill 1 - Run a one-off Pod
 **Budget:** 1 min
 **Task:** Create Pod `nginx` from image `nginx:1.27`, restart policy `Never`.
 
@@ -50,7 +50,7 @@ The point is **muscle memory**: when the exam gives you a command to run inside 
 kubectl run nginx --image=nginx:1.27 --restart=Never
 ```
 
-Verify — `READY 1/1`, `STATUS Running`:
+Verify - `READY 1/1`, `STATUS Running`:
 
 ```bash
 kubectl get pod nginx
@@ -59,7 +59,7 @@ kubectl get pod nginx
 
 ---
 
-### Drill 2 — Pod that runs a custom command
+### Drill 2 - Pod that runs a custom command
 **Budget:** 2 min
 **Task:** Create Pod `busybox` from `busybox` that runs `sleep 3600`. Anything after `--` is the command.
 
@@ -80,7 +80,7 @@ kubectl get pod busybox -o jsonpath='{.spec.containers[0].command}'   # ["sleep"
 
 ---
 
-### Drill 3 — Pod with port and labels
+### Drill 3 - Pod with port and labels
 **Budget:** 2 min
 **Task:** Create Pod `web` (`nginx`) exposing port 80, labels `app=web,tier=frontend`.
 
@@ -99,7 +99,7 @@ kubectl get pod web --show-labels
 
 ---
 
-### Drill 4 — Create a Deployment
+### Drill 4 - Create a Deployment
 **Budget:** 1 min
 **Task:** Deployment `api` from `nginx:1.27`, **3 replicas**.
 
@@ -109,7 +109,7 @@ kubectl get pod web --show-labels
 kubectl create deployment api --image=nginx:1.27 --replicas=3
 ```
 
-Verify — `READY 3/3`:
+Verify - `READY 3/3`:
 
 ```bash
 kubectl get deploy api
@@ -118,7 +118,7 @@ kubectl get deploy api
 
 ---
 
-### Drill 5 — Generate Deployment YAML, don't apply
+### Drill 5 - Generate Deployment YAML, don't apply
 **Budget:** 2 min
 **Task:** Produce a Deployment manifest for `api` (`nginx:1.27`, 2 replicas) into `api.yaml` **without** touching the cluster.
 
@@ -138,9 +138,9 @@ kubectl apply --dry-run=client -f api.yaml
 
 ---
 
-## Section B — Scale, expose, autoscale, rollout
+## Section B - Scale, expose, autoscale, rollout
 
-### Drill 6 — Scale a Deployment
+### Drill 6 - Scale a Deployment
 **Budget:** 1 min
 **Task:** Scale `api` to 5 replicas.
 
@@ -159,7 +159,7 @@ kubectl get deploy api    # READY 5/5
 
 ---
 
-### Drill 7 — Expose a Deployment as a Service
+### Drill 7 - Expose a Deployment as a Service
 **Budget:** 2 min
 **Task:** Expose Deployment `api` as `ClusterIP` Service `api-svc` on port 80, target port 8080.
 
@@ -179,7 +179,7 @@ kubectl get endpoints api-svc      # endpoints == api pod IPs
 
 ---
 
-### Drill 8 — Expose a Pod as NodePort
+### Drill 8 - Expose a Pod as NodePort
 **Budget:** 2 min
 **Task:** Expose Pod `web` as a NodePort Service named `web-np` on port 80.
 
@@ -189,7 +189,7 @@ kubectl get endpoints api-svc      # endpoints == api pod IPs
 kubectl expose pod web --name=web-np --type=NodePort --port=80
 ```
 
-Verify — note the `NODE-PORT` column:
+Verify - note the `NODE-PORT` column:
 
 ```bash
 kubectl get svc web-np
@@ -198,7 +198,7 @@ kubectl get svc web-np
 
 ---
 
-### Drill 9 — Autoscale a Deployment (HPA)
+### Drill 9 - Autoscale a Deployment (HPA)
 **Budget:** 2 min
 **Task:** Create an HPA for `api`: min 2, max 5, target CPU 70%.
 
@@ -221,7 +221,7 @@ kubectl get hpa api
 
 ---
 
-### Drill 10 — Rollout: status, history, undo, restart
+### Drill 10 - Rollout: status, history, undo, restart
 **Budget:** 3 min
 **Task:** For Deployment `api`:
 1. update its image to `nginx:1.28`,
@@ -246,12 +246,12 @@ Verify the active image after undo (should be `nginx:1.27`):
 kubectl get deploy api -o jsonpath='{.spec.template.spec.containers[0].image}'
 ```
 
-> `set image deploy/<name> <container>=<image>`. The container name comes from the Pod template — for a freshly created Deployment it usually matches the deployment name (`nginx` here, matching `--image=nginx:1.27` from drill 4).
+> `set image deploy/<name> <container>=<image>`. The container name comes from the Pod template - for a freshly created Deployment it usually matches the deployment name (`nginx` here, matching `--image=nginx:1.27` from drill 4).
 </details>
 
 ---
 
-### Drill 11 — Set environment variables on a Deployment
+### Drill 11 - Set environment variables on a Deployment
 **Budget:** 2 min
 **Task:** Set `LOG_LEVEL=debug` on Deployment `api` (triggers a rollout).
 
@@ -273,9 +273,9 @@ kubectl rollout status deploy/api
 
 ---
 
-## Section C — ConfigMaps & Secrets
+## Section C - ConfigMaps & Secrets
 
-### Drill 12 — ConfigMap from literals
+### Drill 12 - ConfigMap from literals
 **Budget:** 1 min
 **Task:** ConfigMap `app-cfg` with keys `ENV=prod`, `LOG=debug`.
 
@@ -294,7 +294,7 @@ kubectl get cm app-cfg -o jsonpath='{.data}'
 
 ---
 
-### Drill 13 — ConfigMap from a file or env-file
+### Drill 13 - ConfigMap from a file or env-file
 **Budget:** 3 min
 **Task:**
 1. Create file `app.env` with two lines `ENV=prod` and `LOG=debug`.
@@ -320,12 +320,12 @@ kubectl get cm app-env       -o jsonpath='{.data}'   # keys: ENV, LOG
 kubectl get cm app-cfg-file  -o jsonpath='{.data}'   # key:  app.env
 ```
 
-> `--from-env-file` parses lines. `--from-file` stores the file. Two **different** outcomes — make sure you reach for the right flag.
+> `--from-env-file` parses lines. `--from-file` stores the file. Two **different** outcomes - make sure you reach for the right flag.
 </details>
 
 ---
 
-### Drill 14 — Generic Secret from literals
+### Drill 14 - Generic Secret from literals
 **Budget:** 1 min
 **Task:** Secret `db` with `user=admin`, `pass=s3cr3t`.
 
@@ -344,7 +344,7 @@ kubectl get secret db -o jsonpath='{.data.user}' | base64 -d   # admin
 
 ---
 
-### Drill 15 — Docker registry pull Secret
+### Drill 15 - Docker registry pull Secret
 **Budget:** 2 min
 **Task:** Secret `regcred` for `myregistry.example.com`, user `bob`, password `hunter2`.
 
@@ -358,7 +358,7 @@ kubectl create secret docker-registry regcred \
   [email protected]
 ```
 
-Verify — type must be `kubernetes.io/dockerconfigjson`:
+Verify - type must be `kubernetes.io/dockerconfigjson`:
 
 ```bash
 kubectl get secret regcred -o jsonpath='{.type}'
@@ -369,7 +369,7 @@ kubectl get secret regcred -o jsonpath='{.type}'
 
 ---
 
-### Drill 16 — TLS Secret from cert+key files
+### Drill 16 - TLS Secret from cert+key files
 **Budget:** 2 min
 **Task:** Given files `tls.crt` and `tls.key` exist in the current directory, create Secret `web-tls` of type TLS.
 
@@ -379,7 +379,7 @@ kubectl get secret regcred -o jsonpath='{.type}'
 kubectl create secret tls web-tls --cert=tls.crt --key=tls.key
 ```
 
-Verify — type must be `kubernetes.io/tls`:
+Verify - type must be `kubernetes.io/tls`:
 
 ```bash
 kubectl get secret web-tls -o jsonpath='{.type}'
@@ -388,9 +388,9 @@ kubectl get secret web-tls -o jsonpath='{.type}'
 
 ---
 
-## Section D — Jobs, CronJobs, ServiceAccounts
+## Section D - Jobs, CronJobs, ServiceAccounts
 
-### Drill 17 — Create a Job
+### Drill 17 - Create a Job
 **Budget:** 2 min
 **Task:** Create a Job named `countdown` (image `busybox`) that runs `sh -c 'for i in 9 8 7 6 5 4 3 2 1 0; do echo $i; done'` with `backoffLimit: 4`.
 
@@ -403,7 +403,7 @@ kubectl create job countdown --image=busybox -o yaml --dry-run=client -- \
   | kubectl apply -f -
 ```
 
-> `kubectl create job` has no `--backoff-limit` flag — generate YAML with `--dry-run=client -o yaml`, patch `backoffLimit`, then pipe to `kubectl apply`.
+> `kubectl create job` has no `--backoff-limit` flag - generate YAML with `--dry-run=client -o yaml`, patch `backoffLimit`, then pipe to `kubectl apply`.
 
 Verify:
 
@@ -415,7 +415,7 @@ kubectl logs job/countdown
 
 ---
 
-### Drill 18 — Create a CronJob
+### Drill 18 - Create a CronJob
 **Budget:** 2 min
 **Task:** CronJob `hello` (image `busybox`) that prints `hello` every 5 minutes.
 
@@ -431,12 +431,12 @@ Verify:
 kubectl get cronjob hello
 ```
 
-> Tip: `--schedule="* * * * *"` (every minute) is convenient when practicing — you don't have to wait 5 minutes for the first run.
+> Tip: `--schedule="* * * * *"` (every minute) is convenient when practicing - you don't have to wait 5 minutes for the first run.
 </details>
 
 ---
 
-### Drill 19 — ServiceAccount and short-lived token
+### Drill 19 - ServiceAccount and short-lived token
 **Budget:** 2 min
 **Task:** Create ServiceAccount `build-sa`, then mint a short-lived token for it (modern alternative to legacy `kubernetes.io/service-account-token` Secrets).
 
@@ -458,9 +458,9 @@ kubectl get sa build-sa
 
 ---
 
-## Section E — RBAC
+## Section E - RBAC
 
-### Drill 20 — Role + RoleBinding
+### Drill 20 - Role + RoleBinding
 **Budget:** 3 min
 **Task:**
 1. Role `pod-reader` allowing `get,list,watch` on `pods`.
@@ -474,7 +474,7 @@ kubectl create role pod-reader --verb=get,list,watch --resource=pods
 kubectl create rolebinding read-pods --role=pod-reader --serviceaccount=practice:build-sa
 ```
 
-Verify — both should print `yes` / `no` as expected:
+Verify - both should print `yes` / `no` as expected:
 
 ```bash
 kubectl auth can-i list   pods --as=system:serviceaccount:practice:build-sa   # yes
@@ -484,7 +484,7 @@ kubectl auth can-i delete pods --as=system:serviceaccount:practice:build-sa   # 
 
 ---
 
-### Drill 21 — ClusterRole + ClusterRoleBinding
+### Drill 21 - ClusterRole + ClusterRoleBinding
 **Budget:** 2 min
 **Task:** ClusterRole `node-reader` (`get,list` on `nodes`), bound cluster-wide to `practice:build-sa`.
 
@@ -505,7 +505,7 @@ kubectl auth can-i list nodes --as=system:serviceaccount:practice:build-sa   # y
 
 ---
 
-### Drill 22 — Role for a non-resource URL
+### Drill 22 - Role for a non-resource URL
 **Budget:** 2 min
 **Task:** ClusterRole `metrics-reader` allowing `get` on the non-resource URL `/metrics`.
 
@@ -524,9 +524,9 @@ kubectl get clusterrole metrics-reader -o yaml | grep -A3 nonResourceURLs
 
 ---
 
-## Section F — Ingress, Quotas, NetworkPolicy
+## Section F - Ingress, Quotas, NetworkPolicy
 
-### Drill 23 — Path- and host-based Ingress
+### Drill 23 - Path- and host-based Ingress
 **Budget:** 3 min
 **Task:** Ingress `web-ing` with class `nginx`, host `web.local`, path `/` → Service `web:80`.
 
@@ -562,7 +562,7 @@ kubectl describe ingress web-ing | grep -E 'Class|Host|Path|Backend'
 
 ---
 
-### Drill 24 — ResourceQuota
+### Drill 24 - ResourceQuota
 **Budget:** 2 min
 **Task:** Quota `team-q` capping namespace `practice` at 2 CPU, 4Gi memory, 10 pods.
 
@@ -581,7 +581,7 @@ kubectl describe quota team-q
 
 ---
 
-### Drill 25 — NetworkPolicy (no imperative form)
+### Drill 25 - NetworkPolicy (no imperative form)
 **Budget:** 3 min
 **Task:** There is **no** `kubectl create networkpolicy` command. Practice the 30-second YAML scaffold instead: deny-all-ingress for the namespace.
 
@@ -605,14 +605,14 @@ Verify:
 kubectl get netpol default-deny-ingress
 ```
 
-> Memorise this skeleton — `podSelector: {}` selects everything, `policyTypes: [Ingress]` with no `ingress:` rules = deny-all. Full NetworkPolicy practice: [drills-1-core.md Drill 23](drills-1-core.md#drill-23--networkpolicy--allow-only-from-labeled-pods). Exam-day actions: [README §9.2](README.md#92-networkpolicy-drill-23).
+> Memorise this skeleton - `podSelector: {}` selects everything, `policyTypes: [Ingress]` with no `ingress:` rules = deny-all. Full NetworkPolicy practice: [drills-1-core.md Drill 23](drills-1-core.md#drill-23--networkpolicy--allow-only-from-labeled-pods). Exam-day actions: [README §9.2](README.md#92-networkpolicy-drill-23).
 </details>
 
 ---
 
-## Section G — Labels, annotations, taints, edit-in-place
+## Section G - Labels, annotations, taints, edit-in-place
 
-### Drill 26 — Label and annotate
+### Drill 26 - Label and annotate
 **Budget:** 2 min
 **Task:**
 1. Add label `tier=frontend` to Pod `web` (overwrite if exists).
@@ -637,7 +637,7 @@ kubectl get deploy api -o jsonpath='{.metadata.annotations.owner}'
 
 ---
 
-### Drill 27 — Taint and untaint a node
+### Drill 27 - Taint and untaint a node
 **Budget:** 2 min
 **Task:** Taint node `<node>` with `dedicated=ckad:NoSchedule`, then remove it.
 
@@ -658,7 +658,7 @@ kubectl describe node "$NODE" | grep Taints
 
 ---
 
-### Drill 28 — Patch and edit in place
+### Drill 28 - Patch and edit in place
 **Budget:** 2 min
 **Task:**
 1. Use `patch` (not `edit`) to change `api` to 4 replicas.
@@ -677,16 +677,16 @@ Verify:
 kubectl get deploy api -o jsonpath='{.spec.replicas}{"\n"}{.spec.template.spec.containers[0].image}'
 ```
 
-> `patch` is scriptable and survives YAML drift. `edit` is faster when you need to touch several fields at once. The exam allows both — use whichever is faster for the question.
+> `patch` is scriptable and survives YAML drift. `edit` is faster when you need to touch several fields at once. The exam allows both - use whichever is faster for the question.
 </details>
 
 ---
 
-## Section H — Debug / inspect / scaffolds
+## Section H - Debug / inspect / scaffolds
 
-These four are pure speed multipliers — practice until they're reflex.
+These four are pure speed multipliers - practice until they're reflex.
 
-### Drill 29 — Throwaway debug Pod
+### Drill 29 - Throwaway debug Pod
 **Budget:** 1 min
 **Task:** Open an interactive `sh` in a one-shot `busybox` Pod and have it self-delete on exit.
 
@@ -709,7 +709,7 @@ exit
 
 ---
 
-### Drill 30 — Dump a live object as a YAML scaffold
+### Drill 30 - Dump a live object as a YAML scaffold
 **Budget:** 2 min
 **Task:** Save Deployment `api`'s spec to `api-live.yaml` and remove the server-side fields you should never re-apply.
 
@@ -733,7 +733,7 @@ kubectl apply --dry-run=client -f api-live.yaml
 
 ---
 
-### Drill 31 — Find a field path with `kubectl explain`
+### Drill 31 - Find a field path with `kubectl explain`
 **Budget:** 2 min
 **Task:** Without opening the docs, find the YAML path for a container's CPU/memory **limits**.
 
@@ -751,7 +751,7 @@ Expected path: `spec.containers[].resources.limits.{cpu,memory}`.
 
 ---
 
-### Drill 32 — `auth can-i`, `api-resources`, `api-versions`
+### Drill 32 - `auth can-i`, `api-resources`, `api-versions`
 **Budget:** 2 min
 **Task:**
 1. Can `practice:build-sa` create deployments? (expect `no`)
@@ -807,4 +807,5 @@ kubectl delete ns practice && kubectl create ns practice
 - Solved within 1.5× budget, or peeked once → **1 pt**
 - Did not solve, or used full answer → **0 pts**
 
-Target for exam-readiness: **52+ / 64** across a full 32-drill run, with **zero misses** in Section H (debug/inspect — these are the time-savers).
+Target for exam-readiness: **52+ / 64** across a full 32-drill run, with **zero misses** in Section H (debug/inspect - these are the time-savers).
+

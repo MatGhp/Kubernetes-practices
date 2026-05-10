@@ -1,6 +1,6 @@
-# CKAD Mock Exam — 18 Tasks, ~2.5 Hours
+# CKAD Mock Exam - 18 Tasks, ~2.5 Hours
 
-A timed simulation of the **current** CKAD exam format (April 2026). Original tasks — no leaked content. Designed to mirror the **shape** of the live exam: terminal-only, mixed difficulty, weighted percentages roughly matching the [published curriculum](https://github.com/cncf/curriculum), and worded to be unambiguous so you can self-grade.
+A timed simulation of the **current** CKAD exam format (2026). Tasks are original; nothing here comes from leaked content. The structure mirrors the real exam: terminal-only, mixed difficulty, weighted to match the [published curriculum](https://github.com/cncf/curriculum). Self-grade when the timer stops.
 
 > **Use this file last.** Run [drills-1-core.md](drills-1-core.md) → [drills-2-advanced.md](drills-2-advanced.md) → [drills-3-imperative.md](drills-3-imperative.md) → [drills-4-modern.md](drills-4-modern.md) → [drills-6-community.md](drills-6-community.md), then attempt this paper end-to-end.
 
@@ -33,11 +33,11 @@ A timed simulation of the **current** CKAD exam format (April 2026). Original ta
 
 ---
 
-## Section 1 — Application Design and Build (27 pts)
+## Section 1 - Application Design and Build (27 pts)
 
-> **Namespace:** `ns-build` — `kubectl config set-context --current --namespace=ns-build`
+> **Namespace:** `ns-build` - `kubectl config set-context --current --namespace=ns-build`
 
-### Task 1 — Multi-container Pod with shared `emptyDir` (6 pts, 5 min)
+### Task 1 - Multi-container Pod with shared `emptyDir` (6 pts, 5 min)
 
 Create a Pod `task1` with **two containers**:
 
@@ -79,7 +79,7 @@ kubectl logs task1 -c reader --tail=3
 
 ---
 
-### Task 2 — Init container that gates startup (6 pts, 5 min)
+### Task 2 - Init container that gates startup (6 pts, 5 min)
 
 Create a Pod `task2` with one main container `app` (`nginx:1.27`) and one init container `wait-for-svc` (`busybox:1.36`) that runs `sh -c "until nslookup gate.ns-build.svc.cluster.local; do sleep 2; done"`. Then create the Service `gate` (ClusterIP, port 80, no backing pods needed) and observe `task2` transition `Init` → `Running`.
 
@@ -117,7 +117,7 @@ kubectl get pod task2 -w   # Ctrl-C once Running
 
 ---
 
-### Task 3 — Build manifest from spec (8 pts, 6 min)
+### Task 3 - Build manifest from spec (8 pts, 6 min)
 
 Create a Deployment `api` (3 replicas, image `nginx:1.27`) and a ClusterIP Service `api` on port 80. Add a `livenessProbe` (HTTP `GET /` on port 80, initial delay 5 s) and a `readinessProbe` (same target, period 5 s). Resource requests `cpu: 100m`, `memory: 64Mi`.
 
@@ -131,7 +131,7 @@ kubectl expose deploy api --port=80
 ```
 
 ```yaml
-# extract from task3.yaml — container spec
+# extract from task3.yaml - container spec
         resources:
           requests: { cpu: 100m, memory: 64Mi }
         livenessProbe:
@@ -152,11 +152,11 @@ kubectl get svc api
 
 ---
 
-## Section 2 — Application Deployment (20 pts)
+## Section 2 - Application Deployment (20 pts)
 
-> **Namespace:** `ns-deploy` — `kubectl config set-context --current --namespace=ns-deploy`
+> **Namespace:** `ns-deploy` - `kubectl config set-context --current --namespace=ns-deploy`
 
-### Task 4 — Canary at 10% (6 pts, 5 min)
+### Task 4 - Canary at 10% (6 pts, 5 min)
 
 A Service `shop` selects `app=shop` (no version label). Create a `shop-stable` Deployment (9 replicas, `nginx:1.27`, labels `app=shop,track=stable`) and a `shop-canary` Deployment (1 replica, `nginx:1.28`, labels `app=shop,track=canary`).
 
@@ -226,7 +226,7 @@ kubectl get endpointslices -l kubernetes.io/service-name=shop \
 
 ---
 
-### Task 5 — Helm release with override (6 pts, 5 min)
+### Task 5 - Helm release with override (6 pts, 5 min)
 
 In namespace `ns-deploy`, the Helm repo `bitnami` (`https://charts.bitnami.com/bitnami`) has been added for you. Install chart `bitnami/nginx` as release `front` with `replicaCount=2` and `service.type=ClusterIP`.
 
@@ -255,13 +255,13 @@ kubectl get deploy,svc -l app.kubernetes.io/instance=front
 
 ---
 
-### Task 6 — Kustomize overlay (8 pts, 6 min)
+### Task 6 - Kustomize overlay (8 pts, 6 min)
 
 A base is **already provided** at `~/task6/base/` containing a Deployment `web` (1 replica of `nginx:1.27`) and a `kustomization.yaml` listing it as a resource.
 
 Create an overlay at `~/task6/overlays/staging/` that, when applied with `kubectl apply -k ~/task6/overlays/staging -n ns-deploy`, produces a Deployment `web` with **4 replicas** and label `env=staging`. Do not modify any file under `base/`.
 
-> **Setup (run once before the timer — simulates the pre-created files the real exam gives you):**
+> **Setup (run once before the timer - simulates the pre-created files the real exam gives you):**
 >
 > ```bash
 > mkdir -p ~/task6/base ~/task6/overlays/staging
@@ -324,11 +324,11 @@ kubectl get deploy web -n ns-deploy -o jsonpath='{.spec.replicas} {.metadata.lab
 
 ---
 
-## Section 3 — Environment, Configuration & Security (25 pts)
+## Section 3 - Environment, Configuration & Security (25 pts)
 
-> **Namespace:** `ns-config` — `kubectl config set-context --current --namespace=ns-config`
+> **Namespace:** `ns-config` - `kubectl config set-context --current --namespace=ns-config`
 
-### Task 7 — ConfigMap + Secret consumption (6 pts, 4 min)
+### Task 7 - ConfigMap + Secret consumption (6 pts, 4 min)
 
 Create ConfigMap `app-cfg` with key `LOG_LEVEL=debug`. Create Secret `app-sec` with key `API_KEY=s3cr3t`. Create a Pod `task7` (`nginx:1.27`) that exposes `LOG_LEVEL` as an env var from the ConfigMap and mounts the Secret at `/etc/secrets`.
 
@@ -367,7 +367,7 @@ kubectl exec task7 -- ls /etc/secrets
 
 ---
 
-### Task 8 — SecurityContext: non-root + read-only FS (7 pts, 5 min)
+### Task 8 - SecurityContext: non-root + read-only FS (7 pts, 5 min)
 
 Pod `task8` (image `nginx:1.27`) must run as user `1001`, group `2002`, with a **read-only root filesystem** and an `emptyDir` mounted at `/var/cache/nginx` and `/var/run` so nginx can still start.
 
@@ -399,9 +399,9 @@ spec:
 
 > **Common mistakes to avoid:**
 >
-> 1. **`readOnlyRootFilesystem` at pod level** — this field belongs under `spec.containers[*].securityContext`, not `spec.securityContext`. Placing it at pod level is silently ignored; the filesystem stays writable.
-> 2. **Missing `fsGroup`** — without it, mounted volumes are owned by root. The process can still write because emptyDir defaults to mode `0777`, but the task explicitly requires group `2002`.
-> 3. **One emptyDir for both mounts** — Kubernetes allows it, but sharing one volume across two mount paths creates hidden coupling. Use two separate `emptyDir` volumes.
+> 1. **`readOnlyRootFilesystem` at pod level** - this field belongs under `spec.containers[*].securityContext`, not `spec.securityContext`. Placing it at pod level is silently ignored; the filesystem stays writable.
+> 2. **Missing `fsGroup`** - without it, mounted volumes are owned by root. The process can still write because emptyDir defaults to mode `0777`, but the task explicitly requires group `2002`.
+> 3. **One emptyDir for both mounts** - Kubernetes allows it, but sharing one volume across two mount paths creates hidden coupling. Use two separate `emptyDir` volumes.
 
 **Verify:**
 
@@ -413,7 +413,7 @@ kubectl exec task8 -- touch /test 2>&1 | grep -i "read-only"
 
 ---
 
-### Task 9 — ServiceAccount + read-only Role (6 pts, 5 min)
+### Task 9 - ServiceAccount + read-only Role (6 pts, 5 min)
 
 Create ServiceAccount `viewer`, Role `pod-viewer` allowing `get,list,watch` on `pods`, and a RoleBinding `viewer-binds-pod-viewer` binding the SA to the Role. Create a Pod `task9` (`bitnami/kubectl:latest`) using the `viewer` ServiceAccount. Confirm the SA can list pods in namespace `ns-config` but **cannot** list Deployments (expect `Forbidden`).
 
@@ -440,14 +440,14 @@ spec:
 **Verify:**
 
 ```bash
-kubectl exec task9 -- kubectl get pods                              # succeeds — SA has pod-viewer Role
-kubectl exec task9 -- kubectl get deploy 2>&1 | grep -i forbidden   # denied — Deployments not in Role
+kubectl exec task9 -- kubectl get pods                              # succeeds - SA has pod-viewer Role
+kubectl exec task9 -- kubectl get deploy 2>&1 | grep -i forbidden   # denied - Deployments not in Role
 ```
 </details>
 
 ---
 
-### Task 10 — NetworkPolicy: default-deny + allow from one label (6 pts, 5 min)
+### Task 10 - NetworkPolicy: default-deny + allow from one label (6 pts, 5 min)
 
 Add two NetworkPolicies in namespace `ns-config`:
 
@@ -487,11 +487,11 @@ kubectl get netpol -n ns-config
 
 ---
 
-## Section 4 — Services and Networking (20 pts)
+## Section 4 - Services and Networking (20 pts)
 
-> **Namespace:** `ns-network` — `kubectl config set-context --current --namespace=ns-network`
+> **Namespace:** `ns-network` - `kubectl config set-context --current --namespace=ns-network`
 
-### Task 11 — Path-based Ingress (8 pts, 6 min)
+### Task 11 - Path-based Ingress (8 pts, 6 min)
 
 In namespace `ns-network`, two Deployments (`web-a`, `web-b`, both `nginx:1.27`, 1 replica) and matching ClusterIP Services on port 80 **already exist**. Create an Ingress named `paths` so that:
 
@@ -500,7 +500,7 @@ In namespace `ns-network`, two Deployments (`web-a`, `web-b`, both `nginx:1.27`,
 
 Use `pathType: Prefix` and the cluster's default IngressClass.
 
-> **Setup (run once before the timer — simulates the pre-created Deployments and Services):**
+> **Setup (run once before the timer - simulates the pre-created Deployments and Services):**
 >
 > ```bash
 > kubectl -n ns-network create deploy web-a --image=nginx:1.27
@@ -550,7 +550,7 @@ kubectl describe ingress paths -n ns-network | grep -E 'Path|Backend'
 
 ---
 
-### Task 12 — Headless Service for stable DNS (6 pts, 4 min)
+### Task 12 - Headless Service for stable DNS (6 pts, 4 min)
 
 Create a headless Service (`clusterIP: None`) `db` on port 5432 selecting `app=db`. Create a 2-replica Deployment `db` (`postgres:16`, env `POSTGRES_PASSWORD=x`). Confirm that an `nslookup` of `db.ns-network.svc.cluster.local` returns **two** IP addresses.
 
@@ -592,11 +592,11 @@ kubectl run dns --rm -it --restart=Never --image=busybox:1.36 -- \
 
 ---
 
-### Task 13 — `port-forward` to a private Service (6 pts, 3 min)
+### Task 13 - `port-forward` to a private Service (6 pts, 3 min)
 
 Forward local port 9090 to Service `api` (port 80) in namespace `ns-network`, then `curl` `http://localhost:9090` to confirm a 200 response. Run the forward in the background and clean it up.
 
-> **Setup (run once before the timer — simulates the pre-created `api` Service):**
+> **Setup (run once before the timer - simulates the pre-created `api` Service):**
 >
 > ```bash
 > kubectl -n ns-network create deploy api --image=nginx:1.27
@@ -617,11 +617,11 @@ kill $PF
 
 ---
 
-## Section 5 — Observability & Maintenance (28 pts)
+## Section 5 - Observability & Maintenance (28 pts)
 
-> **Namespace:** `ns-observe` — `kubectl config set-context --current --namespace=ns-observe`
+> **Namespace:** `ns-observe` - `kubectl config set-context --current --namespace=ns-observe`
 
-### Task 14 — Diagnose a CrashLooping Pod (8 pts, 7 min)
+### Task 14 - Diagnose a CrashLooping Pod (8 pts, 7 min)
 
 Apply this manifest as-is, diagnose the failure, then fix it so the Pod reaches `Running`:
 
@@ -655,7 +655,7 @@ kubectl get pod task14
 kubectl describe pod task14 | grep -A2 "Last State\|Reason\|Exit Code"
 kubectl logs task14 --previous
 
-# Fix — Pod's `spec.containers[*].command` is immutable, so `kubectl edit` will reject the change.
+# Fix - Pod's `spec.containers[*].command` is immutable, so `kubectl edit` will reject the change.
 # Recreate via replace --force (or delete + apply):
 kubectl get pod task14 -o yaml > task14.yaml
 # edit task14.yaml: change command to ["sleep","3600"]
@@ -673,11 +673,11 @@ kubectl wait --for=condition=Ready pod/task14 --timeout=30s
 
 ---
 
-### Task 15 — Ephemeral debug container (7 pts, 5 min)
+### Task 15 - Ephemeral debug container (7 pts, 5 min)
 
 A running Pod `target` (image `nginx:1.27`) has no shell debugging tools. Without restarting it, attach an ephemeral `busybox:1.36` container, `wget` `localhost`, and capture the response status into a file `/tmp/probe.txt` on your local host.
 
-> **Setup (run once before the timer — simulates the running Pod the real exam gives you):**
+> **Setup (run once before the timer - simulates the running Pod the real exam gives you):**
 >
 > ```bash
 > kubectl run target --image=nginx:1.27 -n ns-observe
@@ -698,9 +698,9 @@ cat /tmp/probe.txt
 
 ---
 
-### Task 16 — Build and deploy a local container image (7 pts, 6 min)
+### Task 16 - Build and deploy a local container image (7 pts, 6 min)
 
-> **Curriculum:** Application Design & Build — container images  
+> **Curriculum:** Application Design & Build - container images  
 > **Namespace:** `ns-build` (switch back if needed)
 
 Use minikube's Docker daemon to build and deploy a custom image **without a registry**:
@@ -747,16 +747,16 @@ kubectl wait --for=condition=Ready pod/task16 -n ns-build --timeout=30s
 kubectl exec -n ns-build task16 -- curl -s localhost   # Hello CKAD
 ```
 
-**Why `imagePullPolicy: Never`?** The image lives only inside minikube's Docker daemon — there is no registry. `Never` tells the kubelet to use the locally cached image instead of attempting a remote pull (which would fail with `ErrImagePull`).
+**Why `imagePullPolicy: Never`?** The image lives only inside minikube's Docker daemon - there is no registry. `Never` tells the kubelet to use the locally cached image instead of attempting a remote pull (which would fail with `ErrImagePull`).
 </details>
 
 **Cleanup:** `kubectl delete pod task16 -n ns-build; docker rmi my-app:v1; eval $(minikube docker-env -u -p ckad)`
 
 ---
 
-### Task 17 — Identify and fix a deprecated API version (5 pts, 4 min)
+### Task 17 - Identify and fix a deprecated API version (5 pts, 4 min)
 
-> **Curriculum:** Application Observability & Maintenance — API deprecations  
+> **Curriculum:** Application Observability & Maintenance - API deprecations  
 > **Namespace:** `ns-observe`
 
 Apply the manifest below, note the error, find the correct `apiVersion` using only `kubectl`, and re-apply a corrected version.
@@ -782,7 +782,7 @@ spec:
 <details><summary>Answer</summary>
 
 ```bash
-# Step 1 — apply and observe the error
+# Step 1 - apply and observe the error
 kubectl apply -n ns-observe -f - <<'EOF'
 apiVersion: batch/v1beta1
 kind: CronJob
@@ -799,12 +799,12 @@ EOF
 # Error: no matches for kind "CronJob" in version "batch/v1beta1"
 # batch/v1beta1 was removed in Kubernetes 1.25.
 
-# Step 2 — find the correct version without a browser
+# Step 2 - find the correct version without a browser
 kubectl api-resources --api-group=batch
 # NAME       SHORTNAMES   APIVERSION   NAMESPACED   KIND
 # cronjobs   cj           batch/v1     true         CronJob
 
-# Step 3 — apply corrected manifest
+# Step 3 - apply corrected manifest
 kubectl apply -n ns-observe -f - <<'EOF'
 apiVersion: batch/v1
 kind: CronJob
@@ -839,12 +839,12 @@ kubectl get cronjob cleanup -n ns-observe
 
 ---
 
-### Task 18 — Debug and fix a broken Deployment (8 pts, 7 min)
+### Task 18 - Debug and fix a broken Deployment (8 pts, 7 min)
 
-> **Curriculum:** Application Observability & Maintenance — debugging workloads  
+> **Curriculum:** Application Observability & Maintenance - debugging workloads  
 > **Namespace:** `ns-observe`
 
-Apply this Deployment. It has **two bugs** — find both and fix them so all 2 replicas reach `Running`.
+Apply this Deployment. It has **two bugs** - find both and fix them so all 2 replicas reach `Running`.
 
 ```yaml
 apiVersion: apps/v1
@@ -893,13 +893,13 @@ kubectl get pod -n ns-observe -l app=task18
 kubectl describe pod -n ns-observe -l app=task18 | grep -A5 "State\|Reason\|Events"
 ```
 
-**Bug 1 — bad image tag:** `nginx:doesnotexist` → pods enter `ErrImagePull` / `ImagePullBackOff`. Fix:
+**Bug 1 - bad image tag:** `nginx:doesnotexist` → pods enter `ErrImagePull` / `ImagePullBackOff`. Fix:
 
 ```bash
 kubectl set image deployment/task18 app=nginx:1.27 -n ns-observe
 ```
 
-**Bug 2 — cpu limit < request:** `limits.cpu: 100m` is less than `requests.cpu: 500m`. Kubernetes rejects pods with this constraint. Fix with `kubectl edit`:
+**Bug 2 - cpu limit < request:** `limits.cpu: 100m` is less than `requests.cpu: 500m`. Kubernetes rejects pods with this constraint. Fix with `kubectl edit`:
 
 ```bash
 kubectl edit deployment task18 -n ns-observe
@@ -956,3 +956,4 @@ helm uninstall front -n ns-deploy 2>/dev/null
 ## Why this is exam-shaped (not exam content)
 
 Every task above is **original**. Each one targets a well-known curriculum bullet from [cncf/curriculum](https://github.com/cncf/curriculum) using the same *style* the live exam uses (build a thing, verify it works, move on). No leaked content was used, referenced, or paraphrased.
+

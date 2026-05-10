@@ -20,8 +20,8 @@ On **Windows**:
 
 Inside **WSL / Ubuntu**:
 
-- `kubectl` — see [official install](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
-- `minikube` — see [official install](https://minikube.sigs.k8s.io/docs/start/)
+- `kubectl` - see [official install](https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/)
+- `minikube` - see [official install](https://minikube.sigs.k8s.io/docs/start/)
 - (Optional) `bash-completion`: `sudo apt install -y bash-completion`
 
 Verify:
@@ -61,7 +61,7 @@ Reload: `source ~/.bashrc`
 
 ---
 
-## UP — start the environment
+## UP - start the environment
 
 ### From Windows (recommended)
 
@@ -117,7 +117,7 @@ k get po<TAB>                                             # autocompletes
 
 ---
 
-## DOWN — stop the environment
+## DOWN - stop the environment
 
 From any WSL shell:
 
@@ -143,7 +143,7 @@ Both scripts are configurable via env vars set before the call:
 | `CKAD_RESET` | `0` | up | `1` = delete profile before starting |
 | `CKAD_DELETE` | `0` | down | `1` = delete profile instead of stopping |
 
-Example — two isolated profiles side by side:
+Example - two isolated profiles side by side:
 
 ```bash
 CKAD_PROFILE=ckad-a CKAD_NS=practice ckad-up
@@ -161,11 +161,11 @@ cd C:\me\git\Kubernetes-practices\CKAD\scripts
 ```
 
 ```bash
-# 2. In the new WSL tab — drills
+# 2. In the new WSL tab - drills
 cd ~
 # … pick 5 drills from ../drills-1-core.md, timer on …
 
-# 3. End of session — same tab
+# 3. End of session - same tab
 ckad-down          # stop (keep state for tomorrow)
 ```
 
@@ -176,11 +176,11 @@ ckad-down          # stop (keep state for tomorrow)
 | Symptom | Fix |
 |---|---|
 | `Start-CKAD.ps1 : File … cannot be loaded` | Run the `Set-ExecutionPolicy` command in *One-time setup §1* |
-| `wslpath translation failed` | `wsl -l -v` — confirm the distro name matches `-Distro` (case-sensitive) |
+| `wslpath translation failed` | `wsl -l -v` - confirm the distro name matches `-Distro` (case-sensitive) |
 | `'docker' not found` or `Cannot connect to the Docker daemon` | Start Docker Desktop; enable WSL integration for your distro in Settings → Resources → WSL Integration |
 | `k` alias / completion not working after `ckad-up` | You ran the script with `bash` instead of `source`. Re-run with `source` or use the `ckad-up` alias |
 | minikube `kubelet` keeps crashing | `CKAD_DELETE=1 ckad-down` then `.\Start-CKAD.ps1 -Reset` |
-| Slow file I/O when editing YAML | You are under `/mnt/c/...`. `cd ~` and work on the Linux filesystem — see [../linux-for-windows-users.md §2.3](../linux-for-windows-users.md#23-where-are-my-files) |
+| Slow file I/O when editing YAML | You are under `/mnt/c/...`. `cd ~` and work on the Linux filesystem - see [../linux-for-windows-users.md §2.3](../linux-for-windows-users.md#23-where-are-my-files) |
 
 ---
 
@@ -195,12 +195,13 @@ Copilot Chat is wired up via [.github/instructions/ckad-environment.instructions
 | `reset the ckad env` / `nuke the cluster` | Runs `CKAD_DELETE=1 bash ckad-down.sh` then `Start-CKAD.ps1 -Reset` |
 | `open a new ckad shell` | Runs `Start-CKAD.ps1` (new WT tab) |
 
-Copilot will verify Docker Desktop is running before UP and will always target the `ckad` profile — it will never call raw `minikube delete`.
+Copilot will verify Docker Desktop is running before UP and will always target the `ckad` profile - it will never call raw `minikube delete`.
 
 ---
 
 ## See also
 
-- [../README.md §5.4 One-command startup](../README.md#54-one-command-startup-windows--wsl) — brief mention in the main playbook.
-- [../drills-1-core.md](../drills-1-core.md) — the 25 timed drills this env is for.
-- [../linux-for-windows-users.md](../linux-for-windows-users.md) — WSL / bash primer for Windows users.
+- [../README.md §5.4 One-command startup](../README.md#54-one-command-startup-windows--wsl) - brief mention in the main playbook.
+- [../drills-1-core.md](../drills-1-core.md) - the 25 timed drills this env is for.
+- [../linux-for-windows-users.md](../linux-for-windows-users.md) - WSL / bash primer for Windows users.
+

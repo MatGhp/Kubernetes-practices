@@ -1,22 +1,22 @@
-# CKAD Mock Lab — Modern Drills (Curriculum Gap Fillers)
+# CKAD Mock Lab - Modern Drills (Curriculum Gap Fillers)
 
-Follow-up to [`drills-1-core.md`](drills-1-core.md), [`drills-2-advanced.md`](drills-2-advanced.md), and [`drills-3-imperative.md`](drills-3-imperative.md). These 13 drills target topics on the **current** CKAD curriculum that none of the other three files exercise:
+Follow-up to [`drills-1-core.md`](drills-1-core.md), [`drills-2-advanced.md`](drills-2-advanced.md), and [`drills-3-imperative.md`](drills-3-imperative.md). These 13 drills cover topics in the **current** CKAD curriculum that parts 1-3 don't address:
 
-- **Deployment strategies** — blue-green, canary
-- **Packaging** — Helm install/upgrade/rollback, Kustomize overlays
-- **Scheduling** — `nodeSelector`, `nodeAffinity`, `podAntiAffinity`
-- **Resource governance** — `LimitRange`
-- **Storage** — `StorageClass` + dynamic PVC
-- **Custom Resources** — author a CRD and create an instance
-- **Resilience** — `PodDisruptionBudget`
-- **Modern debug** — `kubectl debug` ephemeral container
-- **Autoscaling** — `HorizontalPodAutoscaler` (`kubectl autoscale`)
+- **Deployment strategies** - blue-green, canary
+- **Packaging** - Helm install/upgrade/rollback, Kustomize overlays
+- **Scheduling** - `nodeSelector`, `nodeAffinity`, `podAntiAffinity`
+- **Resource governance** - `LimitRange`
+- **Storage** - `StorageClass` + dynamic PVC
+- **Custom Resources** - author a CRD and create an instance
+- **Resilience** - `PodDisruptionBudget`
+- **Modern debug** - `kubectl debug` ephemeral container
+- **Autoscaling** - `HorizontalPodAutoscaler` (`kubectl autoscale`)
 
-All scenarios are written from scratch against Kubernetes **1.34+** APIs (current supported branches: 1.34, 1.35, 1.36). Same drill format as part 2: set a timer, solve without peeking, then expand the answer. Every answer ends with a **Verify** block plus a per-drill **Cleanup** so you can reset the namespace between attempts.
+All drills target Kubernetes **1.34+** (the current exam API). Same format as parts 1–3: timer on, solve without peeking, then expand the answer. Each answer includes a **Verify** block and a **Cleanup** so you can re-run the drill cleanly.
 
-> **Why a separate file?** External community drill sources we would normally adapt (e.g. some O'Reilly-affiliated repos) ship without a software license. We can't redistribute or closely paraphrase that content. So this file is **original** material covering the same curriculum domains those sources address — and only the topics still in the current exam blueprint. No standalone `ReplicaSet` drill, no legacy SA-token-Secret drill, no deprecated probe fields.
+> All scenarios are original and cover only topics in the current exam blueprint: no legacy APIs, no deprecated fields.
 
-Assumed setup (same as part 1/2 — see [`README.md`](README.md#21-kubectl-aliases-and-autocompletion) §2.1):
+Assumed setup (same as part 1/2 - see [`README.md`](README.md#21-kubectl-aliases-and-autocompletion) §2.1):
 
 ```bash
 kubectl create namespace practice 2>/dev/null
@@ -28,25 +28,25 @@ export do="--dry-run=client -o yaml"
 Some drills need cluster add-ons or extra tooling. Enable them once up-front:
 
 ```bash
-# StorageClass drill — minikube ships a default 'standard' StorageClass via the
+# StorageClass drill - minikube ships a default 'standard' StorageClass via the
 # storage-provisioner addon, which is enabled by default. Confirm:
 kubectl get storageclass
 
-# Helm drill — install the CLI on the host (Windows: choco install kubernetes-helm)
+# Helm drill - install the CLI on the host (Windows: choco install kubernetes-helm)
 helm version
 
-# kubectl debug drill — ephemeral containers GA since 1.25 (on by default)
+# kubectl debug drill - ephemeral containers GA since 1.25 (on by default)
 kubectl debug --help >/dev/null && echo "ok"
 
-# HPA drill — metrics-server is required for HPA to compute CPU utilisation
+# HPA drill - metrics-server is required for HPA to compute CPU utilisation
 minikube -p ckad addons enable metrics-server
 ```
 
 ---
 
-## Section A — Deployment Strategies
+## Section A - Deployment Strategies
 
-### Drill 38 — Blue-green: flip a Service selector
+### Drill 38 - Blue-green: flip a Service selector
 **Curriculum:** Application Deployment
 **Budget:** 4 min
 **Task:** Two Deployments `web-blue` and `web-green` (3 replicas each, image `nginx:1.27` and `nginx:1.28`, both label `app=web`, plus distinguishing `version=blue|green`). One Service `web` of type `ClusterIP` initially routes to `version=blue`. Cut traffic to green by editing **only** the Service selector. Reference: [`demos/04-pod-design/04-blue-green-deployment.yaml`](../demos/04-pod-design/04-blue-green-deployment.yaml).
@@ -101,11 +101,11 @@ spec:
 ```bash
 kubectl apply -f web-bg.yaml
 
-# Cut over — single-field patch, no restart, no client downtime
+# Cut over - single-field patch, no restart, no client downtime
 kubectl patch svc web -p '{"spec":{"selector":{"app":"web","version":"green"}}}'
 ```
 
-Verify — endpoints should now point at green pods, and the served version banner from `nginx:1.28` should match:
+Verify - endpoints should now point at green pods, and the served version banner from `nginx:1.28` should match:
 
 ```bash
 # v1 Endpoints is deprecated in 1.33+; use EndpointSlice
@@ -120,7 +120,7 @@ kubectl run curl --rm -i --image=curlimages/curl --restart=Never -- \
 
 ---
 
-### Drill 39 — Canary: 9 stable / 1 canary behind one Service
+### Drill 39 - Canary: 9 stable / 1 canary behind one Service
 **Curriculum:** Application Deployment
 **Budget:** 4 min
 **Task:** One Service `shop` selecting `app=shop` (no version label). Two Deployments `shop-stable` (9 replicas, `nginx:1.27`) and `shop-canary` (1 replica, `nginx:1.28`), both labeled `app=shop` plus `track=stable|canary`. ~10% of traffic should hit canary. Reference: [`demos/04-pod-design/05-canary-deployment.yaml`](../demos/04-pod-design/05-canary-deployment.yaml).
@@ -157,7 +157,7 @@ apiVersion: v1
 kind: Service
 metadata: { name: shop }
 spec:
-  selector: { app: shop }   # NB: no `track` — both Deployments are picked up
+  selector: { app: shop }   # NB: no `track` - both Deployments are picked up
   ports: [{ port: 80, targetPort: 80 }]
 ```
 
@@ -165,14 +165,14 @@ spec:
 kubectl apply -f shop-canary.yaml
 ```
 
-Verify — endpoint count should be 10, and ~1/10 hits should land on canary:
+Verify - endpoint count should be 10, and ~1/10 hits should land on canary:
 
 ```bash
 # v1 Endpoints is deprecated in 1.33+; use EndpointSlice instead
 kubectl get endpointslice -l kubernetes.io/service-name=shop \
   -o jsonpath='{.items[*].endpoints[*].addresses[*]}' | wc -w
 
-# nginx images have no curl — spin up a throwaway curl pod to sample traffic
+# nginx images have no curl - spin up a throwaway curl pod to sample traffic
 kubectl run canary-test --rm -it --image=curlimages/curl --restart=Never -- \
   sh -c 'for i in $(seq 1 30); do
     curl -s -o /dev/null -w "%{http_code} %{remote_ip}\n" http://shop
@@ -184,9 +184,9 @@ kubectl run canary-test --rm -it --image=curlimages/curl --restart=Never -- \
 
 ---
 
-## Section B — Packaging
+## Section B - Packaging
 
-### Drill 40 — Helm: install, upgrade, rollback
+### Drill 40 - Helm: install, upgrade, rollback
 **Curriculum:** Application Deployment
 **Budget:** 4 min
 **Task:** Add the Bitnami repo, install `nginx` as release `web1` with `replicaCount=2`, upgrade to `replicaCount=4`, then roll back to revision 1. List the release history.
@@ -203,7 +203,7 @@ helm history  web1
 helm rollback web1 1
 ```
 
-Verify — after rollback the Deployment is back to 2 replicas and `helm history` shows a new revision pointing at revision 1:
+Verify - after rollback the Deployment is back to 2 replicas and `helm history` shows a new revision pointing at revision 1:
 
 ```bash
 kubectl get deploy -l app.kubernetes.io/instance=web1
@@ -217,7 +217,7 @@ helm history web1 | tail -3
 
 ---
 
-### Drill 40b — Helm: search, show values, install with a values file
+### Drill 40b - Helm: search, show values, install with a values file
 **Curriculum:** Application Deployment
 **Budget:** 3 min
 **Task:** Inspect the Bitnami nginx chart before installing: search the repo for nginx charts, dump the chart's default values to `my-values.yaml`, edit `replicaCount` to `3` and `service.type` to `ClusterIP`, then install a new release `web2` using that file. Confirm with `helm list`.
@@ -229,14 +229,14 @@ helm search repo nginx             # shows bitnami/nginx, version, app version
 
 helm show values bitnami/nginx > my-values.yaml
 
-# Edit the two fields — use sed to keep it scriptable:
+# Edit the two fields - use sed to keep it scriptable:
 sed -i 's/^replicaCount: .*/replicaCount: 3/' my-values.yaml
 sed -i 's/type: LoadBalancer/type: ClusterIP/' my-values.yaml
 
 helm install web2 bitnami/nginx -f my-values.yaml
 ```
 
-Verify — `helm list` shows the release; the Deployment has 3 replicas:
+Verify - `helm list` shows the release; the Deployment has 3 replicas:
 
 ```bash
 helm list
@@ -249,7 +249,7 @@ kubectl get deploy -l app.kubernetes.io/instance=web2 \
 
 ---
 
-### Drill 41 — Kustomize overlay
+### Drill 41 - Kustomize overlay
 **Curriculum:** Application Deployment
 **Budget:** 3 min
 **Task:** Create a base with one Deployment (`api`, image `nginx:1.27`, 1 replica) and an overlay `overlays/dev` that bumps replicas to 3 and injects `commonLabels: {env: dev}`. Apply the overlay with `kubectl -k`. Reference: existing examples in [`demos/09-kustomize/`](../demos/09-kustomize/).
@@ -311,7 +311,7 @@ spec:
 kubectl apply -k kustomize-drill/overlays/dev
 ```
 
-Verify — 3 replicas plus the `env=dev` label propagated to the Deployment, ReplicaSet, and Pods:
+Verify - 3 replicas plus the `env=dev` label propagated to the Deployment, ReplicaSet, and Pods:
 
 ```bash
 kubectl get deploy api -o jsonpath='{.spec.replicas}{"\n"}'
@@ -323,10 +323,10 @@ kubectl get pod -l app=api,env=dev
 
 ---
 
-### Drill 41b — Kustomize: `images:` transformer + dry-preview with `kubectl kustomize`
+### Drill 41b - Kustomize: `images:` transformer + dry-preview with `kubectl kustomize`
 **Curriculum:** Application Deployment
 **Budget:** 2 min
-**Task:** Extend the `overlays/dev` kustomization from Drill 41 with an `images:` transformer that bumps the nginx tag from `1.27` → `1.28`. Before applying, use `kubectl kustomize` to preview the final rendered YAML — confirm the tag changed — then apply.
+**Task:** Extend the `overlays/dev` kustomization from Drill 41 with an `images:` transformer that bumps the nginx tag from `1.27` → `1.28`. Before applying, use `kubectl kustomize` to preview the final rendered YAML - confirm the tag changed - then apply.
 
 <details><summary>Answer</summary>
 
@@ -347,7 +347,7 @@ images:
 ```
 
 ```bash
-# Preview only — renders to stdout, nothing is applied:
+# Preview only - renders to stdout, nothing is applied:
 kubectl kustomize kustomize-drill/overlays/dev
 
 # Spot-check the image tag in the preview:
@@ -357,7 +357,7 @@ kubectl kustomize kustomize-drill/overlays/dev | grep "image:"
 kubectl apply -k kustomize-drill/overlays/dev
 ```
 
-Verify — the Deployment's image tag is now `nginx:1.28`:
+Verify - the Deployment's image tag is now `nginx:1.28`:
 
 ```bash
 kubectl get deploy api \
@@ -369,9 +369,9 @@ kubectl get deploy api \
 
 ---
 
-## Section C — Scheduling
+## Section C - Scheduling
 
-### Drill 42 — nodeSelector
+### Drill 42 - nodeSelector
 **Curriculum:** Environment, Configuration & Security
 **Budget:** 2 min
 **Task:** Label one node with `disktype=ssd`, then schedule a Pod `fast` (image `nginx`) that runs **only** on that node.
@@ -410,7 +410,7 @@ kubectl get node -l disktype=ssd
 
 ---
 
-### Drill 43 — nodeAffinity (required + preferred)
+### Drill 43 - nodeAffinity (required + preferred)
 **Curriculum:** Environment, Configuration & Security
 **Budget:** 3 min
 **Task:** Pod `picky` (image `nginx`) that **must** schedule on a node where `kubernetes.io/os=linux`, and **prefers** a node labeled `zone=eu-west`. Demonstrate that the Pod still schedules even if no node has the preferred label.
@@ -438,7 +438,7 @@ spec:
     - { name: nginx, image: nginx }
 ```
 
-Verify — `picky` is `Running`; if you label a node `zone=eu-west` *before* applying, it lands there:
+Verify - `picky` is `Running`; if you label a node `zone=eu-west` *before* applying, it lands there:
 
 ```bash
 kubectl apply -f picky.yaml
@@ -450,10 +450,10 @@ kubectl get pod picky -o wide
 
 ---
 
-### Drill 44 — podAntiAffinity for HA spread
+### Drill 44 - podAntiAffinity for HA spread
 **Curriculum:** Environment, Configuration & Security
 **Budget:** 3 min
-**Task:** Deployment `ha` (image `nginx`, 3 replicas) whose pods **must not** co-locate on the same node — spread by `topologyKey: kubernetes.io/hostname`. On a single-node minikube, demonstrate that only 1 pod becomes `Running` (the rest stay `Pending`) — that's the *evidence* the rule is enforced.
+**Task:** Deployment `ha` (image `nginx`, 3 replicas) whose pods **must not** co-locate on the same node - spread by `topologyKey: kubernetes.io/hostname`. On a single-node minikube, demonstrate that only 1 pod becomes `Running` (the rest stay `Pending`) - that's the *evidence* the rule is enforced.
 
 <details><summary>Answer</summary>
 
@@ -491,9 +491,9 @@ kubectl describe pod -l app=ha | grep -A2 "didn't match pod anti-affinity"
 
 ---
 
-## Section D — Resource Governance
+## Section D - Resource Governance
 
-### Drill 45 — LimitRange populates implicit Pod resources
+### Drill 45 - LimitRange populates implicit Pod resources
 **Curriculum:** Environment, Configuration & Security
 **Budget:** 3 min
 **Task:** Create a `LimitRange` named `sane-defaults` in `practice` with `defaultRequest: { cpu: 100m, memory: 64Mi }`, `default: { cpu: 500m, memory: 256Mi }`, `min`/`max` bounds. Then create a Pod **without** explicit `resources` and confirm it inherits the defaults.
@@ -519,7 +519,7 @@ kubectl apply -f sane-defaults.yaml
 kubectl run no-res --image=nginx --restart=Never
 ```
 
-Verify — the Pod's container has `requests` and `limits` populated even though the manifest didn't set them:
+Verify - the Pod's container has `requests` and `limits` populated even though the manifest didn't set them:
 
 ```bash
 kubectl get pod no-res -o jsonpath='{.spec.containers[0].resources}{"\n"}'
@@ -530,12 +530,12 @@ kubectl get pod no-res -o jsonpath='{.spec.containers[0].resources}{"\n"}'
 
 ---
 
-## Section E — Storage
+## Section E - Storage
 
-### Drill 46 — StorageClass + dynamic PVC with WaitForFirstConsumer
+### Drill 46 - StorageClass + dynamic PVC with WaitForFirstConsumer
 **Curriculum:** Environment, Configuration & Security
 **Budget:** 3 min
-**Task:** Using the cluster's default `StorageClass`, create a PVC `data` (1 Gi, RWO), then a Pod that mounts it. Confirm the PVC ends up `Bound`. On real-world clusters with `volumeBindingMode: WaitForFirstConsumer` the PVC stays `Pending` until a consumer Pod is scheduled — minikube's `standard` class uses `Immediate` binding so it binds straight away, but the Pod-side flow is identical.
+**Task:** Using the cluster's default `StorageClass`, create a PVC `data` (1 Gi, RWO), then a Pod that mounts it. Confirm the PVC ends up `Bound`. On real-world clusters with `volumeBindingMode: WaitForFirstConsumer` the PVC stays `Pending` until a consumer Pod is scheduled - minikube's `standard` class uses `Immediate` binding so it binds straight away, but the Pod-side flow is identical.
 
 <details><summary>Answer</summary>
 
@@ -574,7 +574,7 @@ spec:
 kubectl apply -f data.yaml
 ```
 
-Verify — the PVC reaches `Bound` and the file written by the Pod survives in the volume. With `Immediate` binding the PVC binds at apply time; with `WaitForFirstConsumer` it binds only after `writer` is scheduled.
+Verify - the PVC reaches `Bound` and the file written by the Pod survives in the volume. With `Immediate` binding the PVC binds at apply time; with `WaitForFirstConsumer` it binds only after `writer` is scheduled.
 
 ```bash
 kubectl get pvc data
@@ -587,9 +587,9 @@ kubectl exec writer -- cat /data/hello
 
 ---
 
-## Section F — Custom Resources
+## Section F - Custom Resources
 
-### Drill 47 — Author a CRD and create an instance
+### Drill 47 - Author a CRD and create an instance
 **Curriculum:** Environment, Configuration & Security
 **Budget:** 4 min
 **Task:** Define a `CustomResourceDefinition` for `widgets.example.com` (cluster-scoped is fine, but use Namespaced for this drill) with a small OpenAPI v3 schema (`spec.size` ∈ `small|medium|large`, `spec.color` string). Create a `Widget` CR named `gizmo` and list it. Reference: existing examples in [`demos/08-custom-resource-definition/`](../demos/08-custom-resource-definition/).
@@ -642,12 +642,12 @@ kubectl wait --for=condition=Established crd/widgets.example.com --timeout=30s
 kubectl apply -f gizmo.yaml
 ```
 
-Verify — the CR is listed via the new short-name, and an invalid value is rejected by the schema:
+Verify - the CR is listed via the new short-name, and an invalid value is rejected by the schema:
 
 ```bash
 kubectl get wg
 kubectl explain widget.spec
-# Negative test — should fail with validation error
+# Negative test - should fail with validation error
 kubectl apply -f - <<'EOF' || echo "rejected as expected"
 apiVersion: example.com/v1
 kind: Widget
@@ -661,9 +661,9 @@ EOF
 
 ---
 
-## Section G — Resilience & Modern Debug
+## Section G - Resilience & Modern Debug
 
-### Drill 48 — PodDisruptionBudget
+### Drill 48 - PodDisruptionBudget
 **Curriculum:** Application Deployment
 **Budget:** 2 min
 **Task:** Deployment `quorum` (image `nginx`, 3 replicas, label `app=quorum`). Add a `PodDisruptionBudget` `quorum-pdb` requiring `minAvailable: 2`. Confirm `kubectl drain` would respect it (use `--dry-run=server`).
@@ -695,7 +695,7 @@ spec:
 kubectl apply -f quorum.yaml
 ```
 
-Verify — `ALLOWED DISRUPTIONS` should be `1` (3 replicas, min 2 available):
+Verify - `ALLOWED DISRUPTIONS` should be `1` (3 replicas, min 2 available):
 
 ```bash
 kubectl get pdb quorum-pdb
@@ -706,7 +706,7 @@ kubectl get pdb quorum-pdb
 
 ---
 
-### Drill 49 — `kubectl debug` ephemeral container
+### Drill 49 - `kubectl debug` ephemeral container
 **Curriculum:** Application Observability & Maintenance
 **Budget:** 3 min
 **Task:** A running Pod `target` (image `nginx`, no shell tools beyond what nginx ships). Without restarting it, attach an ephemeral `busybox` container so you can `wget` localhost from inside the Pod's network namespace. Then demonstrate the `--copy-to` variant that creates a debug clone with extra tools and a shell command override.
@@ -718,7 +718,7 @@ kubectl run target --image=nginx
 kubectl wait --for=condition=Ready pod/target --timeout=30s
 ```
 
-Ephemeral container — joins the running pod's net + pid namespaces:
+Ephemeral container - joins the running pod's net + pid namespaces:
 
 ```bash
 kubectl debug -it target --image=busybox --target=target -- sh
@@ -727,7 +727,7 @@ kubectl debug -it target --image=busybox --target=target -- sh
 #   exit
 ```
 
-`--copy-to` variant — non-destructive: makes a sibling pod with an added debug image and overridden command, leaving the original untouched. Useful when the target's `command` itself is broken (CrashLoopBackOff scenarios):
+`--copy-to` variant - non-destructive: makes a sibling pod with an added debug image and overridden command, leaving the original untouched. Useful when the target's `command` itself is broken (CrashLoopBackOff scenarios):
 
 ```bash
 # --container=debugger names the added container so we can target it with -c
@@ -748,16 +748,16 @@ kubectl get pod target-debug
 
 ---
 
-## Section H — Autoscaling
+## Section H - Autoscaling
 
-### Drill 50 — Autoscale a Deployment with an HPA
+### Drill 50 - Autoscale a Deployment with an HPA
 **Curriculum:** Application Deployment
 **Budget:** 2 min
-**Task:** A Deployment `api` already exists (image `nginx:1.27`, 2 replicas, with CPU `requests: 100m` set on the container — the HPA needs this). Create a HorizontalPodAutoscaler that keeps the Pod count between **2** and **5** and targets **70% CPU utilisation**. Reference: [`demos/04-pod-design/08-hpa-definition.yaml`](../demos/04-pod-design/08-hpa-definition.yaml).
+**Task:** A Deployment `api` already exists (image `nginx:1.27`, 2 replicas, with CPU `requests: 100m` set on the container - the HPA needs this). Create a HorizontalPodAutoscaler that keeps the Pod count between **2** and **5** and targets **70% CPU utilisation**. Reference: [`demos/04-pod-design/08-hpa-definition.yaml`](../demos/04-pod-design/08-hpa-definition.yaml).
 
 <details><summary>Answer</summary>
 
-Fastest path — imperative `kubectl autoscale`:
+Fastest path - imperative `kubectl autoscale`:
 
 ```bash
 # Setup (only if `api` doesn't already exist)
@@ -770,7 +770,7 @@ kubectl autoscale deployment api --min=2 --max=5 --cpu=70%
 
 > `--cpu` accepts a percentage (`70%`) for average utilisation or an absolute quantity (`500m`) for average milliCPU value. The older `--cpu-percent` flag (integer only) is still accepted but `--cpu` is the current canonical form.
 
-Equivalent declarative form (`autoscaling/v2`) — use this when the task asks you to write YAML, or when you need non-CPU metrics:
+Equivalent declarative form (`autoscaling/v2`) - use this when the task asks you to write YAML, or when you need non-CPU metrics:
 
 ```yaml
 # api-hpa.yaml
@@ -797,7 +797,7 @@ spec:
 kubectl apply -f api-hpa.yaml
 ```
 
-Verify — `TARGETS` shows `<current>%/70%`, `MINPODS=2`, `MAXPODS=5`. The `<unknown>` you may see for the first ~30s is normal: metrics-server needs a scrape interval before the first values land.
+Verify - `TARGETS` shows `<current>%/70%`, `MINPODS=2`, `MAXPODS=5`. The `<unknown>` you may see for the first ~30s is normal: metrics-server needs a scrape interval before the first values land.
 
 ```bash
 kubectl get hpa api
@@ -807,7 +807,7 @@ kubectl top pod -l app=api
 
 > **Gotchas:**
 > - HPA computes utilisation as `usage / requests`. **No CPU `requests` on the Pod → HPA stays `<unknown>` forever.** That's the #1 exam pitfall.
-> - HPA needs metrics-server. On minikube: `minikube -p ckad addons enable metrics-server`. On the real exam it is already running — see [README §9.4](README.md#94-metrics-server--kubectl-top-drill-33).
+> - HPA needs metrics-server. On minikube: `minikube -p ckad addons enable metrics-server`. On the real exam it is already running - see [README §9.4](README.md#94-metrics-server--kubectl-top-drill-33).
 > - `kubectl autoscale` always emits `autoscaling/v1`. The declarative form above uses `autoscaling/v2` so you can add memory or custom metrics later.
 
 </details>
@@ -839,11 +839,11 @@ Each drill maps to an explicit current-curriculum bullet that wasn't already exe
 |---|---|---|
 | 38, 39 | Application Deployment 20% | "Use Kubernetes primitives to implement common deployment strategies (e.g. blue/green or canary)" |
 | 40, 40b, 41, 41b | Application Deployment 20% | "Use Helm and Kustomize to install an existing package" |
-| 42–44 | Env/Config/Security 25% | Pod scheduling — node labels, affinity/anti-affinity |
+| 42–44 | Env/Config/Security 25% | Pod scheduling - node labels, affinity/anti-affinity |
 | 45 | Env/Config/Security 25% | Resource requirements, limits, and quotas |
 | 46 | Env/Config/Security 25% | Persistent and ephemeral volumes |
 | 47 | Env/Config/Security 25% | "Discover and use resources that extend Kubernetes (CRD, Operators)" |
-| 48 | Application Deployment 20% | Application robustness — PDB |
+| 48 | Application Deployment 20% | Application robustness - PDB |
 | 49 | Observability 15% | "Utilize container logs / debug in Kubernetes" |
 | 50 | Application Deployment 20% | "Use the Horizontal Pod Autoscaler to dynamically scale a Deployment" |
 
@@ -854,3 +854,4 @@ Skipped on purpose: standalone `ReplicaSet` (use Deployment), legacy SA-token Se
 ## Scoring
 
 Same as the other drill files: 2 pts solved in budget without peeking, 1 pt solved within 1.5× or after one peek, 0 pts otherwise. Target **22+ / 30** across this set.
+

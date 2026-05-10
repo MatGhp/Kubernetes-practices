@@ -1,19 +1,19 @@
-# CKAD Mock Lab — Part 2 (Gap Fillers)
+# CKAD Mock Lab - Part 2 (Gap Fillers)
 
-Follow-up to [`drills-1-core.md`](drills-1-core.md). These 12 drills cover the topics intentionally left out of part 1:
+Follow-up to [`drills-1-core.md`](drills-1-core.md). These 12 drills cover topics part 1 skips:
 
-- **SecurityContext** — `runAsUser`, `runAsNonRoot`, `fsGroup`, `readOnlyRootFilesystem`
-- **ServiceAccount** — create + bind via `serviceAccountName`
-- **Ingress** — `networking.k8s.io/v1` with path and host rules
-- **Observability** — `kubectl top`, events sorted by time
-- **Multi-container patterns** — adapter and ambassador
+- **SecurityContext** - `runAsUser`, `runAsNonRoot`, `fsGroup`, `readOnlyRootFilesystem`
+- **ServiceAccount** - create + bind via `serviceAccountName`
+- **Ingress** - `networking.k8s.io/v1` with path and host rules
+- **Observability** - `kubectl top`, events sorted by time
+- **Multi-container patterns** - adapter and ambassador
 - **`kubectl edit` vs apply-from-file**
 
-Same rules as part 1: set a timer, solve without peeking, then expand the answer. Every answer ends with a **Verify** block showing exactly what you should see when the change landed.
+Same rules as part 1: set a timer, solve without peeking, then expand the answer. Each **Verify** block shows what a working result looks like.
 
 > Inspired by and cross-checked against the community [`dgkanatsios/CKAD-exercises`](https://github.com/dgkanatsios/CKAD-exercises) reference lab.
 
-Assumed setup (same as part 1 — see [`README.md`](README.md#21-kubectl-aliases-and-autocompletion) §2.1):
+Assumed setup (same as part 1 - see [`README.md`](README.md#21-kubectl-aliases-and-autocompletion) §2.1):
 
 ```bash
 kubectl create namespace practice 2>/dev/null
@@ -25,7 +25,7 @@ export do="--dry-run=client -o yaml"
 Some drills need cluster add-ons. Enable them once up-front:
 
 ```bash
-# Metrics Server (for `kubectl top`) — takes ~30s to start collecting
+# Metrics Server (for `kubectl top`) - takes ~30s to start collecting
 minikube -p ckad addons enable metrics-server
 
 # Ingress controller (nginx) for the Ingress drills
@@ -36,11 +36,11 @@ kubectl wait -n ingress-nginx --for=condition=Ready pod \
 
 ---
 
-## Section F — SecurityContext
+## Section F - SecurityContext
 
-> **`privileged: true` (out of scope for the exam, but a frequent MCQ topic).** Setting `securityContext.privileged: true` on a container disables almost every kernel isolation (capability set, AppArmor/SELinux, seccomp, devices) — the container effectively runs as a root process on the node. The CKAD exam will not ask you to enable it; if anything you'll be asked to keep it `false`. Real-world hardening: prefer `capabilities.add: [NET_BIND_SERVICE]` (drill 27 territory) over `privileged: true`, and always pair with `allowPrivilegeEscalation: false`.
+> **`privileged: true` (out of scope for the exam, but a frequent MCQ topic).** Setting `securityContext.privileged: true` on a container disables almost every kernel isolation (capability set, AppArmor/SELinux, seccomp, devices) - the container effectively runs as a root process on the node. The CKAD exam will not ask you to enable it; if anything you'll be asked to keep it `false`. Real-world hardening: prefer `capabilities.add: [NET_BIND_SERVICE]` (drill 27 territory) over `privileged: true`, and always pair with `allowPrivilegeEscalation: false`.
 
-### Drill 26 — Run as non-root with a fixed UID
+### Drill 26 - Run as non-root with a fixed UID
 **Budget:** 5 min
 **Task:** Pod `sec-uid` (image `busybox`, sleeps forever) that runs as UID `1000` and **must** fail to start if the image tries to run as root.
 
@@ -67,7 +67,7 @@ spec:
 kubectl apply -f sec-uid.yaml
 ```
 
-Verify — logs should print `uid=1000 gid=0(root) ...`; if the image insisted on UID 0 the pod would be in `CreateContainerConfigError` with reason `container has runAsNonRoot and image will run as root`:
+Verify - logs should print `uid=1000 gid=0(root) ...`; if the image insisted on UID 0 the pod would be in `CreateContainerConfigError` with reason `container has runAsNonRoot and image will run as root`:
 
 ```bash
 kubectl logs sec-uid
@@ -77,7 +77,7 @@ kubectl get pod sec-uid -o jsonpath='{.spec.securityContext}{"\n"}'
 
 ---
 
-### Drill 27 — Read-only root filesystem with a writable volume
+### Drill 27 - Read-only root filesystem with a writable volume
 **Budget:** 6 min
 **Task:** Pod `sec-ro` (image `busybox`):
 - `readOnlyRootFilesystem: true` on the container
@@ -115,7 +115,7 @@ spec:
 kubectl apply -f sec-ro.yaml
 ```
 
-Verify — logs show `blocked: read-only fs`; `/tmp/out` exists and contains `ok`:
+Verify - logs show `blocked: read-only fs`; `/tmp/out` exists and contains `ok`:
 
 ```bash
 kubectl logs sec-ro
@@ -125,7 +125,7 @@ kubectl exec sec-ro -- cat /tmp/out
 
 ---
 
-### Drill 28 — fsGroup on a shared volume
+### Drill 28 - fsGroup on a shared volume
 **Budget:** 6 min
 **Task:** Pod `sec-fsgroup` with `fsGroup: 2000` and `runAsUser: 1000`. Mount an `emptyDir` at `/data`, write a file there, and confirm it is owned by group `2000`.
 
@@ -158,7 +158,7 @@ spec:
 kubectl apply -f sec-fsgroup.yaml
 ```
 
-Verify — `ls -ln` in the logs shows owner `1000` and **group `2000`** on `/data/file` (that is what `fsGroup` guarantees on mounted volumes):
+Verify - `ls -ln` in the logs shows owner `1000` and **group `2000`** on `/data/file` (that is what `fsGroup` guarantees on mounted volumes):
 
 ```bash
 kubectl logs sec-fsgroup
@@ -167,9 +167,9 @@ kubectl logs sec-fsgroup
 
 ---
 
-## Section G — ServiceAccount
+## Section G - ServiceAccount
 
-### Drill 29 — Create a ServiceAccount and use it
+### Drill 29 - Create a ServiceAccount and use it
 **Budget:** 4 min
 **Task:**
 1. Create ServiceAccount `deployer` in `practice`.
@@ -198,7 +198,7 @@ spec:
 kubectl apply -f sa-pod.yaml
 ```
 
-Verify — jsonpath prints exactly `deployer`; the projected token exists under `/var/run/secrets/kubernetes.io/serviceaccount/`:
+Verify - jsonpath prints exactly `deployer`; the projected token exists under `/var/run/secrets/kubernetes.io/serviceaccount/`:
 
 ```bash
 kubectl get pod sa-pod -o jsonpath='{.spec.serviceAccountName}{"\n"}'
@@ -208,7 +208,7 @@ kubectl exec sa-pod -- ls /var/run/secrets/kubernetes.io/serviceaccount
 
 ---
 
-### Drill 30 — ServiceAccount with a read-only Role
+### Drill 30 - ServiceAccount with a read-only Role
 **Budget:** 8 min
 **Task:** Give `deployer` permission to `get` and `list` pods in `practice` (nothing else). From inside `sa-pod`, confirm it can list pods but **cannot** delete them.
 
@@ -245,7 +245,7 @@ roleRef:
 kubectl apply -f role-reader.yaml
 ```
 
-Verify with `kubectl auth can-i` impersonating the SA — expect `yes` / `no`:
+Verify with `kubectl auth can-i` impersonating the SA - expect `yes` / `no`:
 
 ```bash
 kubectl auth can-i list pods   --as=system:serviceaccount:practice:deployer -n practice
@@ -255,20 +255,20 @@ kubectl auth can-i delete pods --as=system:serviceaccount:practice:deployer -n p
 
 ---
 
-## Section H — Ingress (`networking.k8s.io/v1`)
+## Section H - Ingress (`networking.k8s.io/v1`)
 
 > **Local env vs real exam:** these drills assume the Minikube `ingress` addon is enabled and resolve hosts via `$(minikube -p ckad ip)` or `/etc/hosts`. The exam cluster already has a controller running and you cannot edit `/etc/hosts`. See [README §9.1 Ingress](README.md#91-ingress-drills-3132b) for exam-day actions and a 30-second fast-path.
 
-> **Prerequisites for Section H (drills 31, 32, 32b).** All three reuse the same `web` and `api` Services. If you are starting from a fresh cluster (no part-1 state), create them once up front. They are idempotent — re-running on top of an existing setup is safe but will print `AlreadyExists` errors you can ignore.
+> **Prerequisites for Section H (drills 31, 32, 32b).** All three reuse the same `web` and `api` Services. If you are starting from a fresh cluster (no part-1 state), create them once up front. They are idempotent - re-running on top of an existing setup is safe but will print `AlreadyExists` errors you can ignore.
 >
 > ```bash
-> # web — from drills-1-core.md D2 + D5
+> # web - from drills-1-core.md D2 + D5
 > kubectl create deployment web --image=nginx
 > kubectl expose deployment web --port=80 --target-port=80
 >
-> # api — used by drill 31 (path) and 32 (host).
+> # api - used by drill 31 (path) and 32 (host).
 > # NOTE: hashicorp/http-echo runs as non-root (cannot bind :80) and has an
-> # ENTRYPOINT, so flags must go via YAML `args:` — not `kubectl create
+> # ENTRYPOINT, so flags must go via YAML `args:` - not `kubectl create
 > # deployment -- ...`, which writes `command:` and replaces the entrypoint,
 > # producing CrashLoopBackOff with `exec: "-text=...": not found`.
 > kubectl apply -f - <<'EOF'
@@ -301,7 +301,7 @@ kubectl auth can-i delete pods --as=system:serviceaccount:practice:deployer -n p
 
 ---
 
-### Drill 31 — Path-based Ingress
+### Drill 31 - Path-based Ingress
 **Budget:** 7 min
 **Task:** Expose deployment `web` (from part 1) and a new deployment `api` behind one Ingress:
 - `GET /`     → service `web` port 80
@@ -367,7 +367,7 @@ spec:
 kubectl apply -f ingress-path.yaml
 ```
 
-Verify — `get ingress` shows a non-empty `ADDRESS`; curl returns the nginx welcome page for `/` and `hello from api` for `/api`:
+Verify - `get ingress` shows a non-empty `ADDRESS`; curl returns the nginx welcome page for `/` and `hello from api` for `/api`:
 
 ```bash
 kubectl get ingress app
@@ -379,7 +379,7 @@ curl -s http://$IP/api
 
 ---
 
-### Drill 32 — Host-based Ingress
+### Drill 32 - Host-based Ingress
 **Budget:** 6 min
 **Task:** Change the Ingress so that `http://web.local` → `web` and `http://api.local` → `api`.
 
@@ -413,7 +413,7 @@ spec:
 kubectl apply -f ingress-host.yaml
 ```
 
-Verify — `describe ingress` lists both hosts; curl with `--resolve` reaches the right backend based on the `Host` header:
+Verify - `describe ingress` lists both hosts; curl with `--resolve` reaches the right backend based on the `Host` header:
 
 ```bash
 kubectl describe ingress app | grep -E 'Host|Path'
@@ -425,7 +425,7 @@ curl -s --resolve api.local:80:$IP http://api.local/
 
 ---
 
-### Drill 32b — TLS-terminated Ingress
+### Drill 32b - TLS-terminated Ingress
 **Budget:** 7 min
 **Task:** Re-expose deployment `web` (from drill 31) at `https://web.local`, terminating TLS at the Ingress. Steps:
 
@@ -472,7 +472,7 @@ spec:
 kubectl apply -f ingress-tls.yaml
 ```
 
-Verify — Secret type, Ingress TLS block, and an HTTPS request all line up:
+Verify - Secret type, Ingress TLS block, and an HTTPS request all line up:
 
 ```bash
 kubectl get secret web-tls -o jsonpath='{.type}{"\n"}'   # → kubernetes.io/tls
@@ -485,16 +485,16 @@ echo | openssl s_client -connect $IP:443 -servername web.local 2>/dev/null \
   | openssl x509 -noout -subject -ext subjectAltName
 ```
 
-> **Why `--resolve` instead of `/etc/hosts`?** The exam terminal blocks editing `/etc/hosts`. `curl --resolve <host>:<port>:<ip>` is the portable trick that works there too. The Secret type **must** be `kubernetes.io/tls`; the keys inside must be exactly `tls.crt` and `tls.key` — `kubectl create secret tls` gets both right for you.
+> **Why `--resolve` instead of `/etc/hosts`?** The exam terminal blocks editing `/etc/hosts`. `curl --resolve <host>:<port>:<ip>` is the portable trick that works there too. The Secret type **must** be `kubernetes.io/tls`; the keys inside must be exactly `tls.crt` and `tls.key` - `kubectl create secret tls` gets both right for you.
 </details>
 
 **Cleanup:** `kubectl delete ingress app; kubectl delete secret web-tls; rm -f web.crt web.key`
 
 ---
 
-## Section I — Observability
+## Section I - Observability
 
-### Drill 33 — `kubectl top` pods and nodes
+### Drill 33 - `kubectl top` pods and nodes
 **Budget:** 3 min
 **Task:** Show CPU and memory usage for every pod in `practice`, sorted by CPU descending. Then show the same for the node.
 
@@ -505,7 +505,7 @@ kubectl top pod --sort-by=cpu
 kubectl top node
 ```
 
-Verify — both commands print a table with `CPU(cores)` and `MEMORY(bytes)` columns. If you see `error: Metrics API not available`, the metrics-server addon is not ready yet — wait 30–60s and retry:
+Verify - both commands print a table with `CPU(cores)` and `MEMORY(bytes)` columns. If you see `error: Metrics API not available`, the metrics-server addon is not ready yet - wait 30–60s and retry:
 
 ```bash
 kubectl -n kube-system get deploy metrics-server
@@ -517,7 +517,7 @@ kubectl -n kube-system rollout status deploy/metrics-server
 
 ---
 
-### Drill 34 — Events sorted by time
+### Drill 34 - Events sorted by time
 **Budget:** 3 min
 **Task:** Print the 20 most recent events in the `practice` namespace, newest last, then the most recent events for pod `web`.
 
@@ -528,14 +528,14 @@ kubectl get events --sort-by=.lastTimestamp | tail -n 20
 kubectl get events --field-selector involvedObject.name=web --sort-by=.lastTimestamp
 ```
 
-Verify — the last column (`MESSAGE`) tells the story in chronological order (e.g. `Scheduled` → `Pulling` → `Created` → `Started`). For a broken pod you would see `Failed` / `BackOff`.
+Verify - the last column (`MESSAGE`) tells the story in chronological order (e.g. `Scheduled` → `Pulling` → `Created` → `Started`). For a broken pod you would see `Failed` / `BackOff`.
 </details>
 
 ---
 
-## Section J — Multi-container patterns
+## Section J - Multi-container patterns
 
-### Drill 35 — Ambassador pattern
+### Drill 35 - Ambassador pattern
 **Budget:** 8 min
 **Task:** Pod `ambassador-demo` where the **app** only talks to `localhost:8080`, and an **ambassador** container proxies that to the external service `web:80`. Use `nginx` as the proxy, app is `busybox` that curls `http://127.0.0.1:8080`.
 
@@ -586,7 +586,7 @@ spec:
 kubectl apply -f ambassador.yaml
 ```
 
-Verify — the app container logs the nginx welcome line every 5s; that line only comes from `web` via the local-loopback proxy. Ambassador access logs show inbound requests on port 8080:
+Verify - the app container logs the nginx welcome line every 5s; that line only comes from `web` via the local-loopback proxy. Ambassador access logs show inbound requests on port 8080:
 
 ```bash
 kubectl logs ambassador-demo -c app --tail=3
@@ -596,16 +596,16 @@ kubectl logs ambassador-demo -c ambassador --tail=3
 
 ---
 
-### Drill 35b — Ambassador pattern (TCP proxy)
+### Drill 35b - Ambassador pattern (TCP proxy)
 **Budget:** 9 min
 **Task:** Namespace `practice` already contains a Service named `redis` on port `6379`.
 Create a Pod named `cache-ambassador` in `practice` with two containers:
-- `app` — image `busybox`, runs: `while true; do nc -z 127.0.0.1 6379 && echo "$(date) redis reachable"; sleep 5; done`
-- `proxy` — image `nginx:1.27`, proxies `localhost:6379` → `redis:6379`
+- `app` - image `busybox`, runs: `while true; do nc -z 127.0.0.1 6379 && echo "$(date) redis reachable"; sleep 5; done`
+- `proxy` - image `nginx:1.27`, proxies `localhost:6379` → `redis:6379`
 
-The `app` container must only reference `localhost` — not the `redis` Service directly.
+The `app` container must only reference `localhost` - not the `redis` Service directly.
 
-> **Trap:** port 6379 is raw TCP, not HTTP. nginx's `http {}` block cannot proxy TCP — you need the `stream {}` block, and the config must replace `/etc/nginx/nginx.conf` entirely (not drop a file in `/etc/nginx/conf.d/`).
+> **Trap:** port 6379 is raw TCP, not HTTP. nginx's `http {}` block cannot proxy TCP - you need the `stream {}` block, and the config must replace `/etc/nginx/nginx.conf` entirely (not drop a file in `/etc/nginx/conf.d/`).
 
 <details><summary>Answer</summary>
 
@@ -659,7 +659,7 @@ spec:
       image: nginx:1.27
       volumeMounts:
         - name: cfg
-          mountPath: /etc/nginx/nginx.conf   # replaces the whole file — required for stream {}
+          mountPath: /etc/nginx/nginx.conf   # replaces the whole file - required for stream {}
           subPath: nginx.conf                # subPath so only this key is mounted as a file
 ```
 
@@ -679,13 +679,13 @@ kubectl exec cache-ambassador -c proxy -- ss -tlnp | grep 6379
 
 > **Why `subPath`?** Without it, the `volumeMount` would replace the entire `/etc/nginx/` directory with the ConfigMap, removing all other nginx files. `subPath: nginx.conf` mounts only that one key as a single file at the given path.
 
-> **Exam recall — three values, one name:** The ConfigMap key, `subPath`, and the filename in `mountPath` are all the same string: `nginx.conf`. You only need to remember the filename once; the rest is mechanical:
+> **Exam recall - three values, one name:** The ConfigMap key, `subPath`, and the filename in `mountPath` are all the same string: `nginx.conf`. You only need to remember the filename once; the rest is mechanical:
 > ```
 > key       = nginx.conf
 > subPath   = nginx.conf          # always equals the key for single-file mounts
 > mountPath = /etc/nginx/nginx.conf   # /etc/nginx/ + key
 > ```
-> **Why the whole file, not `conf.d/`?** nginx's default `nginx.conf` wraps everything in `http {}`, and `conf.d/` files are included *inside* that block. `stream {}` is a top-level directive — it cannot nest inside `http {}`. Replacing the whole file is the only option. Mnemonic: *"stream needs the top — replace the top."*
+> **Why the whole file, not `conf.d/`?** nginx's default `nginx.conf` wraps everything in `http {}`, and `conf.d/` files are included *inside* that block. `stream {}` is a top-level directive - it cannot nest inside `http {}`. Replacing the whole file is the only option. Mnemonic: *"stream needs the top - replace the top."*
 >
 > **Content skeleton (10-second recall):**
 > ```
@@ -703,7 +703,7 @@ kubectl exec cache-ambassador -c proxy -- ss -tlnp | grep 6379
 
 ---
 
-### Drill 36 — Adapter pattern
+### Drill 36 - Adapter pattern
 **Budget:** 8 min
 **Task:** Pod `adapter-demo` where the **app** writes plain lines to `/var/log/app.log`, and an **adapter** container transforms each line into a structured JSON line and writes it to `/var/log/app.json`. Share logs via `emptyDir`.
 
@@ -747,7 +747,7 @@ spec:
 kubectl apply -f adapter.yaml
 ```
 
-Verify — the raw log holds plain lines; the adapted log holds JSON records with the same content:
+Verify - the raw log holds plain lines; the adapted log holds JSON records with the same content:
 
 ```bash
 kubectl exec adapter-demo -c adapter -- tail -n 3 /var/log/app.log
@@ -757,9 +757,9 @@ kubectl exec adapter-demo -c adapter -- tail -n 3 /var/log/app.json
 
 ---
 
-## Section K — `kubectl edit` vs apply-from-file
+## Section K - `kubectl edit` vs apply-from-file
 
-### Drill 37 — Edit a live object, then reconcile from file
+### Drill 37 - Edit a live object, then reconcile from file
 **Budget:** 6 min
 **Task:**
 1. Scale deployment `web` to 5 replicas **using `kubectl edit`** (not `scale`, not `apply`).
@@ -770,7 +770,7 @@ kubectl exec adapter-demo -c adapter -- tail -n 3 /var/log/app.json
 <details><summary>Answer</summary>
 
 ```bash
-# 1) Live edit — opens $EDITOR (vi by default). Change spec.replicas: 5 and save.
+# 1) Live edit - opens $EDITOR (vi by default). Change spec.replicas: 5 and save.
 kubectl edit deployment web
 
 # 2) Snapshot the live object into a clean file (strip server-managed fields).
@@ -784,7 +784,7 @@ kubectl apply -f web.yaml
 kubectl rollout status deployment/web
 ```
 
-Verify — right after step 1 you expect `READY 5/5`, and after step 3 `READY 2/2`. Also, `apply` now owns the fields it wrote (visible under `.metadata.managedFields` with manager `kubectl-client-side-apply` or `kubectl`):
+Verify - right after step 1 you expect `READY 5/5`, and after step 3 `READY 2/2`. Also, `apply` now owns the fields it wrote (visible under `.metadata.managedFields` with manager `kubectl-client-side-apply` or `kubectl`):
 
 ```bash
 kubectl get deploy web
@@ -796,7 +796,7 @@ kubectl get deploy web -o jsonpath='{.metadata.managedFields[*].manager}{"\n"}'
 > - **Reviewable.** The YAML lives in git; diffs are visible in PRs.
 > - **Reproducible.** You can recreate the object in another cluster with the same file.
 > - **Safer rollbacks.** `kubectl apply` uses server-side 3-way merge and respects `managedFields`, so other controllers' changes are not silently overwritten.
-> - `kubectl edit` is fine for quick debugging, but treat it as throwaway — always fold the change back into the source file.
+> - `kubectl edit` is fine for quick debugging, but treat it as throwaway - always fold the change back into the source file.
 </details>
 
 ---
@@ -812,3 +812,4 @@ kubectl delete ingress,deploy,svc,pod,cm,sa,role,rolebinding --all -n practice
 ## Scoring
 
 Same as part 1: 2 pts solved in budget without peeking, 1 pt solved within 1.5× or after one peek, 0 pts otherwise. Target **20+ / 24** across this set.
+

@@ -1,6 +1,6 @@
 # Linux Shell Essentials for Windows Users
 
-A focused guide for Windows developers who need to become comfortable in a Linux shell quickly — specifically for CKAD-style work (WSL2 + Ubuntu + `kubectl` + `vim`).
+A focused guide for Windows developers who need to become comfortable in a Linux shell quickly - specifically for CKAD-style work (WSL2 + Ubuntu + `kubectl` + `vim`).
 
 The goal is **not** to learn Linux. The goal is to stop hesitating in a Linux terminal under time pressure.
 
@@ -40,7 +40,7 @@ The goal is **not** to learn Linux. The goal is to stop hesitating in a Linux te
 
 Keep these in mind:
 
-- **Everything is a file** — devices, sockets, pipes, even process info under `/proc`.
+- **Everything is a file** - devices, sockets, pipes, even process info under `/proc`.
 - **Hidden files** start with a dot: `.bashrc`, `.gitignore`. Use `ls -a` to see them.
 - **Commands are programs**, not verbs. `ls` is `/usr/bin/ls`, found via `$PATH`.
 
@@ -205,7 +205,7 @@ Use `<<'EOF'` (quoted) to write `$vars` **literally** instead of expanding them.
 | `grep pattern file` | Find lines matching `pattern` |
 | `grep -r pattern dir` | Recurse into a directory |
 | `grep -E 'a|b'` | Extended regex (alternation) |
-| `grep -v pattern` | **Invert** — lines NOT matching |
+| `grep -v pattern` | **Invert** - lines NOT matching |
 | `grep -i pattern` | Case-insensitive |
 | `sort` | Sort lines |
 | `uniq` | Collapse adjacent duplicate lines (usually after `sort`) |
@@ -238,7 +238,7 @@ For CKAD, `grep` + `wc -l` + occasionally `awk '{print $1}'` covers ~95% of what
 
 ## 8. Permissions and `sudo`
 
-Each file has an owner, a group, and three permission triplets — user / group / other — each with read (`r`), write (`w`), execute (`x`).
+Each file has an owner, a group, and three permission triplets - user / group / other - each with read (`r`), write (`w`), execute (`x`).
 
 ```bash
 ls -l script.sh
@@ -303,9 +303,9 @@ Key files:
 |---|---|
 | `~/.bashrc` | Every interactive non-login shell (the default in WSL) |
 | `~/.profile` | Login shells; on Ubuntu it sources `~/.bashrc` |
-| `~/.bash_profile` | Login shells (if present). Default Ubuntu does **not** use this — do not put CKAD setup here |
+| `~/.bash_profile` | Login shells (if present). Default Ubuntu does **not** use this - do not put CKAD setup here |
 
-**`Ctrl+R` — reverse history search:** Press `Ctrl+R`, start typing any part of a previous command — bash searches backwards through history and shows the first match. Press `Ctrl+R` again for an older match, `Enter` to run, or `→` / `Esc` to edit. Far faster than pressing `↑` repeatedly under time pressure.
+**`Ctrl+R` - reverse history search:** Press `Ctrl+R`, start typing any part of a previous command - bash searches backwards through history and shows the first match. Press `Ctrl+R` again for an older match, `Enter` to run, or `→` / `Esc` to edit. Far faster than pressing `↑` repeatedly under time pressure.
 
 ---
 
@@ -367,7 +367,7 @@ Ctrl+r     # redo
 
 # Settings (Command mode)
 :set number      # show line numbers
-:set paste       # disable auto-indent — use before pasting from clipboard
+:set paste       # disable auto-indent - use before pasting from clipboard
 ```
 
 > **Exam tip:** If vim is misbehaving (unexpected auto-indent on paste, keys not working as expected), press `Esc` twice to ensure you're in Normal mode. To clear the entire file and start fresh: `ggdG` (go to top, delete to end).
@@ -399,15 +399,15 @@ Important difference: **PowerShell pipes objects, bash pipes text.** Everything 
 
 ## 13. Common Pitfalls for Windows Users
 
-- **Case sensitivity.** `Pod.yaml` and `pod.yaml` are two different files. Tab-completion is your friend — use it.
+- **Case sensitivity.** `Pod.yaml` and `pod.yaml` are two different files. Tab-completion is your friend - use it.
 - **CRLF line endings.** Files edited in Notepad often break on Linux. Configure git: `git config --global core.autocrlf input`. In `vim`, fix with `:set fileformat=unix` then `:wq`.
 - **Working under `/mnt/c`.** Slow and permission-quirky. Keep CKAD practice in `~`, not in your Windows user folder.
 - **Copy/paste in terminals.** In Windows Terminal: `Ctrl+Shift+C` / `Ctrl+Shift+V`. Never paste with middle-click inside tmux sessions you don't own.
 - **`rm -rf` has no undo.** Always check `pwd` first. Never expand a shell variable into `rm -rf "$VAR/"` without confirming `$VAR` is set.
 - **Quotes matter.**
-  - `"..."` — expands `$vars` and `$(...)`.
-  - `'...'` — literal, no expansion.
-  - Backticks / `$(...)` — command substitution.
+  - `"..."` - expands `$vars` and `$(...)`.
+  - `'...'` - literal, no expansion.
+  - Backticks / `$(...)` - command substitution.
 - **`sudo` is not a magic fix.** If `kubectl` fails, the answer is almost never `sudo kubectl`. It's usually the kubeconfig or namespace.
 - **Running `.bashrc` changes.** Edits to `~/.bashrc` take effect only after `source ~/.bashrc` or a new shell.
 
@@ -459,5 +459,6 @@ If you completed that without Googling, you have enough Linux for CKAD. Now go d
 
 ## Related
 
-- [CKAD/README.md](README.md) — main CKAD playbook (environment, speed patterns, exam runbook).
-- [CKAD/drills-1-core.md](drills-1-core.md) — 25 timed CKAD drills with hidden answers.
+- [CKAD/README.md](README.md) - main CKAD playbook (environment, speed patterns, exam runbook).
+- [CKAD/drills-1-core.md](drills-1-core.md) - 25 timed CKAD drills with hidden answers.
+

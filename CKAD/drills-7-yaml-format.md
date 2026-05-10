@@ -1,16 +1,16 @@
-# YAML Format — Reference & Drills
+# YAML Format - Reference & Drills
 
 A focused guide to YAML syntax for Kubernetes. Read each section, then attempt the drill. Expand the answer only after you try.
 
-> These drills are not timed — understanding matters more than speed here.
+> These drills are not timed - understanding matters more than speed here.
 
 ---
 
 ## 1. Core Rules
 
-- **Spaces only** — tabs are illegal in YAML
-- **Indentation defines structure** — two spaces is the Kubernetes convention
-- **Case-sensitive** — `apiVersion` ≠ `ApiVersion`
+- **Spaces only** - tabs are illegal in YAML
+- **Indentation defines structure** - two spaces is the Kubernetes convention
+- **Case-sensitive** - `apiVersion` ≠ `ApiVersion`
 - **Comments** start with `#` and run to end of line
 - **Document separator** `---` splits multiple resources in one file
 
@@ -23,7 +23,7 @@ apiVersion: v1
 kind: Service
 ```
 
-### Drill 1 — Spot the error
+### Drill 1 - Spot the error
 **Task:** Find the syntax error.
 
 ```yaml
@@ -54,16 +54,16 @@ metadata:
 | Type | Example | Notes |
 |---|---|---|
 | Plain string | `name: mypod` | No quotes needed unless value is ambiguous |
-| Single-quoted | `value: 'no expansion'` | Literal — no escape sequences |
+| Single-quoted | `value: 'no expansion'` | Literal - no escape sequences |
 | Double-quoted | `value: "line\n"` | Supports `\n`, `\t`, etc. |
 | Integer | `replicas: 3` | |
 | Float | `cpu: 0.5` | |
 | Boolean | `enabled: true` | Also `false` |
 | Null | `value: null` or `value: ~` | |
 
-> **Gotcha — YAML 1.1 vs 1.2:** `kubectl` uses a YAML 1.1 parser (Go's `go-yaml` library). In YAML 1.1, `yes`, `no`, `on`, `off` are treated as booleans. The current YAML spec (1.2) recognises only `true` and `false` as booleans, but Kubernetes tooling has not yet migrated. Quote these values when you mean a string: `value: "yes"`.
+> **Gotcha - YAML 1.1 vs 1.2:** `kubectl` uses a YAML 1.1 parser (Go's `go-yaml` library). In YAML 1.1, `yes`, `no`, `on`, `off` are treated as booleans. The current YAML spec (1.2) recognises only `true` and `false` as booleans, but Kubernetes tooling has not yet migrated. Quote these values when you mean a string: `value: "yes"`.
 
-> **Gotcha — ambiguous scalar values:** Some values look like plain strings but are parsed as other types. Always quote them:
+> **Gotcha - ambiguous scalar values:** Some values look like plain strings but are parsed as other types. Always quote them:
 >
 > | Value | Parsed as | Use case in K8s |
 > |---|---|---|
@@ -73,7 +73,7 @@ metadata:
 >
 > Fix: `defaultMode: 0755` → `defaultMode: 0o755` (Go octal literal, accepted by K8s) or quote it: `"0755"`.
 
-> **Gotcha — special characters that force quoting:** A plain scalar must be quoted if it starts with (or contains) any of these characters at a position where YAML assigns them structural meaning:
+> **Gotcha - special characters that force quoting:** A plain scalar must be quoted if it starts with (or contains) any of these characters at a position where YAML assigns them structural meaning:
 >
 > | Character | Meaning in YAML | Example fix |
 > |---|---|---|
@@ -85,9 +85,9 @@ metadata:
 > | `!` | YAML tag | `value: "!important"` |
 > | `>` or `\|` | block scalar indicators | cannot appear as a plain value; use quoted form |
 >
-> **Rule of thumb:** if the value contains `:` followed by a space, or starts with any of `{[!"'|>&*%@,` — quote it.
+> **Rule of thumb:** if the value contains `:` followed by a space, or starts with any of `{[!"'|>&*%@,` - quote it.
 
-### Drill 2 — Types
+### Drill 2 - Types
 **Task:** What type does YAML assign to each value? Are any dangerous?
 
 ```yaml
@@ -104,11 +104,11 @@ f: on
 | Key | YAML type | Dangerous? |
 |---|---|---|
 | `a` | Boolean `true` | No |
-| `b` | Boolean `true` (YAML 1.1) | ⚠ Yes — if you meant the string `"yes"` |
+| `b` | Boolean `true` (YAML 1.1) | ⚠ Yes - if you meant the string `"yes"` |
 | `c` | Integer `42` | No |
-| `d` | String `"42"` | No — quotes force string |
+| `d` | String `"42"` | No - quotes force string |
 | `e` | Null | No |
-| `f` | Boolean `true` (YAML 1.1) | ⚠ Yes — if you meant the string `"on"` |
+| `f` | Boolean `true` (YAML 1.1) | ⚠ Yes - if you meant the string `"on"` |
 
 In Kubernetes manifests `yes`/`on` are rare but can cause silent validation errors if a field expects a string.
 </details>
@@ -120,7 +120,7 @@ In Kubernetes manifests `yes`/`on` are rare but can cause silent validation erro
 A mapping is an unordered set of key-value pairs. Keys at the same indent level belong to the same mapping.
 
 ```yaml
-metadata:        # mapping key — value is a nested mapping
+metadata:        # mapping key - value is a nested mapping
   name: mypod
   namespace: default
   labels:        # nested mapping
@@ -130,15 +130,15 @@ metadata:        # mapping key — value is a nested mapping
 
 Kubernetes field order convention: `apiVersion → kind → metadata → spec`.
 
-**Empty and null values** behave differently — this matters in Kubernetes selectors and volume lists:
+**Empty and null values** behave differently - this matters in Kubernetes selectors and volume lists:
 
 ```yaml
-podSelector: {}   # empty mapping — match ALL pods (NetworkPolicy wildcard)
-podSelector:      # null (bare key, no value) — K8s treats same as {}, but {} is clearer
-volumes: []       # explicitly empty list — overrides any inherited volumes
+podSelector: {}   # empty mapping - match ALL pods (NetworkPolicy wildcard)
+podSelector:      # null (bare key, no value) - K8s treats same as {}, but {} is clearer
+volumes: []       # explicitly empty list - overrides any inherited volumes
 ```
 
-### Drill 3 — Nested mapping
+### Drill 3 - Nested mapping
 **Task:** Write a `metadata` block for a Pod named `db` in namespace `ns-config` with label `app: database`.
 
 <details><summary>Answer</summary>
@@ -159,7 +159,7 @@ metadata:
 A sequence is an ordered list. Each item starts with `- `.
 
 ```yaml
-# Block style — most readable
+# Block style - most readable
 containers:
   - name: app
     image: nginx:1.27
@@ -167,21 +167,21 @@ containers:
     image: busybox:1.36
 ```
 
-The `-` can sit at the same column as the key's content or indented further — both are valid:
+The `-` can sit at the same column as the key's content or indented further - both are valid:
 
 ```yaml
-# Dash-aligned style — dash sits at the same column as the key name
+# Dash-aligned style - dash sits at the same column as the key name
 containers:
 - name: app          # dash at col 0, aligned with "containers:"
   image: nginx:1.27
 
-# Block-indented style — dash is indented 2 spaces inside the key
+# Block-indented style - dash is indented 2 spaces inside the key
 containers:
   - name: app        # dash at col 2
     image: nginx:1.27
 ```
 
-### Drill 4 — Write a sequence
+### Drill 4 - Write a sequence
 **Task:** Write an `env` list for a container with two variables: `DB_HOST=mysql` and `DB_PORT=3306`.
 
 <details><summary>Answer</summary>
@@ -191,7 +191,7 @@ env:
   - name: DB_HOST
     value: mysql
   - name: DB_PORT
-    value: "3306"   # quoted — prevents YAML parsing as integer
+    value: "3306"   # quoted - prevents YAML parsing as integer
 ```
 </details>
 
@@ -199,7 +199,7 @@ env:
 
 ## 5. Block vs Flow Style
 
-YAML allows two equivalent representations — **block** (multi-line) and **flow** (inline JSON-like).
+YAML allows two equivalent representations - **block** (multi-line) and **flow** (inline JSON-like).
 
 ```yaml
 # Block
@@ -208,7 +208,7 @@ metadata:
   labels:
     app: myapp
 
-# Flow — identical meaning
+# Flow - identical meaning
 metadata: { name: mypod, labels: { app: myapp } }
 ```
 
@@ -218,13 +218,13 @@ policyTypes:
   - Ingress
   - Egress
 
-# Flow sequence — identical meaning
+# Flow sequence - identical meaning
 policyTypes: [Ingress, Egress]
 ```
 
 > **Exam tip:** Flow style is faster to type in `kubectl edit` or when writing one-liners. Kubernetes accepts both everywhere.
 
-### Drill 5 — Convert styles
+### Drill 5 - Convert styles
 **Task:** Rewrite this in flow style:
 
 ```yaml
@@ -243,7 +243,7 @@ selector: { matchLabels: { app: frontend, version: v2 } }
 
 ---
 
-## 6. Sequence-of-Mappings — The Tricky Indent Rule
+## 6. Sequence-of-Mappings - The Tricky Indent Rule
 
 This is the most common source of Kubernetes YAML errors. When a sequence item is itself a mapping, the `-` introduces the item and the item's keys are indented relative to the `-`.
 
@@ -263,7 +263,7 @@ ingress:
 - `- podSelector:` → sequence item (a new `from` entry)
 - `ports:` → mapping key (no dash → belongs to the parent rule item, not inside `from`)
 
-### Drill 6 — NetworkPolicy indent
+### Drill 6 - NetworkPolicy indent
 **Task:** Fix the indentation. `ports` should allow TCP:80 from `app: frontend` pods only.
 
 ```yaml
@@ -280,7 +280,7 @@ spec:
 
 <details><summary>Answer</summary>
 
-`ports:` is indented as part of the `podSelector` item — that's wrong. `ports` must be a sibling of `from` on the rule item:
+`ports:` is indented as part of the `podSelector` item - that's wrong. `ports` must be a sibling of `from` on the rule item:
 
 ```yaml
 spec:
@@ -302,20 +302,20 @@ The rule item (`- `) has exactly two keys: `from` and `ports`. Both align at the
 ## 7. Multi-line Strings
 
 ```yaml
-# Literal block scalar (|) — preserves newlines
+# Literal block scalar (|) - preserves newlines
 script: |
   #!/bin/bash
   echo "hello"
   exit 0
 
-# Folded block scalar (>) — folds newlines into spaces (good for long prose)
+# Folded block scalar (>) - folds newlines into spaces (good for long prose)
 description: >
   This is a long description
   that wraps across lines.
 ```
 
 ```yaml
-# Strip modifier (|-) — same as | but removes the trailing newline
+# Strip modifier (|-) - same as | but removes the trailing newline
 # Prefer |- over | for shell scripts in ConfigMaps: a trailing newline can silently break scripts
 data:
   script.sh: |-
@@ -324,7 +324,7 @@ data:
 ```
 
 ```yaml
-# Keep modifier (|+) — preserves ALL trailing newlines (rarely needed; default | keeps exactly one)
+# Keep modifier (|+) - preserves ALL trailing newlines (rarely needed; default | keeps exactly one)
 data:
   footer: |+
     line one
@@ -340,7 +340,7 @@ data:
 
 > **Exam tip:** Use `|-` (not `|`) for shell script content in ConfigMaps. The trailing newline that `|` preserves can silently break scripts that are sourced or executed directly.
 
-### Drill 7 — Multi-line command
+### Drill 7 - Multi-line command
 **Task:** Write the `command` and `args` fields for a container that runs two shell commands sequentially using a literal block scalar.
 
 <details><summary>Answer</summary>
@@ -358,20 +358,20 @@ args:
 
 ## 8. Anchors & Aliases (reuse blocks)
 
-Anchors define a reusable block (`&name`). Aliases paste it back in (`*name`). Anchors are **document-scoped** — an alias cannot reference an anchor defined in a different YAML document (across `---`).
+Anchors define a reusable block (`&name`). Aliases paste it back in (`*name`). Anchors are **document-scoped** - an alias cannot reference an anchor defined in a different YAML document (across `---`).
 
 ```yaml
-# Abstract illustration — not a deployable K8s manifest
+# Abstract illustration - not a deployable K8s manifest
 labels: &appLabels    # anchor named "appLabels"
   app: myapp
   team: platform
 
 resource:
   metadata:
-    labels: *appLabels  # alias — inlines app: myapp and team: platform
+    labels: *appLabels  # alias - inlines app: myapp and team: platform
 ```
 
-> Kubernetes itself does not interpret anchors — they are resolved by the YAML parser before the manifest reaches the API server, so `kubectl apply` handles them transparently.
+> Kubernetes itself does not interpret anchors - they are resolved by the YAML parser before the manifest reaches the API server, so `kubectl apply` handles them transparently.
 
 **Merge key (`<<`):** Merges all keys from a referenced mapping into the current mapping. Specific keys can be overridden after the merge:
 
@@ -386,12 +386,12 @@ ingress-rule:
   port: 443       # overrides only port; protocol and timeout are inherited
 ```
 
-### Drill 8 — Anchors in a Deployment
+### Drill 8 - Anchors in a Deployment
 **Task:** When would anchors be most useful within a single Kubernetes manifest, and what is the key constraint to remember about anchors and `---` document separators?
 
 <details><summary>Answer</summary>
 
-Anchors are useful when the **same label set, selector, or resource limits** appear multiple times in one manifest — e.g., `metadata.labels`, `spec.selector.matchLabels`, and `spec.template.metadata.labels` in a Deployment all need identical values.
+Anchors are useful when the **same label set, selector, or resource limits** appear multiple times in one manifest - e.g., `metadata.labels`, `spec.selector.matchLabels`, and `spec.template.metadata.labels` in a Deployment all need identical values.
 
 **Key constraint:** Anchors are document-scoped. An alias (`*name`) cannot reference an anchor defined in a different document (across `---`). Define anchors in the same document as their aliases.
 
@@ -406,7 +406,7 @@ metadata:
     version: v1
 spec:
   selector:
-    matchLabels: *appLabels     # alias — same label set, no copy-paste
+    matchLabels: *appLabels     # alias - same label set, no copy-paste
   template:
     metadata:
       labels: *appLabels        # alias again
@@ -424,15 +424,15 @@ spec:
 | Pitfall | Symptom / cause | Fixed |
 |---|---|---|
 | `ports:` inside `from:` (NetworkPolicy) | Parse error or policy silently allows all traffic | `ports:` as sibling of `from:`, same indent |
-| `matchLabels` doesn’t match `template.metadata.labels` | Pods never reach `Ready` — selector matches nothing | Labels must be identical in selector and template |
-| Integer where string expected | Env var becomes int, not string — app may crash | Wrap in quotes: `value: "8080"` |
+| `matchLabels` doesn’t match `template.metadata.labels` | Pods never reach `Ready` - selector matches nothing | Labels must be identical in selector and template |
+| Integer where string expected | Env var becomes int, not string - app may crash | Wrap in quotes: `value: "8080"` |
 | `latest` image tag | Unexpected pulls; `ErrImagePull` in air-gapped clusters | Pin version: `image: nginx:1.27` |
 | Missing `---` separator in multi-resource file | Second resource silently dropped or parse error | Add `---` between each resource |
 | Tab indentation | `error converting YAML to JSON` parse error | Spaces only |
 | `yes`/`no` used as strings | Silently coerced to boolean `true`/`false` | Quote: `value: "yes"` |
 | Removed `apiVersion` (e.g. `extensions/v1beta1`) | `no matches for kind ... in version ...` error | Use current stable version: `networking.k8s.io/v1` |
 
-### Drill 9 — Two-bug YAML
+### Drill 9 - Two-bug YAML
 **Task:** Find and fix both bugs.
 
 ```yaml
@@ -462,14 +462,14 @@ spec:
 
 <details><summary>Answer</summary>
 
-**Bug 1 — label mismatch:** `selector.matchLabels` is `app: web` but `template.metadata.labels` is `app: frontend`. The Deployment will never match its own pods. Fix:
+**Bug 1 - label mismatch:** `selector.matchLabels` is `app: web` but `template.metadata.labels` is `app: frontend`. The Deployment will never match its own pods. Fix:
 
 ```yaml
       labels:
         app: web
 ```
 
-**Bug 2 — `latest` tag:** `image: nginx` implicitly uses `latest`. On exam clusters `imagePullPolicy` defaults to `IfNotPresent` for tagged images, but `latest` always triggers a pull which may fail or be unpredictable. Fix:
+**Bug 2 - `latest` tag:** `image: nginx` implicitly uses `latest`. On exam clusters `imagePullPolicy` defaults to `IfNotPresent` for tagged images, but `latest` always triggers a pull which may fail or be unpredictable. Fix:
 
 ```yaml
         image: nginx:1.27
@@ -478,7 +478,7 @@ spec:
 
 ---
 
-## 10. Quick Reference — Kubernetes API Field Types
+## 10. Quick Reference - Kubernetes API Field Types
 
 | Field | YAML type | Example |
 |---|---|---|
@@ -492,7 +492,7 @@ spec:
 | `podSelector: {}` | empty mapping = select all | `{}` |
 | `policyTypes` | sequence of strings | `[Ingress, Egress]` |
 
-**Kubernetes resource quantities** (`cpu`, `memory`) use a special string format — they are always strings in YAML, not numbers:
+**Kubernetes resource quantities** (`cpu`, `memory`) use a special string format - they are always strings in YAML, not numbers:
 
 | Suffix | Meaning | Example |
 |---|---|---|
@@ -542,7 +542,7 @@ kubectl explain networkpolicy.spec.ingress.from
 Kubernetes accepts YAML piped on stdin with `kubectl apply -f -`. Useful for one-liners, generated manifests, and scripts:
 
 ```bash
-# Pipe a here-document directly — no file needed
+# Pipe a here-document directly - no file needed
 kubectl apply -f - <<'EOF'
 apiVersion: v1
 kind: ConfigMap
@@ -566,4 +566,5 @@ cat deployment.yaml service.yaml | kubectl apply -f -
 
 > **Quoting the heredoc delimiter:** Use `<<'EOF'` (single-quoted) to prevent the shell from expanding `$VARIABLES` or `$(commands)` inside the YAML block. Use unquoted `<<EOF` only when you deliberately want shell expansion.
 
-> **Exam tip:** `kubectl apply -f - <<'EOF' ... EOF` is the fastest way to create a resource from scratch — combine it with `kubectl explain` to discover field names and write the manifest inline without saving a file.
+> **Exam tip:** `kubectl apply -f - <<'EOF' ... EOF` is the fastest way to create a resource from scratch - combine it with `kubectl explain` to discover field names and write the manifest inline without saving a file.
+

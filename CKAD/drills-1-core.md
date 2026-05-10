@@ -1,4 +1,4 @@
-# CKAD Mock Lab — 25 Drills
+# CKAD Mock Lab - 25 Drills
 
 A self-contained drill sheet. Each task has a **time budget** and a hidden **answer** (`<details>` block). Try the task first, then expand to check.
 
@@ -38,9 +38,9 @@ All answers assume the current namespace is `practice`.
 
 ---
 
-## Section A — Core workloads
+## Section A - Core workloads
 
-### Drill 1 — Create a namespace
+### Drill 1 - Create a namespace
 **Budget:** 1 min
 **Task:** Create a namespace called `practice`.
 
@@ -50,7 +50,7 @@ All answers assume the current namespace is `practice`.
 kubectl create namespace practice
 ```
 
-Verify — expect a row with `STATUS=Active`:
+Verify - expect a row with `STATUS=Active`:
 
 ```bash
 kubectl get ns practice
@@ -59,7 +59,7 @@ kubectl get ns practice
 
 ---
 
-### Drill 2 — Create a deployment
+### Drill 2 - Create a deployment
 **Budget:** 2 min
 **Task:** Create a deployment `web` using image `nginx:1.27` with 1 replica.
 
@@ -69,7 +69,7 @@ kubectl get ns practice
 kubectl create deployment web --image=nginx:1.27
 ```
 
-Verify — rollout prints `successfully rolled out`; `get deploy` shows `READY 1/1` and `IMAGES=nginx:1.27`:
+Verify - rollout prints `successfully rolled out`; `get deploy` shows `READY 1/1` and `IMAGES=nginx:1.27`:
 
 ```bash
 kubectl rollout status deployment/web
@@ -79,7 +79,7 @@ kubectl get deploy web -o wide
 
 ---
 
-### Drill 3 — Scale a deployment
+### Drill 3 - Scale a deployment
 **Budget:** 1 min
 **Task:** Scale `web` to 3 replicas.
 
@@ -89,7 +89,7 @@ kubectl get deploy web -o wide
 kubectl scale deployment web --replicas=3
 ```
 
-Verify — expect `READY 3/3` (may take a few seconds to reach that state):
+Verify - expect `READY 3/3` (may take a few seconds to reach that state):
 
 ```bash
 kubectl get deploy web
@@ -98,7 +98,7 @@ kubectl get deploy web
 
 ---
 
-### Drill 4 — Update the image
+### Drill 4 - Update the image
 **Budget:** 2 min
 **Task:** Change the container image of `web` to `nginx:1.27-alpine`.
 
@@ -109,7 +109,7 @@ kubectl set image deployment/web nginx=nginx:1.27-alpine
 kubectl rollout status deployment/web
 ```
 
-Verify — the command prints exactly `nginx:1.27-alpine`:
+Verify - the command prints exactly `nginx:1.27-alpine`:
 
 ```bash
 kubectl get deploy web -o jsonpath='{.spec.template.spec.containers[0].image}{"\n"}'
@@ -118,7 +118,7 @@ kubectl get deploy web -o jsonpath='{.spec.template.spec.containers[0].image}{"\
 
 ---
 
-### Drill 5 — Expose a deployment
+### Drill 5 - Expose a deployment
 **Budget:** 2 min
 **Task:** Create a ClusterIP service for `web` exposing port 80 → targetPort 80.
 
@@ -128,7 +128,7 @@ kubectl get deploy web -o jsonpath='{.spec.template.spec.containers[0].image}{"\
 kubectl expose deployment web --port=80 --target-port=80
 ```
 
-Verify — `svc` shows `TYPE=ClusterIP` and `PORT(S)=80/TCP`; `endpoints` lists one IP per ready pod (empty `<none>` means the selector matches no ready pods):
+Verify - `svc` shows `TYPE=ClusterIP` and `PORT(S)=80/TCP`; `endpoints` lists one IP per ready pod (empty `<none>` means the selector matches no ready pods):
 
 ```bash
 kubectl get svc web
@@ -138,7 +138,7 @@ kubectl get endpoints web
 
 ---
 
-### Drill 6 — Create a pod that sleeps
+### Drill 6 - Create a pod that sleeps
 **Budget:** 2 min
 **Task:** Create a pod `tools` from `busybox` that sleeps forever.
 
@@ -148,7 +148,7 @@ kubectl get endpoints web
 kubectl run tools --image=busybox --restart=Never -- /bin/sh -c "sleep infinity"
 ```
 
-Verify — expect `STATUS=Running` and `READY 1/1`:
+Verify - expect `STATUS=Running` and `READY 1/1`:
 
 ```bash
 kubectl get pod tools
@@ -157,7 +157,7 @@ kubectl get pod tools
 
 ---
 
-### Drill 7 — Exec into a pod
+### Drill 7 - Exec into a pod
 **Budget:** 2 min
 **Task:** Exec into `tools` and reach the `web` service with `wget`.
 
@@ -172,7 +172,7 @@ wget -qO- http://web:80
 
 ---
 
-### Drill 8 — Print pod labels
+### Drill 8 - Print pod labels
 **Budget:** 1 min
 **Task:** Show labels of every pod belonging to the `web` deployment.
 
@@ -185,7 +185,7 @@ kubectl get pods -l app=web --show-labels
 
 ---
 
-### Drill 9 — Rollout undo
+### Drill 9 - Rollout undo
 **Budget:** 2 min
 **Task:** Undo the last rollout of `web`.
 
@@ -200,7 +200,7 @@ kubectl rollout status deployment/web
 
 ---
 
-### Drill 10 — Generate YAML, edit, apply
+### Drill 10 - Generate YAML, edit, apply
 **Budget:** 5 min
 **Task:** Produce a deployment YAML for `api` (image `nginx`, 2 replicas), change replicas to 4 in `vim`, then apply.
 
@@ -212,7 +212,7 @@ vim api.yaml   # change spec.replicas from 2 to 4, :wq
 kubectl apply -f api.yaml
 ```
 
-Verify — rollout reports success and `get deploy` shows `READY 4/4` (proves the edit took effect, not the original `2`):
+Verify - rollout reports success and `get deploy` shows `READY 4/4` (proves the edit took effect, not the original `2`):
 
 ```bash
 kubectl rollout status deployment/api
@@ -222,9 +222,9 @@ kubectl get deploy api
 
 ---
 
-## Section B — Config and secrets
+## Section B - Config and secrets
 
-### Drill 11 — ConfigMap from literals
+### Drill 11 - ConfigMap from literals
 **Budget:** 2 min
 **Task:** Create ConfigMap `app-cfg` with `APP_ENV=prod` and `APP_TIER=web`.
 
@@ -236,7 +236,7 @@ kubectl create configmap app-cfg \
   --from-literal=APP_TIER=web
 ```
 
-Verify — output is a JSON map with both keys, e.g. `map[APP_ENV:prod APP_TIER:web]`:
+Verify - output is a JSON map with both keys, e.g. `map[APP_ENV:prod APP_TIER:web]`:
 
 ```bash
 kubectl get cm app-cfg -o jsonpath='{.data}{"\n"}'
@@ -245,7 +245,7 @@ kubectl get cm app-cfg -o jsonpath='{.data}{"\n"}'
 
 ---
 
-### Drill 12 — ConfigMap as env vars
+### Drill 12 - ConfigMap as env vars
 **Budget:** 5 min
 **Task:** Create pod `cm-env` (image `busybox`) that sleeps and exposes all `app-cfg` keys as env vars. Verify with `env` inside the pod.
 
@@ -276,7 +276,7 @@ kubectl exec cm-env -- env | grep APP_
 
 ---
 
-### Drill 13 — ConfigMap as a volume
+### Drill 13 - ConfigMap as a volume
 **Budget:** 5 min
 **Task:** Mount `app-cfg` as a read-only volume at `/etc/app-cfg` in pod `cm-vol`.
 
@@ -313,7 +313,7 @@ kubectl exec cm-vol -- cat /etc/app-cfg/APP_ENV
 
 ---
 
-### Drill 14 — Secret from literals
+### Drill 14 - Secret from literals
 **Budget:** 2 min
 **Task:** Create Secret `app-sec` with `API_KEY=supersecret`.
 
@@ -323,7 +323,7 @@ kubectl exec cm-vol -- cat /etc/app-cfg/APP_ENV
 kubectl create secret generic app-sec --from-literal=API_KEY=supersecret
 ```
 
-Verify — the stored value is base64 (`.data.API_KEY` would print `c3VwZXJzZWNyZXQ=`); decoding it prints `supersecret`:
+Verify - the stored value is base64 (`.data.API_KEY` would print `c3VwZXJzZWNyZXQ=`); decoding it prints `supersecret`:
 
 ```bash
 kubectl get secret app-sec -o jsonpath='{.data.API_KEY}' | base64 -d; echo
@@ -332,7 +332,7 @@ kubectl get secret app-sec -o jsonpath='{.data.API_KEY}' | base64 -d; echo
 
 ---
 
-### Drill 15 — Consume a Secret
+### Drill 15 - Consume a Secret
 **Budget:** 5 min
 **Task:** Pod `sec-pod` (image `busybox`) exposes `API_KEY` from the Secret as an env var.
 
@@ -366,9 +366,9 @@ kubectl exec sec-pod -- sh -c 'echo $API_KEY'
 
 ---
 
-## Section C — Probes, resources, Jobs
+## Section C - Probes, resources, Jobs
 
-### Drill 16 — Readiness & liveness probes
+### Drill 16 - Readiness & liveness probes
 **Budget:** 6 min
 **Task:** Pod `probed` (image `nginx:1.27`) with:
 - `readinessProbe` httpGet `/` port 80 (delay 2s, period 5s)
@@ -406,7 +406,7 @@ kubectl describe pod probed | grep -E 'Readiness|Liveness'
 
 ---
 
-### Drill 17 — Resource requests and limits
+### Drill 17 - Resource requests and limits
 **Budget:** 3 min
 **Task:** Pod `rsrc` (image `nginx:1.27`) with requests `cpu=100m, memory=128Mi` and limits `cpu=250m, memory=256Mi`.
 
@@ -439,7 +439,7 @@ kubectl get pod rsrc -o jsonpath='{.spec.containers[0].resources}'
 
 ---
 
-### Drill 18 — One-shot Job
+### Drill 18 - One-shot Job
 **Budget:** 3 min
 **Task:** Create Job `hello` that runs `echo hello` once and completes.
 
@@ -453,7 +453,7 @@ kubectl logs job/hello
 
 ---
 
-### Drill 19 — CronJob every 5 minutes
+### Drill 19 - CronJob every 5 minutes
 **Budget:** 3 min
 **Task:** Create CronJob `hello-cron` that runs `echo hello` every 5 minutes.
 
@@ -466,7 +466,7 @@ kubectl create cronjob hello-cron \
   -- echo hello
 ```
 
-Verify — expect `SCHEDULE=*/5 * * * *`, `SUSPEND=False`, and `LAST SCHEDULE` fills in after the first firing (up to 5 min):
+Verify - expect `SCHEDULE=*/5 * * * *`, `SUSPEND=False`, and `LAST SCHEDULE` fills in after the first firing (up to 5 min):
 
 ```bash
 kubectl get cronjob hello-cron
@@ -475,7 +475,7 @@ kubectl get cronjob hello-cron
 
 ---
 
-### Drill 20 — Debug a failing pod
+### Drill 20 - Debug a failing pod
 **Budget:** 6 min
 
 **Setup (run before starting the timer):**
@@ -505,9 +505,9 @@ kubectl rollout status deployment/broken
 
 ---
 
-## Section D — Multi-container and networking
+## Section D - Multi-container and networking
 
-### Drill 21 — Sidecar that tails a shared log
+### Drill 21 - Sidecar that tails a shared log
 **Budget:** 7 min
 **Task:** Pod `logger` with two containers sharing an `emptyDir`:
 - `app` (busybox) writes a line every 2s to `/var/log/app.log`
@@ -552,7 +552,7 @@ kubectl logs logger -c sidecar --tail=5
 
 ---
 
-### Drill 22 — Init container waits for a service (requires `web` service from Drill 5)
+### Drill 22 - Init container waits for a service (requires `web` service from Drill 5)
 **Budget:** 6 min
 **Task:** Assuming the `web` service from Drill 5 already exists, create pod `delayed` so its initContainer blocks until service `web` resolves via DNS, then the main container runs `nginx:1.27`.
 
@@ -582,14 +582,14 @@ kubectl apply -f delayed.yaml
 kubectl get pod delayed -w   # stays in Init: until service `web` exists
 ```
 
-> Requires the `web` service from Drill 5. If it does not exist, the initContainer loops forever — that is the point.
+> Requires the `web` service from Drill 5. If it does not exist, the initContainer loops forever - that is the point.
 </details>
 
 ---
 
-### Drill 23 — NetworkPolicy — allow only from labeled pods
+### Drill 23 - NetworkPolicy - allow only from labeled pods
 **Budget:** 6 min
-**Task:** NetworkPolicy `allow-web-from-client` — allow ingress to pods with `app=web` **only** from pods with `role=client`, on port 80.
+**Task:** NetworkPolicy `allow-web-from-client` - allow ingress to pods with `app=web` **only** from pods with `role=client`, on port 80.
 
 <details><summary>Answer</summary>
 
@@ -624,7 +624,7 @@ kubectl describe netpol allow-web-from-client
 
 ---
 
-### Drill 24 — Port-forward to a service
+### Drill 24 - Port-forward to a service
 **Budget:** 2 min
 **Task:** Port-forward localhost `8080` to `web` service port `80`, then curl it.
 
@@ -639,9 +639,9 @@ kill %1
 
 ---
 
-## Section E — Storage
+## Section E - Storage
 
-### Drill 25 — PVC persistence round-trip
+### Drill 25 - PVC persistence round-trip
 **Budget:** 8 min
 **Task:**
 1. Create PVC `data-pvc` (1Gi, `ReadWriteOnce`).
@@ -740,13 +740,14 @@ minikube delete -p ckad && minikube start -p ckad --driver=docker
 
 ---
 
-## Coverage — what is and isn't in this lab
+## Coverage - what is and isn't in this lab
 
 These 25 drills cover ~80% of the CKAD curriculum. The remaining gaps are covered in [`drills-2-advanced.md`](drills-2-advanced.md):
 
-- **SecurityContext** — `runAsUser`, `runAsNonRoot`, `fsGroup`, `readOnlyRootFilesystem` (drills 26–28).
-- **ServiceAccount** — create + bind via `serviceAccountName`, plus RBAC with `auth can-i` (drills 29–30).
-- **Ingress** — `networking.k8s.io/v1` path- and host-based rules (drills 31–32).
-- **Observability** — `kubectl top` and events sorted by time (drills 33–34).
-- **Multi-container patterns** — ambassador and adapter (drills 35–36).
+- **SecurityContext** - `runAsUser`, `runAsNonRoot`, `fsGroup`, `readOnlyRootFilesystem` (drills 26–28).
+- **ServiceAccount** - create + bind via `serviceAccountName`, plus RBAC with `auth can-i` (drills 29–30).
+- **Ingress** - `networking.k8s.io/v1` path- and host-based rules (drills 31–32).
+- **Observability** - `kubectl top` and events sorted by time (drills 33–34).
+- **Multi-container patterns** - ambassador and adapter (drills 35–36).
 - **`kubectl edit` vs apply-from-file** (drill 37).
+
