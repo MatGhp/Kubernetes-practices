@@ -18,9 +18,10 @@ export do="--dry-run=client -o yaml"
 ## Section A - Discovery & Documentation
 
 ### Drill 50 - `kubectl explain` deep-dive
-**Curriculum:** Application Design & Build
-**Budget:** 2 min
-**Task:** Without opening a browser, find:
+**Curriculum:** Application Design & Build  
+**Budget:** 2 min  
+**Task:**  
+Without opening a browser, find:
 1. The full field path for a Pod's container `livenessProbe.httpGet.path`.
 2. The valid values for a `Service.spec.type`.
 3. The default value of a Job's `spec.completions`.
@@ -47,9 +48,10 @@ kubectl explain pod.spec --recursive | grep -A1 livenessProbe | head
 ## Section B - Pods & Multi-container Patterns
 
 ### Drill 51 - `command` vs `args` (exec-form)
-**Curriculum:** Application Design & Build
-**Budget:** 2 min
-**Task:** Run a Pod `greeter` (`busybox:1.36`) that prints `hello $NAME`, where `NAME=world` is set via env var. Use `command` to override the entrypoint to `/bin/sh -c` and `args` to pass the script. Pod must terminate cleanly (`Completed`).
+**Curriculum:** Application Design & Build  
+**Budget:** 2 min  
+**Task:**  
+Run a Pod `greeter` (`busybox:1.36`) that prints `hello $NAME`, where `NAME=world` is set via env var. Use `command` to override the entrypoint to `/bin/sh -c` and `args` to pass the script. Pod must terminate cleanly (`Completed`).
 
 <details><summary>Answer</summary>
 
@@ -90,9 +92,10 @@ kubectl get pod greeter   # STATUS Completed
 ---
 
 ### Drill 52 - Downward API as files
-**Curriculum:** Environment, Configuration & Security
-**Budget:** 3 min
-**Task:** Pod `meta` (`busybox:1.36`, sleeps forever) with a `downwardAPI` volume mounted at `/etc/podinfo` exposing the Pod's name and labels (label `app=meta` set in metadata). `cat /etc/podinfo/name` from inside the Pod must print `meta`.
+**Curriculum:** Environment, Configuration & Security  
+**Budget:** 3 min  
+**Task:**  
+Pod `meta` (`busybox:1.36`, sleeps forever) with a `downwardAPI` volume mounted at `/etc/podinfo` exposing the Pod's name and labels (label `app=meta` set in metadata). `cat /etc/podinfo/name` from inside the Pod must print `meta`.
 
 <details><summary>Answer</summary>
 
@@ -133,9 +136,10 @@ kubectl exec meta -- cat /etc/podinfo/labels
 ## Section C - Storage Edge Cases
 
 ### Drill 53 - `subPath` mount
-**Curriculum:** Environment, Configuration & Security
-**Budget:** 3 min
-**Task:** Mount a single key from a ConfigMap as a file at a path that doesn't overwrite the rest of the directory. ConfigMap `nginxconf` has key `default.conf` (the body of an nginx server block). Mount **only** that key at `/etc/nginx/conf.d/default.conf` in a `nginx:1.27` Pod `nginx-conf` - `/etc/nginx/conf.d/` must still contain its other default files.
+**Curriculum:** Environment, Configuration & Security  
+**Budget:** 3 min  
+**Task:**  
+Mount a single key from a ConfigMap as a file at a path that doesn't overwrite the rest of the directory. ConfigMap `nginxconf` has key `default.conf` (the body of an nginx server block). Mount **only** that key at `/etc/nginx/conf.d/default.conf` in a `nginx:1.27` Pod `nginx-conf` - `/etc/nginx/conf.d/` must still contain its other default files.
 
 <details><summary>Answer</summary>
 
@@ -181,9 +185,10 @@ kubectl exec nginx-conf -- curl -s localhost:8080
 ## Section D - Services & DNS
 
 ### Drill 54 - Resolve a Service from a Pod
-**Curriculum:** Services & Networking
-**Budget:** 3 min
-**Task:** Service `web` (ClusterIP, port 80) in namespace `practice`. From a one-shot debug Pod in **another** namespace `client-ns`, look up `web` using its FQDN. Demonstrate that the short name fails outside the Service's namespace but the FQDN works.
+**Curriculum:** Services & Networking  
+**Budget:** 3 min  
+**Task:**  
+Service `web` (ClusterIP, port 80) in namespace `practice`. From a one-shot debug Pod in **another** namespace `client-ns`, look up `web` using its FQDN. Demonstrate that the short name fails outside the Service's namespace but the FQDN works.
 
 <details><summary>Answer</summary>
 
@@ -209,9 +214,10 @@ kubectl run dns -n client-ns --rm -it --restart=Never --image=busybox:1.36 -- \
 ---
 
 ### Drill 55 - `ExternalName` Service
-**Curriculum:** Services & Networking
-**Budget:** 2 min
-**Task:** Create a Service `gh` of type `ExternalName` that maps to `api.github.com`. From a debug Pod, `nslookup gh.practice.svc.cluster.local` should return the `api.github.com` CNAME.
+**Curriculum:** Services & Networking  
+**Budget:** 2 min  
+**Task:**  
+Create a Service `gh` of type `ExternalName` that maps to `api.github.com`. From a debug Pod, `nslookup gh.practice.svc.cluster.local` should return the `api.github.com` CNAME.
 
 <details><summary>Answer</summary>
 
@@ -240,9 +246,10 @@ kubectl run dns --rm -it --restart=Never --image=busybox:1.36 -- \
 ## Section E - Deployment Mechanics
 
 ### Drill 56 - `rollout pause` and `resume`
-**Curriculum:** Application Deployment
-**Budget:** 3 min
-**Task:** Deployment `flow` (`nginx:1.27`, 4 replicas). Pause the rollout, change the image to `nginx:1.28`, observe that **no** new ReplicaSet is created, then resume and watch the rollout complete.
+**Curriculum:** Application Deployment  
+**Budget:** 3 min  
+**Task:**  
+Deployment `flow` (`nginx:1.27`, 4 replicas). Pause the rollout, change the image to `nginx:1.28`, observe that **no** new ReplicaSet is created, then resume and watch the rollout complete.
 
 <details><summary>Answer</summary>
 
@@ -264,9 +271,10 @@ kubectl get rs -l app=flow   # now 2 RSes
 ---
 
 ### Drill 57 - Annotations vs Labels in practice
-**Curriculum:** Application Deployment
-**Budget:** 3 min
-**Task:** Deployment `tagged`: each Pod must carry **label** `app=tagged` and **annotation** `team.example.com/owner=platform`. Demonstrate that a label selector finds the Pod but an annotation cannot be selected against - annotations are metadata only.
+**Curriculum:** Application Deployment  
+**Budget:** 3 min  
+**Task:**  
+Deployment `tagged`: each Pod must carry **label** `app=tagged` and **annotation** `team.example.com/owner=platform`. Demonstrate that a label selector finds the Pod but an annotation cannot be selected against - annotations are metadata only.
 
 <details><summary>Answer</summary>
 
@@ -301,9 +309,10 @@ kubectl get pod -l app=tagged -o jsonpath='{.items[0].metadata.annotations}{"\n"
 ## Section F - Operational Skills
 
 ### Drill 58 - `kubectl run` with `--command`
-**Curriculum:** Application Observability & Maintenance
-**Budget:** 2 min
-**Task:** One-shot Pod that runs `cat /etc/os-release` inside `busybox:1.36` and exits. Use `kubectl run` only - no manifest file. Auto-clean.
+**Curriculum:** Application Observability & Maintenance  
+**Budget:** 2 min  
+**Task:**  
+One-shot Pod that runs `cat /etc/os-release` inside `busybox:1.36` and exits. Use `kubectl run` only - no manifest file. Auto-clean.
 
 <details><summary>Answer</summary>
 
@@ -321,9 +330,10 @@ The `--command` flag tells `kubectl run` that everything after `--` is the conta
 ---
 
 ### Drill 59 - `kubectl cp` files in and out
-**Curriculum:** Application Observability & Maintenance
-**Budget:** 3 min
-**Task:** Copy `/etc/hostname` from the Pod `flow-xxxx` (any pod from drill 56, or create a new busybox sleeper) to a local file `pod-hostname.txt`. Then copy a local file `note.txt` (with text `hi`) into the Pod at `/tmp/note.txt`.
+**Curriculum:** Application Observability & Maintenance  
+**Budget:** 3 min  
+**Task:**  
+Copy `/etc/hostname` from the Pod `flow-xxxx` (any pod from drill 56, or create a new busybox sleeper) to a local file `pod-hostname.txt`. Then copy a local file `note.txt` (with text `hi`) into the Pod at `/tmp/note.txt`.
 
 <details><summary>Answer</summary>
 
@@ -345,9 +355,10 @@ kubectl exec keeper -- cat /tmp/note.txt
 ---
 
 ### Drill 60 - `kubectl logs` flags
-**Curriculum:** Application Observability & Maintenance
-**Budget:** 2 min
-**Task:** Given a Deployment `noisy` running `busybox:1.36` with command `sh -c "while true; do echo line-$RANDOM; sleep 1; done"`, fetch:
+**Curriculum:** Application Observability & Maintenance  
+**Budget:** 2 min  
+**Task:**  
+Given a Deployment `noisy` running `busybox:1.36` with command `sh -c "while true; do echo line-$RANDOM; sleep 1; done"`, fetch:
 1. The last 5 lines from any one Pod.
 2. Logs from **all** Pods of the Deployment, prefixed with the Pod name.
 3. Live-tail logs across the Deployment for 10 seconds, then exit.
@@ -380,9 +391,10 @@ Key flags: `-l <selector>` fans out across matching Pods; `--prefix` stamps each
 ---
 
 ### Drill 61 - `kubectl wait` patterns
-**Curriculum:** Application Observability & Maintenance
-**Budget:** 3 min
-**Task:** Wait for:
+**Curriculum:** Application Observability & Maintenance  
+**Budget:** 3 min  
+**Task:**  
+Wait for:
 1. Deployment `api` to be `Available` (timeout 60 s).
 2. A specific Pod `task14` to be `Ready` (timeout 30 s).
 3. A Job `oneshot` to reach condition `complete` (timeout 2 min).
@@ -417,9 +429,10 @@ kubectl wait --for=delete pod/task14 --timeout=30s
 ## Section G - Container Images & API Versioning
 
 ### Drill 62 - `docker build` + minikube local image deploy
-**Curriculum:** Application Design & Build
-**Budget:** 5 min
-**Task:** Build a custom nginx image locally and deploy it to the cluster without a registry:
+**Curriculum:** Application Design & Build  
+**Budget:** 5 min  
+**Task:**  
+Build a custom nginx image locally and deploy it to the cluster without a registry:
 1. Write a `Dockerfile` using `FROM nginx:1.27` that copies a local `index.html` (content: `Hello CKAD`) to `/usr/share/nginx/html/index.html`.
 2. Build the image as `my-app:v1` **inside minikube's Docker daemon**.
 3. Deploy a Pod `my-app` (namespace `practice`) using that image with `imagePullPolicy: Never`.
@@ -473,9 +486,10 @@ kubectl exec my-app -- curl -s localhost   # Hello CKAD
 ---
 
 ### Drill 63 - Multi-stage Dockerfile (minimise final image)
-**Curriculum:** Application Design & Build
-**Budget:** 8 min
-**Task:** Write a multi-stage `Dockerfile`:
+**Curriculum:** Application Design & Build  
+**Budget:** 8 min  
+**Task:**  
+Write a multi-stage `Dockerfile`:
 - **Stage 1** (`builder`): `FROM golang:1.22-alpine`, compile a Go program (`fmt.Println("hello CKAD")`) to `/app/server`.
 - **Stage 2**: `FROM alpine:3.20`, copy only `/app/server` from the builder stage, set it as the default command.
 
@@ -534,9 +548,10 @@ kubectl logs go-hello   # hello CKAD
 ---
 
 ### Drill 64 - Identify and fix a deprecated API version
-**Curriculum:** Application Observability & Maintenance
-**Budget:** 4 min
-**Task:** The manifest below uses a removed API version. Without opening a browser:
+**Curriculum:** Application Observability & Maintenance  
+**Budget:** 4 min  
+**Task:**  
+The manifest below uses a removed API version. Without opening a browser:
 1. Apply it and observe the error.
 2. Use only `kubectl` to find the correct `apiVersion` for `CronJob`.
 3. Apply a corrected version and verify the CronJob exists.
