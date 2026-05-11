@@ -53,6 +53,15 @@ kubectl explain pod.spec --recursive | grep -A1 livenessProbe | head
 
 <details><summary>Answer</summary>
 
+**Imperative (easier):**
+```bash
+k run greeter --image=busybox:1.36 --env=NAME=world --restart=Never -- sh -c 'echo "hello $NAME"'
+kubectl wait --for=condition=Initialized pod/greeter --timeout=10s
+kubectl logs greeter
+kubectl get pod greeter   # STATUS Completed
+```
+
+**YAML (declarative):**
 ```yaml
 # greeter.yaml
 apiVersion: v1
