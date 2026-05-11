@@ -221,6 +221,15 @@ Create a Service `gh` of type `ExternalName` that maps to `api.github.com`. From
 
 <details><summary>Answer</summary>
 
+**Imperative (easier):**
+```bash
+k create svc externalname gh --external-name=api.github.com
+kubectl run dns --rm -it --restart=Never --image=busybox:1.36 -- \
+  nslookup gh.practice.svc.cluster.local
+# Expect a CNAME record pointing at api.github.com
+```
+
+**YAML (declarative):**
 ```yaml
 # gh.yaml
 apiVersion: v1
@@ -235,7 +244,6 @@ spec:
 kubectl apply -f gh.yaml
 kubectl run dns --rm -it --restart=Never --image=busybox:1.36 -- \
   nslookup gh.practice.svc.cluster.local
-# Expect a CNAME record pointing at api.github.com
 ```
 </details>
 
