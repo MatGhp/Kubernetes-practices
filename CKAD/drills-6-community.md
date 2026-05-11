@@ -320,17 +320,24 @@ kubectl get pod -l app=tagged -o jsonpath='{.items[0].metadata.annotations}{"\n"
 **Curriculum:** Application Observability & Maintenance  
 **Budget:** 2 min  
 **Task:**  
-One-shot Pod that runs `cat /etc/os-release` inside `busybox:1.36` and exits. Use `kubectl run` only - no manifest file. Auto-clean.
+One-shot Pod that runs `uname -a` inside `busybox:1.36` and exits. Use `kubectl run` only - no manifest file. Auto-clean.
 
 <details><summary>Answer</summary>
 
 ```bash
 kubectl run os --rm -it --restart=Never \
   --image=busybox:1.36 \
-  --command -- cat /etc/os-release
+  --command -- uname -a
 ```
 
 The `--command` flag tells `kubectl run` that everything after `--` is the container's `command`, not its `args`.
+
+**Alternative:** Check Alpine version (busybox is Alpine-based):
+```bash
+kubectl run os --rm -it --restart=Never \
+  --image=busybox:1.36 \
+  --command -- cat /etc/alpine-release
+```
 </details>
 
 **Cleanup:** none (`--rm`).
