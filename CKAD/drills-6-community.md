@@ -409,7 +409,7 @@ Key flags: `-l <selector>` fans out across matching Pods; `--prefix` stamps each
 **Curriculum:** Application Observability & Maintenance  
 **Budget:** 3 min  
 **Task:**  
-Wait for:
+Create resources and wait for them to reach desired conditions:
 1. Deployment `api` to be `Available` (timeout 60 s).
 2. A specific Pod `task14` to be `Ready` (timeout 30 s).
 3. A Job `oneshot` to reach condition `complete` (timeout 2 min).
@@ -419,6 +419,13 @@ Practise the canonical syntax for each.
 <details><summary>Answer</summary>
 
 ```bash
+# Create the resources first:
+kubectl create deploy api --image=nginx:1.27 --replicas=2
+kubectl run task14 --image=busybox:1.36 -- sleep 3600
+kubectl create job oneshot --image=busybox:1.36 -- echo done
+
+# Now wait for each resource:
+
 # 1. Deployment available
 kubectl wait --for=condition=Available deploy/api --timeout=60s
 
@@ -437,7 +444,7 @@ kubectl wait --for=delete pod/task14 --timeout=30s
 ```
 </details>
 
-**Cleanup:** none (commands only).
+**Cleanup:** `kubectl delete deploy api job oneshot` (task14 already deleted in example).
 
 ---
 
