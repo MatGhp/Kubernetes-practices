@@ -41,8 +41,9 @@ All answers assume the current namespace is `practice`.
 ## Section A - Core workloads
 
 ### Drill 1 - Create a namespace
-**Budget:** 1 min
-**Task:** Create a namespace called `practice`.
+**Budget:** 1 min  
+**Task:**  
+Create a namespace called `practice`.
 
 <details><summary>Answer</summary>
 
@@ -60,8 +61,9 @@ kubectl get ns practice
 ---
 
 ### Drill 2 - Create a deployment
-**Budget:** 2 min
-**Task:** Create a deployment `web` using image `nginx:1.27` with 1 replica.
+**Budget:** 2 min  
+**Task:**  
+Create a deployment `web` using image `nginx:1.27` with 1 replica.
 
 <details><summary>Answer</summary>
 
@@ -80,8 +82,9 @@ kubectl get deploy web -o wide
 ---
 
 ### Drill 3 - Scale a deployment
-**Budget:** 1 min
-**Task:** Scale `web` to 3 replicas.
+**Budget:** 1 min  
+**Task:**  
+Scale `web` to 3 replicas.
 
 <details><summary>Answer</summary>
 
@@ -99,8 +102,9 @@ kubectl get deploy web
 ---
 
 ### Drill 4 - Update the image
-**Budget:** 2 min
-**Task:** Change the container image of `web` to `nginx:1.27-alpine`.
+**Budget:** 2 min  
+**Task:**  
+Change the container image of `web` to `nginx:1.27-alpine`.
 
 <details><summary>Answer</summary>
 
@@ -119,8 +123,9 @@ kubectl get deploy web -o jsonpath='{.spec.template.spec.containers[0].image}{"\
 ---
 
 ### Drill 5 - Expose a deployment
-**Budget:** 2 min
-**Task:** Create a ClusterIP service for `web` exposing port 80 → targetPort 80.
+**Budget:** 2 min  
+**Task:**  
+Create a ClusterIP service for `web` exposing port 80 → targetPort 80.
 
 <details><summary>Answer</summary>
 
@@ -139,8 +144,9 @@ kubectl get endpoints web
 ---
 
 ### Drill 6 - Create a pod that sleeps
-**Budget:** 2 min
-**Task:** Create a pod `tools` from `busybox` that sleeps forever.
+**Budget:** 2 min  
+**Task:**  
+Create a pod `tools` from `busybox` that sleeps forever.
 
 <details><summary>Answer</summary>
 
@@ -158,8 +164,9 @@ kubectl get pod tools
 ---
 
 ### Drill 7 - Exec into a pod
-**Budget:** 2 min
-**Task:** Exec into `tools` and reach the `web` service with `wget`.
+**Budget:** 2 min  
+**Task:**  
+Exec into `tools` and reach the `web` service with `wget`.
 
 <details><summary>Answer</summary>
 
@@ -173,8 +180,9 @@ wget -qO- http://web:80
 ---
 
 ### Drill 8 - Print pod labels
-**Budget:** 1 min
-**Task:** Show labels of every pod belonging to the `web` deployment.
+**Budget:** 1 min  
+**Task:**  
+Show labels of every pod belonging to the `web` deployment.
 
 <details><summary>Answer</summary>
 
@@ -186,8 +194,9 @@ kubectl get pods -l app=web --show-labels
 ---
 
 ### Drill 9 - Rollout undo
-**Budget:** 2 min
-**Task:** Undo the last rollout of `web`.
+**Budget:** 2 min  
+**Task:**  
+Undo the last rollout of `web`.
 
 <details><summary>Answer</summary>
 
@@ -201,8 +210,9 @@ kubectl rollout status deployment/web
 ---
 
 ### Drill 10 - Generate YAML, edit, apply
-**Budget:** 5 min
-**Task:** Produce a deployment YAML for `api` (image `nginx`, 2 replicas), change replicas to 4 in `vim`, then apply.
+**Budget:** 5 min  
+**Task:**  
+Produce a deployment YAML for `api` (image `nginx`, 2 replicas), change replicas to 4 in `vim`, then apply.
 
 <details><summary>Answer</summary>
 
@@ -225,8 +235,9 @@ kubectl get deploy api
 ## Section B - Config and secrets
 
 ### Drill 11 - ConfigMap from literals
-**Budget:** 2 min
-**Task:** Create ConfigMap `app-cfg` with `APP_ENV=prod` and `APP_TIER=web`.
+**Budget:** 2 min  
+**Task:**  
+Create ConfigMap `app-cfg` with `APP_ENV=prod` and `APP_TIER=web`.
 
 <details><summary>Answer</summary>
 
@@ -246,8 +257,9 @@ kubectl get cm app-cfg -o jsonpath='{.data}{"\n"}'
 ---
 
 ### Drill 12 - ConfigMap as env vars
-**Budget:** 5 min
-**Task:** Create pod `cm-env` (image `busybox`) that sleeps and exposes all `app-cfg` keys as env vars. Verify with `env` inside the pod.
+**Budget:** 5 min  
+**Task:**  
+Create pod `cm-env` (image `busybox`) that sleeps and exposes all `app-cfg` keys as env vars. Verify with `env` inside the pod.
 
 <details><summary>Answer</summary>
 
@@ -277,8 +289,9 @@ kubectl exec cm-env -- env | grep APP_
 ---
 
 ### Drill 13 - ConfigMap as a volume
-**Budget:** 5 min
-**Task:** Mount `app-cfg` as a read-only volume at `/etc/app-cfg` in pod `cm-vol`.
+**Budget:** 5 min  
+**Task:**  
+Mount `app-cfg` as a read-only volume at `/etc/app-cfg` in pod `cm-vol`.
 
 <details><summary>Answer</summary>
 
@@ -314,8 +327,9 @@ kubectl exec cm-vol -- cat /etc/app-cfg/APP_ENV
 ---
 
 ### Drill 14 - Secret from literals
-**Budget:** 2 min
-**Task:** Create Secret `app-sec` with `API_KEY=supersecret`.
+**Budget:** 2 min  
+**Task:**  
+Create Secret `app-sec` with `API_KEY=supersecret`.
 
 <details><summary>Answer</summary>
 
@@ -333,8 +347,9 @@ kubectl get secret app-sec -o jsonpath='{.data.API_KEY}' | base64 -d; echo
 ---
 
 ### Drill 15 - Consume a Secret
-**Budget:** 5 min
-**Task:** Pod `sec-pod` (image `busybox`) exposes `API_KEY` from the Secret as an env var.
+**Budget:** 5 min  
+**Task:**  
+Pod `sec-pod` (image `busybox`) exposes `API_KEY` from the Secret as an env var.
 
 <details><summary>Answer</summary>
 
@@ -369,8 +384,9 @@ kubectl exec sec-pod -- sh -c 'echo $API_KEY'
 ## Section C - Probes, resources, Jobs
 
 ### Drill 16 - Readiness & liveness probes
-**Budget:** 6 min
-**Task:** Pod `probed` (image `nginx:1.27`) with:
+**Budget:** 6 min  
+**Task:**  
+Pod `probed` (image `nginx:1.27`) with:
 - `readinessProbe` httpGet `/` port 80 (delay 2s, period 5s)
 - `livenessProbe` httpGet `/` port 80 (delay 10s, period 10s)
 
@@ -407,8 +423,9 @@ kubectl describe pod probed | grep -E 'Readiness|Liveness'
 ---
 
 ### Drill 17 - Resource requests and limits
-**Budget:** 3 min
-**Task:** Pod `rsrc` (image `nginx:1.27`) with requests `cpu=100m, memory=128Mi` and limits `cpu=250m, memory=256Mi`.
+**Budget:** 3 min  
+**Task:**  
+Pod `rsrc` (image `nginx:1.27`) with requests `cpu=100m, memory=128Mi` and limits `cpu=250m, memory=256Mi`.
 
 <details><summary>Answer</summary>
 
@@ -440,8 +457,9 @@ kubectl get pod rsrc -o jsonpath='{.spec.containers[0].resources}'
 ---
 
 ### Drill 18 - One-shot Job
-**Budget:** 3 min
-**Task:** Create Job `hello` that runs `echo hello` once and completes.
+**Budget:** 3 min  
+**Task:**  
+Create Job `hello` that runs `echo hello` once and completes.
 
 <details><summary>Answer</summary>
 
@@ -454,8 +472,9 @@ kubectl logs job/hello
 ---
 
 ### Drill 19 - CronJob every 5 minutes
-**Budget:** 3 min
-**Task:** Create CronJob `hello-cron` that runs `echo hello` every 5 minutes.
+**Budget:** 3 min  
+**Task:**  
+Create CronJob `hello-cron` that runs `echo hello` every 5 minutes.
 
 <details><summary>Answer</summary>
 
@@ -485,7 +504,8 @@ kubectl run broken --image=nginx:doesnotexist
 kubectl get pod broken   # should show ImagePullBackOff / ErrImagePull
 ```
 
-**Task:** Pod `broken` is in `ImagePullBackOff`. Diagnose and fix to `nginx:1.27`.
+**Task:**  
+Pod `broken` is in `ImagePullBackOff`. Diagnose and fix to `nginx:1.27`.
 
 <details><summary>Answer</summary>
 
@@ -508,8 +528,9 @@ kubectl rollout status deployment/broken
 ## Section D - Multi-container and networking
 
 ### Drill 21 - Sidecar that tails a shared log
-**Budget:** 7 min
-**Task:** Pod `logger` with two containers sharing an `emptyDir`:
+**Budget:** 7 min  
+**Task:**  
+Pod `logger` with two containers sharing an `emptyDir`:
 - `app` (busybox) writes a line every 2s to `/var/log/app.log`
 - `sidecar` (busybox) runs `tail -F /var/log/app.log`
 
@@ -553,8 +574,9 @@ kubectl logs logger -c sidecar --tail=5
 ---
 
 ### Drill 22 - Init container waits for a service (requires `web` service from Drill 5)
-**Budget:** 6 min
-**Task:** Assuming the `web` service from Drill 5 already exists, create pod `delayed` so its initContainer blocks until service `web` resolves via DNS, then the main container runs `nginx:1.27`.
+**Budget:** 6 min  
+**Task:**  
+Assuming the `web` service from Drill 5 already exists, create pod `delayed` so its initContainer blocks until service `web` resolves via DNS, then the main container runs `nginx:1.27`.
 
 <details><summary>Answer</summary>
 
@@ -588,8 +610,9 @@ kubectl get pod delayed -w   # stays in Init: until service `web` exists
 ---
 
 ### Drill 23 - NetworkPolicy - allow only from labeled pods
-**Budget:** 6 min
-**Task:** NetworkPolicy `allow-web-from-client` - allow ingress to pods with `app=web` **only** from pods with `role=client`, on port 80.
+**Budget:** 6 min  
+**Task:**  
+NetworkPolicy `allow-web-from-client` - allow ingress to pods with `app=web` **only** from pods with `role=client`, on port 80.
 
 <details><summary>Answer</summary>
 
@@ -625,8 +648,9 @@ kubectl describe netpol allow-web-from-client
 ---
 
 ### Drill 24 - Port-forward to a service
-**Budget:** 2 min
-**Task:** Port-forward localhost `8080` to `web` service port `80`, then curl it.
+**Budget:** 2 min  
+**Task:**  
+Port-forward localhost `8080` to `web` service port `80`, then curl it.
 
 <details><summary>Answer</summary>
 
@@ -642,8 +666,8 @@ kill %1
 ## Section E - Storage
 
 ### Drill 25 - PVC persistence round-trip
-**Budget:** 8 min
-**Task:**
+**Budget:** 8 min  
+**Task:**  
 1. Create PVC `data-pvc` (1Gi, `ReadWriteOnce`).
 2. Pod `writer` mounts it at `/data` and writes `"hello"` to `/data/out.txt`.
 3. Delete the pod.
