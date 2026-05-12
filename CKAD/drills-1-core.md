@@ -495,7 +495,7 @@ kubectl get cronjob hello-cron
 ---
 
 ### Drill 20 - Debug a failing pod
-**Budget:** 6 min
+**Budget:** 6 min  
 
 **Setup (run before starting the timer):**
 

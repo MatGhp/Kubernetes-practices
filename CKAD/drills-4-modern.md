@@ -47,9 +47,10 @@ minikube -p ckad addons enable metrics-server
 ## Section A - Deployment Strategies
 
 ### Drill 38 - Blue-green: flip a Service selector
-**Curriculum:** Application Deployment
-**Budget:** 4 min
-**Task:** Two Deployments `web-blue` and `web-green` (3 replicas each, image `nginx:1.27` and `nginx:1.28`, both label `app=web`, plus distinguishing `version=blue|green`). One Service `web` of type `ClusterIP` initially routes to `version=blue`. Cut traffic to green by editing **only** the Service selector. Reference: [`demos/04-pod-design/04-blue-green-deployment.yaml`](../demos/04-pod-design/04-blue-green-deployment.yaml).
+**Curriculum:** Application Deployment  
+**Budget:** 4 min  
+**Task:**  
+Two Deployments `web-blue` and `web-green` (3 replicas each, image `nginx:1.27` and `nginx:1.28`, both label `app=web`, plus distinguishing `version=blue|green`). One Service `web` of type `ClusterIP` initially routes to `version=blue`. Cut traffic to green by editing **only** the Service selector. Reference: [`demos/04-pod-design/04-blue-green-deployment.yaml`](../demos/04-pod-design/04-blue-green-deployment.yaml).
 
 <details><summary>Answer</summary>
 
@@ -121,9 +122,10 @@ kubectl run curl --rm -i --image=curlimages/curl --restart=Never -- \
 ---
 
 ### Drill 39 - Canary: 9 stable / 1 canary behind one Service
-**Curriculum:** Application Deployment
-**Budget:** 4 min
-**Task:** One Service `shop` selecting `app=shop` (no version label). Two Deployments `shop-stable` (9 replicas, `nginx:1.27`) and `shop-canary` (1 replica, `nginx:1.28`), both labeled `app=shop` plus `track=stable|canary`. ~10% of traffic should hit canary. Reference: [`demos/04-pod-design/05-canary-deployment.yaml`](../demos/04-pod-design/05-canary-deployment.yaml).
+**Curriculum:** Application Deployment  
+**Budget:** 4 min  
+**Task:**  
+One Service `shop` selecting `app=shop` (no version label). Two Deployments `shop-stable` (9 replicas, `nginx:1.27`) and `shop-canary` (1 replica, `nginx:1.28`), both labeled `app=shop` plus `track=stable|canary`. ~10% of traffic should hit canary. Reference: [`demos/04-pod-design/05-canary-deployment.yaml`](../demos/04-pod-design/05-canary-deployment.yaml).
 
 <details><summary>Answer</summary>
 
@@ -187,9 +189,10 @@ kubectl run canary-test --rm -it --image=curlimages/curl --restart=Never -- \
 ## Section B - Packaging
 
 ### Drill 40 - Helm: install, upgrade, rollback
-**Curriculum:** Application Deployment
-**Budget:** 4 min
-**Task:** Add the Bitnami repo, install `nginx` as release `web1` with `replicaCount=2`, upgrade to `replicaCount=4`, then roll back to revision 1. List the release history.
+**Curriculum:** Application Deployment  
+**Budget:** 4 min  
+**Task:**  
+Add the Bitnami repo, install `nginx` as release `web1` with `replicaCount=2`, upgrade to `replicaCount=4`, then roll back to revision 1. List the release history.
 
 <details><summary>Answer</summary>
 
@@ -218,9 +221,10 @@ helm history web1 | tail -3
 ---
 
 ### Drill 40b - Helm: search, show values, install with a values file
-**Curriculum:** Application Deployment
-**Budget:** 3 min
-**Task:** Inspect the Bitnami nginx chart before installing: search the repo for nginx charts, dump the chart's default values to `my-values.yaml`, edit `replicaCount` to `3` and `service.type` to `ClusterIP`, then install a new release `web2` using that file. Confirm with `helm list`.
+**Curriculum:** Application Deployment  
+**Budget:** 3 min  
+**Task:**  
+Inspect the Bitnami nginx chart before installing: search the repo for nginx charts, dump the chart's default values to `my-values.yaml`, edit `replicaCount` to `3` and `service.type` to `ClusterIP`, then install a new release `web2` using that file. Confirm with `helm list`.
 
 <details><summary>Answer</summary>
 
@@ -250,9 +254,10 @@ kubectl get deploy -l app.kubernetes.io/instance=web2 \
 ---
 
 ### Drill 41 - Kustomize overlay
-**Curriculum:** Application Deployment
-**Budget:** 3 min
-**Task:** Create a base with one Deployment (`api`, image `nginx:1.27`, 1 replica) and an overlay `overlays/dev` that bumps replicas to 3 and injects `commonLabels: {env: dev}`. Apply the overlay with `kubectl -k`. Reference: existing examples in [`demos/09-kustomize/`](../demos/09-kustomize/).
+**Curriculum:** Application Deployment  
+**Budget:** 3 min  
+**Task:**  
+Create a base with one Deployment (`api`, image `nginx:1.27`, 1 replica) and an overlay `overlays/dev` that bumps replicas to 3 and injects `commonLabels: {env: dev}`. Apply the overlay with `kubectl -k`. Reference: existing examples in [`demos/09-kustomize/`](../demos/09-kustomize/).
 
 <details><summary>Answer</summary>
 
@@ -324,9 +329,10 @@ kubectl get pod -l app=api,env=dev
 ---
 
 ### Drill 41b - Kustomize: `images:` transformer + dry-preview with `kubectl kustomize`
-**Curriculum:** Application Deployment
-**Budget:** 2 min
-**Task:** Extend the `overlays/dev` kustomization from Drill 41 with an `images:` transformer that bumps the nginx tag from `1.27` → `1.28`. Before applying, use `kubectl kustomize` to preview the final rendered YAML - confirm the tag changed - then apply.
+**Curriculum:** Application Deployment  
+**Budget:** 2 min  
+**Task:**  
+Extend the `overlays/dev` kustomization from Drill 41 with an `images:` transformer that bumps the nginx tag from `1.27` → `1.28`. Before applying, use `kubectl kustomize` to preview the final rendered YAML - confirm the tag changed - then apply.
 
 <details><summary>Answer</summary>
 
@@ -372,9 +378,10 @@ kubectl get deploy api \
 ## Section C - Scheduling
 
 ### Drill 42 - nodeSelector
-**Curriculum:** Environment, Configuration & Security
-**Budget:** 2 min
-**Task:** Label one node with `disktype=ssd`, then schedule a Pod `fast` (image `nginx`) that runs **only** on that node.
+**Curriculum:** Environment, Configuration & Security  
+**Budget:** 2 min  
+**Task:**  
+Label one node with `disktype=ssd`, then schedule a Pod `fast` (image `nginx`) that runs **only** on that node.
 
 <details><summary>Answer</summary>
 
@@ -411,9 +418,10 @@ kubectl get node -l disktype=ssd
 ---
 
 ### Drill 43 - nodeAffinity (required + preferred)
-**Curriculum:** Environment, Configuration & Security
-**Budget:** 3 min
-**Task:** Pod `picky` (image `nginx`) that **must** schedule on a node where `kubernetes.io/os=linux`, and **prefers** a node labeled `zone=eu-west`. Demonstrate that the Pod still schedules even if no node has the preferred label.
+**Curriculum:** Environment, Configuration & Security  
+**Budget:** 3 min  
+**Task:**  
+Pod `picky` (image `nginx`) that **must** schedule on a node where `kubernetes.io/os=linux`, and **prefers** a node labeled `zone=eu-west`. Demonstrate that the Pod still schedules even if no node has the preferred label.
 
 <details><summary>Answer</summary>
 
@@ -451,9 +459,10 @@ kubectl get pod picky -o wide
 ---
 
 ### Drill 44 - podAntiAffinity for HA spread
-**Curriculum:** Environment, Configuration & Security
-**Budget:** 3 min
-**Task:** Deployment `ha` (image `nginx`, 3 replicas) whose pods **must not** co-locate on the same node - spread by `topologyKey: kubernetes.io/hostname`. On a single-node minikube, demonstrate that only 1 pod becomes `Running` (the rest stay `Pending`) - that's the *evidence* the rule is enforced.
+**Curriculum:** Environment, Configuration & Security  
+**Budget:** 3 min  
+**Task:**  
+Deployment `ha` (image `nginx`, 3 replicas) whose pods **must not** co-locate on the same node - spread by `topologyKey: kubernetes.io/hostname`. On a single-node minikube, demonstrate that only 1 pod becomes `Running` (the rest stay `Pending`) - that's the *evidence* the rule is enforced.
 
 <details><summary>Answer</summary>
 
@@ -494,9 +503,10 @@ kubectl describe pod -l app=ha | grep -A2 "didn't match pod anti-affinity"
 ## Section D - Resource Governance
 
 ### Drill 45 - LimitRange populates implicit Pod resources
-**Curriculum:** Environment, Configuration & Security
-**Budget:** 3 min
-**Task:** Create a `LimitRange` named `sane-defaults` in `practice` with `defaultRequest: { cpu: 100m, memory: 64Mi }`, `default: { cpu: 500m, memory: 256Mi }`, `min`/`max` bounds. Then create a Pod **without** explicit `resources` and confirm it inherits the defaults.
+**Curriculum:** Environment, Configuration & Security  
+**Budget:** 3 min  
+**Task:**  
+Create a `LimitRange` named `sane-defaults` in `practice` with `defaultRequest: { cpu: 100m, memory: 64Mi }`, `default: { cpu: 500m, memory: 256Mi }`, `min`/`max` bounds. Then create a Pod **without** explicit `resources` and confirm it inherits the defaults.
 
 <details><summary>Answer</summary>
 
@@ -533,9 +543,10 @@ kubectl get pod no-res -o jsonpath='{.spec.containers[0].resources}{"\n"}'
 ## Section E - Storage
 
 ### Drill 46 - StorageClass + dynamic PVC with WaitForFirstConsumer
-**Curriculum:** Environment, Configuration & Security
-**Budget:** 3 min
-**Task:** Using the cluster's default `StorageClass`, create a PVC `data` (1 Gi, RWO), then a Pod that mounts it. Confirm the PVC ends up `Bound`. On real-world clusters with `volumeBindingMode: WaitForFirstConsumer` the PVC stays `Pending` until a consumer Pod is scheduled - minikube's `standard` class uses `Immediate` binding so it binds straight away, but the Pod-side flow is identical.
+**Curriculum:** Environment, Configuration & Security  
+**Budget:** 3 min  
+**Task:**  
+Using the cluster's default `StorageClass`, create a PVC `data` (1 Gi, RWO), then a Pod that mounts it. Confirm the PVC ends up `Bound`. On real-world clusters with `volumeBindingMode: WaitForFirstConsumer` the PVC stays `Pending` until a consumer Pod is scheduled - minikube's `standard` class uses `Immediate` binding so it binds straight away, but the Pod-side flow is identical.
 
 <details><summary>Answer</summary>
 
@@ -590,9 +601,10 @@ kubectl exec writer -- cat /data/hello
 ## Section F - Custom Resources
 
 ### Drill 47 - Author a CRD and create an instance
-**Curriculum:** Environment, Configuration & Security
-**Budget:** 4 min
-**Task:** Define a `CustomResourceDefinition` for `widgets.example.com` (cluster-scoped is fine, but use Namespaced for this drill) with a small OpenAPI v3 schema (`spec.size` ∈ `small|medium|large`, `spec.color` string). Create a `Widget` CR named `gizmo` and list it. Reference: existing examples in [`demos/08-custom-resource-definition/`](../demos/08-custom-resource-definition/).
+**Curriculum:** Environment, Configuration & Security  
+**Budget:** 4 min  
+**Task:**  
+Define a `CustomResourceDefinition` for `widgets.example.com` (cluster-scoped is fine, but use Namespaced for this drill) with a small OpenAPI v3 schema (`spec.size` ∈ `small|medium|large`, `spec.color` string). Create a `Widget` CR named `gizmo` and list it. Reference: existing examples in [`demos/08-custom-resource-definition/`](../demos/08-custom-resource-definition/).
 
 <details><summary>Answer</summary>
 
@@ -664,9 +676,10 @@ EOF
 ## Section G - Resilience & Modern Debug
 
 ### Drill 48 - PodDisruptionBudget
-**Curriculum:** Application Deployment
-**Budget:** 2 min
-**Task:** Deployment `quorum` (image `nginx`, 3 replicas, label `app=quorum`). Add a `PodDisruptionBudget` `quorum-pdb` requiring `minAvailable: 2`. Confirm `kubectl drain` would respect it (use `--dry-run=server`).
+**Curriculum:** Application Deployment  
+**Budget:** 2 min  
+**Task:**  
+Deployment `quorum` (image `nginx`, 3 replicas, label `app=quorum`). Add a `PodDisruptionBudget` `quorum-pdb` requiring `minAvailable: 2`. Confirm `kubectl drain` would respect it (use `--dry-run=server`).
 
 <details><summary>Answer</summary>
 
@@ -707,9 +720,10 @@ kubectl get pdb quorum-pdb
 ---
 
 ### Drill 49 - `kubectl debug` ephemeral container
-**Curriculum:** Application Observability & Maintenance
-**Budget:** 3 min
-**Task:** A running Pod `target` (image `nginx`, no shell tools beyond what nginx ships). Without restarting it, attach an ephemeral `busybox` container so you can `wget` localhost from inside the Pod's network namespace. Then demonstrate the `--copy-to` variant that creates a debug clone with extra tools and a shell command override.
+**Curriculum:** Application Observability & Maintenance  
+**Budget:** 3 min  
+**Task:**  
+A running Pod `target` (image `nginx`, no shell tools beyond what nginx ships). Without restarting it, attach an ephemeral `busybox` container so you can `wget` localhost from inside the Pod's network namespace. Then demonstrate the `--copy-to` variant that creates a debug clone with extra tools and a shell command override.
 
 <details><summary>Answer</summary>
 
@@ -751,9 +765,10 @@ kubectl get pod target-debug
 ## Section H - Autoscaling
 
 ### Drill 50 - Autoscale a Deployment with an HPA
-**Curriculum:** Application Deployment
-**Budget:** 2 min
-**Task:** A Deployment `api` already exists (image `nginx:1.27`, 2 replicas, with CPU `requests: 100m` set on the container - the HPA needs this). Create a HorizontalPodAutoscaler that keeps the Pod count between **2** and **5** and targets **70% CPU utilisation**. Reference: [`demos/04-pod-design/08-hpa-definition.yaml`](../demos/04-pod-design/08-hpa-definition.yaml).
+**Curriculum:** Application Deployment  
+**Budget:** 2 min  
+**Task:**  
+A Deployment `api` already exists (image `nginx:1.27`, 2 replicas, with CPU `requests: 100m` set on the container - the HPA needs this). Create a HorizontalPodAutoscaler that keeps the Pod count between **2** and **5** and targets **70% CPU utilisation**. Reference: [`demos/04-pod-design/08-hpa-definition.yaml`](../demos/04-pod-design/08-hpa-definition.yaml).
 
 <details><summary>Answer</summary>
 

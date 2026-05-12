@@ -24,7 +24,8 @@ kind: Service
 ```
 
 ### Drill 1 - Spot the error
-**Task:** Find the syntax error.
+**Task:**  
+Find the syntax error.
 
 ```yaml
 apiVersion: v1
@@ -88,7 +89,8 @@ metadata:
 > **Rule of thumb:** if the value contains `:` followed by a space, or starts with any of `{[!"'|>&*%@,` - quote it.
 
 ### Drill 2 - Types
-**Task:** What type does YAML assign to each value? Are any dangerous?
+**Task:**  
+What type does YAML assign to each value? Are any dangerous?
 
 ```yaml
 a: true
@@ -139,7 +141,8 @@ volumes: []       # explicitly empty list - overrides any inherited volumes
 ```
 
 ### Drill 3 - Nested mapping
-**Task:** Write a `metadata` block for a Pod named `db` in namespace `ns-config` with label `app: database`.
+**Task:**  
+Write a `metadata` block for a Pod named `db` in namespace `ns-config` with label `app: database`.
 
 <details><summary>Answer</summary>
 
@@ -182,7 +185,8 @@ containers:
 ```
 
 ### Drill 4 - Write a sequence
-**Task:** Write an `env` list for a container with two variables: `DB_HOST=mysql` and `DB_PORT=3306`.
+**Task:**  
+Write an `env` list for a container with two variables: `DB_HOST=mysql` and `DB_PORT=3306`.
 
 <details><summary>Answer</summary>
 
@@ -225,7 +229,8 @@ policyTypes: [Ingress, Egress]
 > **Exam tip:** Flow style is faster to type in `kubectl edit` or when writing one-liners. Kubernetes accepts both everywhere.
 
 ### Drill 5 - Convert styles
-**Task:** Rewrite this in flow style:
+**Task:**  
+Rewrite this in flow style:
 
 ```yaml
 selector:
@@ -264,7 +269,8 @@ ingress:
 - `ports:` → mapping key (no dash → belongs to the parent rule item, not inside `from`)
 
 ### Drill 6 - NetworkPolicy indent
-**Task:** Fix the indentation. `ports` should allow TCP:80 from `app: frontend` pods only.
+**Task:**  
+Fix the indentation. `ports` should allow TCP:80 from `app: frontend` pods only.
 
 ```yaml
 spec:
@@ -341,7 +347,8 @@ data:
 > **Exam tip:** Use `|-` (not `|`) for shell script content in ConfigMaps. The trailing newline that `|` preserves can silently break scripts that are sourced or executed directly.
 
 ### Drill 7 - Multi-line command
-**Task:** Write the `command` and `args` fields for a container that runs two shell commands sequentially using a literal block scalar.
+**Task:**  
+Write the `command` and `args` fields for a container that runs two shell commands sequentially using a literal block scalar.
 
 <details><summary>Answer</summary>
 
@@ -387,7 +394,8 @@ ingress-rule:
 ```
 
 ### Drill 8 - Anchors in a Deployment
-**Task:** When would anchors be most useful within a single Kubernetes manifest, and what is the key constraint to remember about anchors and `---` document separators?
+**Task:**  
+When would anchors be most useful within a single Kubernetes manifest, and what is the key constraint to remember about anchors and `---` document separators?
 
 <details><summary>Answer</summary>
 
@@ -433,7 +441,8 @@ spec:
 | Removed `apiVersion` (e.g. `extensions/v1beta1`) | `no matches for kind ... in version ...` error | Use current stable version: `networking.k8s.io/v1` |
 
 ### Drill 9 - Two-bug YAML
-**Task:** Find and fix both bugs.
+**Task:**  
+Find and fix both bugs.
 
 ```yaml
 apiVersion: apps/v1

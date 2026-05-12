@@ -41,8 +41,9 @@ kubectl wait -n ingress-nginx --for=condition=Ready pod \
 > **`privileged: true` (out of scope for the exam, but a frequent MCQ topic).** Setting `securityContext.privileged: true` on a container disables almost every kernel isolation (capability set, AppArmor/SELinux, seccomp, devices) - the container effectively runs as a root process on the node. The CKAD exam will not ask you to enable it; if anything you'll be asked to keep it `false`. Real-world hardening: prefer `capabilities.add: [NET_BIND_SERVICE]` (drill 27 territory) over `privileged: true`, and always pair with `allowPrivilegeEscalation: false`.
 
 ### Drill 26 - Run as non-root with a fixed UID
-**Budget:** 5 min
-**Task:** Pod `sec-uid` (image `busybox`, sleeps forever) that runs as UID `1000` and **must** fail to start if the image tries to run as root.
+**Budget:** 5 min  
+**Task:**  
+Pod `sec-uid` (image `busybox`, sleeps forever) that runs as UID `1000` and **must** fail to start if the image tries to run as root.
 
 <details><summary>Answer</summary>
 
@@ -78,8 +79,9 @@ kubectl get pod sec-uid -o jsonpath='{.spec.securityContext}{"\n"}'
 ---
 
 ### Drill 27 - Read-only root filesystem with a writable volume
-**Budget:** 6 min
-**Task:** Pod `sec-ro` (image `busybox`):
+**Budget:** 6 min  
+**Task:**  
+Pod `sec-ro` (image `busybox`):
 - `readOnlyRootFilesystem: true` on the container
 - Mount an `emptyDir` at `/tmp` so the app can still write there
 - Command: write `"ok"` to `/tmp/out`, then try to write to `/etc/out` (must fail), then sleep
@@ -126,8 +128,9 @@ kubectl exec sec-ro -- cat /tmp/out
 ---
 
 ### Drill 28 - fsGroup on a shared volume
-**Budget:** 6 min
-**Task:** Pod `sec-fsgroup` with `fsGroup: 2000` and `runAsUser: 1000`. Mount an `emptyDir` at `/data`, write a file there, and confirm it is owned by group `2000`.
+**Budget:** 6 min  
+**Task:**  
+Pod `sec-fsgroup` with `fsGroup: 2000` and `runAsUser: 1000`. Mount an `emptyDir` at `/data`, write a file there, and confirm it is owned by group `2000`.
 
 <details><summary>Answer</summary>
 
@@ -170,8 +173,8 @@ kubectl logs sec-fsgroup
 ## Section G - ServiceAccount
 
 ### Drill 29 - Create a ServiceAccount and use it
-**Budget:** 4 min
-**Task:**
+**Budget:** 4 min  
+**Task:**  
 1. Create ServiceAccount `deployer` in `practice`.
 2. Create pod `sa-pod` (image `nginx:1.27`) that runs under `deployer`.
 
@@ -209,8 +212,9 @@ kubectl exec sa-pod -- ls /var/run/secrets/kubernetes.io/serviceaccount
 ---
 
 ### Drill 30 - ServiceAccount with a read-only Role
-**Budget:** 8 min
-**Task:** Give `deployer` permission to `get` and `list` pods in `practice` (nothing else). From inside `sa-pod`, confirm it can list pods but **cannot** delete them.
+**Budget:** 8 min  
+**Task:**  
+Give `deployer` permission to `get` and `list` pods in `practice` (nothing else). From inside `sa-pod`, confirm it can list pods but **cannot** delete them.
 
 <details><summary>Answer</summary>
 
@@ -302,8 +306,9 @@ kubectl auth can-i delete pods --as=system:serviceaccount:practice:deployer -n p
 ---
 
 ### Drill 31 - Path-based Ingress
-**Budget:** 7 min
-**Task:** Expose deployment `web` (from part 1) and a new deployment `api` behind one Ingress:
+**Budget:** 7 min  
+**Task:**  
+Expose deployment `web` (from part 1) and a new deployment `api` behind one Ingress:
 - `GET /`     → service `web` port 80
 - `GET /api`  → service `api` port 80 (strip the prefix is not required)
 
@@ -380,8 +385,9 @@ curl -s http://$IP/api
 ---
 
 ### Drill 32 - Host-based Ingress
-**Budget:** 6 min
-**Task:** Change the Ingress so that `http://web.local` → `web` and `http://api.local` → `api`.
+**Budget:** 6 min  
+**Task:**  
+Change the Ingress so that `http://web.local` → `web` and `http://api.local` → `api`.
 
 <details><summary>Answer</summary>
 
@@ -426,8 +432,9 @@ curl -s --resolve api.local:80:$IP http://api.local/
 ---
 
 ### Drill 32b - TLS-terminated Ingress
-**Budget:** 7 min
-**Task:** Re-expose deployment `web` (from drill 31) at `https://web.local`, terminating TLS at the Ingress. Steps:
+**Budget:** 7 min  
+**Task:**  
+Re-expose deployment `web` (from drill 31) at `https://web.local`, terminating TLS at the Ingress. Steps:
 
 1. Generate a self-signed cert/key for CN `web.local`.
 2. Load it into a `kubernetes.io/tls` Secret named `web-tls` in `practice`.
@@ -495,8 +502,9 @@ echo | openssl s_client -connect $IP:443 -servername web.local 2>/dev/null \
 ## Section I - Observability
 
 ### Drill 33 - `kubectl top` pods and nodes
-**Budget:** 3 min
-**Task:** Show CPU and memory usage for every pod in `practice`, sorted by CPU descending. Then show the same for the node.
+**Budget:** 3 min  
+**Task:**  
+Show CPU and memory usage for every pod in `practice`, sorted by CPU descending. Then show the same for the node.
 
 <details><summary>Answer</summary>
 
@@ -518,8 +526,9 @@ kubectl -n kube-system rollout status deploy/metrics-server
 ---
 
 ### Drill 34 - Events sorted by time
-**Budget:** 3 min
-**Task:** Print the 20 most recent events in the `practice` namespace, newest last, then the most recent events for pod `web`.
+**Budget:** 3 min  
+**Task:**  
+Print the 20 most recent events in the `practice` namespace, newest last, then the most recent events for pod `web`.
 
 <details><summary>Answer</summary>
 
@@ -536,8 +545,9 @@ Verify - the last column (`MESSAGE`) tells the story in chronological order (e.g
 ## Section J - Multi-container patterns
 
 ### Drill 35 - Ambassador pattern
-**Budget:** 8 min
-**Task:** Pod `ambassador-demo` where the **app** only talks to `localhost:8080`, and an **ambassador** container proxies that to the external service `web:80`. Use `nginx` as the proxy, app is `busybox` that curls `http://127.0.0.1:8080`.
+**Budget:** 8 min  
+**Task:**  
+Pod `ambassador-demo` where the **app** only talks to `localhost:8080`, and an **ambassador** container proxies that to the external service `web:80`. Use `nginx` as the proxy, app is `busybox` that curls `http://127.0.0.1:8080`.
 
 <details><summary>Answer</summary>
 
@@ -597,8 +607,9 @@ kubectl logs ambassador-demo -c ambassador --tail=3
 ---
 
 ### Drill 35b - Ambassador pattern (TCP proxy)
-**Budget:** 9 min
-**Task:** Namespace `practice` already contains a Service named `redis` on port `6379`.
+**Budget:** 9 min  
+**Task:**  
+Namespace `practice` already contains a Service named `redis` on port `6379`.
 Create a Pod named `cache-ambassador` in `practice` with two containers:
 - `app` - image `busybox`, runs: `while true; do nc -z 127.0.0.1 6379 && echo "$(date) redis reachable"; sleep 5; done`
 - `proxy` - image `nginx:1.27`, proxies `localhost:6379` → `redis:6379`
@@ -704,8 +715,9 @@ kubectl exec cache-ambassador -c proxy -- ss -tlnp | grep 6379
 ---
 
 ### Drill 36 - Adapter pattern
-**Budget:** 8 min
-**Task:** Pod `adapter-demo` where the **app** writes plain lines to `/var/log/app.log`, and an **adapter** container transforms each line into a structured JSON line and writes it to `/var/log/app.json`. Share logs via `emptyDir`.
+**Budget:** 8 min  
+**Task:**  
+Pod `adapter-demo` where the **app** writes plain lines to `/var/log/app.log`, and an **adapter** container transforms each line into a structured JSON line and writes it to `/var/log/app.json`. Share logs via `emptyDir`.
 
 <details><summary>Answer</summary>
 
@@ -760,8 +772,8 @@ kubectl exec adapter-demo -c adapter -- tail -n 3 /var/log/app.json
 ## Section K - `kubectl edit` vs apply-from-file
 
 ### Drill 37 - Edit a live object, then reconcile from file
-**Budget:** 6 min
-**Task:**
+**Budget:** 6 min  
+**Task:**  
 1. Scale deployment `web` to 5 replicas **using `kubectl edit`** (not `scale`, not `apply`).
 2. Produce a file `web.yaml` that matches the current state.
 3. Change replicas back to 2 in the file and `apply` it.
