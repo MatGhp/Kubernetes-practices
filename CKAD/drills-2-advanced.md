@@ -621,7 +621,24 @@ Verify - the last column (`MESSAGE`) tells the story in chronological order (e.g
 ### Drill 35 - Ambassador pattern
 **Budget:** 8 min  
 **Task:**  
-Pod `ambassador-demo` where the **app** only talks to `localhost:8080`, and an **ambassador** container proxies that to the external service `web:80`. Use `nginx` as the proxy, app is `busybox` that curls `http://127.0.0.1:8080`.
+A ConfigMap named `amb-proxy` already exists in namespace `practice` with the following content:
+
+```
+data:
+  default.conf: |
+    server {
+      listen 8080;
+      location / {
+        proxy_pass http://web:80;
+      }
+    }
+```
+
+Create a Pod named `ambassador-demo` in namespace `practice` with two containers:
+- `app` — image `busybox`, runs: `while true; do wget -qO- http://127.0.0.1:8080 | head -n 1; sleep 5; done`
+- `ambassador` — image `nginx:1.27`, mounts the ConfigMap `amb-proxy` at `/etc/nginx/conf.d`
+
+The `app` container must only communicate via `localhost:8080`; the ambassador proxies it to `web:80`.
 
 <details><summary>Answer</summary>
 
