@@ -257,6 +257,30 @@ kubectl auth can-i delete pods --as=system:serviceaccount:practice:deployer -n p
 ```
 </details>
 
+<details><summary>Alternative (imperative)</summary>
+
+```bash
+kubectl create role pod-reader \
+  --verb=get,list \
+  --resource=pods \
+  -n practice
+
+kubectl create rolebinding deployer-can-read-pods \
+  --role=pod-reader \
+  --serviceaccount=practice:deployer \
+  -n practice
+```
+
+> `--serviceaccount` takes the format `namespace:name` — the only non-obvious part of the imperative form.
+
+Verify (same as above):
+
+```bash
+kubectl auth can-i list pods   --as=system:serviceaccount:practice:deployer -n practice
+kubectl auth can-i delete pods --as=system:serviceaccount:practice:deployer -n practice
+```
+</details>
+
 ---
 
 ## Section H - Ingress (`networking.k8s.io/v1`)
