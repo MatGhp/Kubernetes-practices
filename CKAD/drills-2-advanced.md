@@ -504,6 +504,8 @@ curl -s --resolve api.local:80:$IP http://api.local/
 ---
 
 ### Drill 32b - TLS-terminated Ingress
+> **Note:** TLS termination at the Ingress (`spec.tls`) is **not on the CKAD exam** — it is CKA scope. This drill is useful context but skip it if you are pressed for time.
+
 **Budget:** 7 min  
 **Task:**  
 Re-expose deployment `web` (from drill 31) at `https://web.local`, terminating TLS at the Ingress. Steps:
