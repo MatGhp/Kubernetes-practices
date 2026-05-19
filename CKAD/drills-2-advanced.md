@@ -700,41 +700,42 @@ kubectl logs ambassador-demo -c ambassador --tail=3
 ### Drill 35b - Ambassador pattern (TCP proxy)
 **Budget:** 9 min  
 **Task:**  
-Namespace `practice` already contains a Service named `redis` on port `6379`.
-Create a Pod named `cache-ambassador` in `practice` with two containers:
-- `app` - image `busybox`, runs: `while true; do nc -z 127.0.0.1 6379 && echo "$(date) redis reachable"; sleep 5; done`
-- `proxy` - image `nginx:1.27`, proxies `localhost:6379` → `redis:6379`
+Namespace `practice` already contains:
+- A Service named `redis` on port `6379`
+- A ConfigMap named `tcp-proxy-conf` with the following content:
 
-The `app` container must only reference `localhost` - not the `redis` Service directly.
-
-> **Trap:** port 6379 is raw TCP, not HTTP. nginx's `http {}` block cannot proxy TCP - you need the `stream {}` block, and the config must replace `/etc/nginx/nginx.conf` entirely (not drop a file in `/etc/nginx/conf.d/`).
-
-<details><summary>Answer</summary>
-
-```bash
-# Pre-req: create the redis Deployment + Service in the practice namespace
-kubectl create deployment redis --image=redis:7 --port=6379 -n practice
-kubectl expose deployment redis --port=6379 -n practice
-kubectl wait --for=condition=available deploy/redis -n practice --timeout=60s
 ```
-
-```yaml
-# cache-ambassador.yaml
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: tcp-proxy-conf
-  namespace: practice
 data:
   nginx.conf: |
     events {}
     stream {
       server {
         listen 6379;
-        proxy_pass redis:6379;   # resolved via cluster DNS within the same namespace
+        proxy_pass redis:6379;
       }
     }
----
+```
+
+Create a Pod named `cache-ambassador` in `practice` with two containers:
+- `app` — image `busybox`, runs: `while true; do nc -z 127.0.0.1 6379 && echo "$(date) redis reachable"; sleep 5; done`
+- `proxy` — image `nginx:1.27`, mounts the `nginx.conf` key of ConfigMap `tcp-proxy-conf` as the file `/etc/nginx/nginx.conf` (replacing the whole file, not adding a sibling)
+
+The `app` container must only reference `localhost` — not the `redis` Service directly.
+
+> **Hint:** mounting a single ConfigMap key over an existing file requires `subPath` on the `volumeMount`. Without `subPath`, the whole directory is replaced and other files (mime.types, etc.) disappear.
+
+<details><summary>Answer</summary>
+
+```bash
+# Pre-req (test setup only — would already exist on the exam):
+kubectl create deployment redis --image=redis:7 --port=6379 -n practice
+kubectl expose deployment redis --port=6379 -n practice
+kubectl wait --for=condition=available deploy/redis -n practice --timeout=60s
+kubectl create configmap tcp-proxy-conf -n practice --from-file=nginx.conf=<your file>
+```
+
+```yaml
+# cache-ambassador.yaml
 apiVersion: v1
 kind: Pod
 metadata:
@@ -761,7 +762,7 @@ spec:
       image: nginx:1.27
       volumeMounts:
         - name: cfg
-          mountPath: /etc/nginx/nginx.conf   # replaces the whole file - required for stream {}
+          mountPath: /etc/nginx/nginx.conf   # replaces the whole file
           subPath: nginx.conf                # subPath so only this key is mounted as a file
 ```
 
