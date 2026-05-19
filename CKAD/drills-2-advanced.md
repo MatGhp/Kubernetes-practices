@@ -406,6 +406,30 @@ curl -s http://$IP/api
 ```
 </details>
 
+<details><summary>Alternative (imperative)</summary>
+
+```bash
+kubectl create ingress app \
+  --class=nginx \
+  --rule="/api*=api:80" \
+  --rule="/*=web:80"
+```
+
+> **Three things to remember:**
+> - `*` suffix → `pathType: Prefix`; without it you get `ImplementationSpecific`
+> - More specific rule (`/api*`) must come **first** — first-match-wins per the K8s spec (nginx does longest-match in practice, but order matters for correctness)
+> - `--class=nginx` matches the minikube addon; on the exam use whatever class the question specifies
+
+Verify (same as above):
+
+```bash
+kubectl get ingress app
+IP=$(minikube -p ckad ip)
+curl -s http://$IP/       | head -n 1
+curl -s http://$IP/api
+```
+</details>
+
 ---
 
 ### Drill 32 - Host-based Ingress
