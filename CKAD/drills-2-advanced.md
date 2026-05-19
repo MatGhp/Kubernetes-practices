@@ -477,6 +477,30 @@ curl -s --resolve api.local:80:$IP http://api.local/
 ```
 </details>
 
+<details><summary>Alternative (imperative)</summary>
+
+```bash
+kubectl create ingress app \
+  --class=nginx \
+  --rule="web.local/*=web:80" \
+  --rule="api.local/*=api:80"
+```
+
+> **Three things to remember:**
+> - Format is `host/path*=service:port` — the host comes **before** the `/`
+> - `*` suffix → `pathType: Prefix`; omitting it gives `ImplementationSpecific`
+> - Each `--rule` flag becomes one host rule; order doesn't matter for host-based routing
+
+Verify (same as above):
+
+```bash
+kubectl describe ingress app | grep -E 'Host|Path'
+IP=$(minikube -p ckad ip)
+curl -s --resolve web.local:80:$IP http://web.local/ | head -n 1
+curl -s --resolve api.local:80:$IP http://api.local/
+```
+</details>
+
 ---
 
 ### Drill 32b - TLS-terminated Ingress
